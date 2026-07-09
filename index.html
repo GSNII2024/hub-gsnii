@@ -1023,6 +1023,29 @@ function migrateDocMeta(){
   });
 }
 
+function shareDocUrl(url,name){
+  if(navigator.share){
+    navigator.share({title:name,url:url}).catch(function(){});
+  }else{
+    window.open(url,'_blank');
+  }
+}
+
+function deleteCloudDoc(clientId,path,containerId){
+  if(!confirm('Ștergi documentul?'))return;
+  sbStorageDelete([path]).then(function(){
+    sbGet('doc_meta_'+clientId).then(function(meta){
+      if(!meta)return;
+      var allMeta=typeof meta==='string'?JSON.parse(meta):meta;
+      allMeta=allMeta.filter(function(m){return m.path!==path;});
+      sbSet('doc_meta_'+clientId,allMeta).then(function(){
+        var cat=containerId.split('-').slice(3).join('-');
+        loadDocsCatMerged(clientId,cat,containerId);
+      });
+    });
+  }).catch(function(){alert('Eroare la ștergere.');});
+}
+
 function loadDocsCatMerged(clientId,category,containerId){
   var el=document.getElementById(containerId);
   if(!el)return;
