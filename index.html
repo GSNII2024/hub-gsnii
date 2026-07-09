@@ -1164,12 +1164,11 @@ function loadDocsList(clientId,containerId){
   if(!clientId||clientId==='__new__')return;
   var cats=['ci','cert','contract'];
   cats.forEach(function(cat){
-    loadDocsCat(clientId,cat,'docs-cat-'+clientId+'-'+cat);
+    loadDocsCatMerged(clientId,cat,'docs-cat-'+clientId+'-'+cat);
   });
   loadDocsDU(clientId);
-  // Categoria liberă se încarcă doar dacă panoul e deschis
   var libreEl=document.getElementById('docs-cat-'+clientId+'-libre');
-  if(libreEl)loadDocsCat(clientId,'libre','docs-cat-'+clientId+'-libre');
+  if(libreEl)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
 }
 
 function deleteDocById(id,clientId,containerId){
