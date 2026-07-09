@@ -357,6 +357,7 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
         <label><button onclick="document.getElementById('imp-backup').click()"><i class="ti ti-database-import"></i> Restaurează</button></label>
         <input type="file" id="imp-backup" accept=".json" style="display:none">
         <button onclick="restoreAutoBackup()"><i class="ti ti-history"></i> Backup automat</button>
+        <button onclick="migrateDocMeta()" style="background:rgba(180,110,0,0.08);border-color:rgba(180,110,0,0.3);color:#8a5500"><i class="ti ti-refresh"></i> Migrează documente</button>
         <button onclick="generateSpvRepPDF()" style="display:none"></button>
         <button onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
         <label><button onclick="document.getElementById('imp').click()"><i class="ti ti-upload"></i> Import CSV</button></label>
@@ -988,6 +989,37 @@ function deleteDocReload(id,clientId,reloadFn){
   deleteDoc(id).then(function(){
     if(reloadFn==='du') loadDocsDU(clientId);
     else loadDocsCat(clientId,reloadFn,'docs-cat-'+clientId+'-'+reloadFn);
+  });
+}
+
+function migrateDocMeta(){
+  if(!confirm('Migrează documentele de la ID-urile vechi la cele noi?\nAceastă operațiune se face o singură dată.'))return;
+  var migrated=0;
+  var promises=[];
+  
+  clients.forEach(function(c,idx){
+    // ID-ul vechi era r0, r1, r2...
+    var oldId='r'+idx;
+    var newId=c.id;
+    if(oldId===newId)return; // deja corect
+    
+    var p=sbGet('doc_meta_'+oldId).then(function(meta){
+      if(!meta)return;
+      var allMeta=typeof meta==='string'?JSON.parse(meta):meta;
+      if(!allMeta.length)return;
+      // Salvează cu noul ID
+      return sbSet('doc_meta_'+newId, allMeta).then(function(){
+        migrated++;
+        console.log('Migrat: '+oldId+' -> '+newId+' ('+c.nume+')');
+      });
+    });
+    promises.push(p);
+  });
+  
+  Promise.all(promises).then(function(){
+    alert('Migrare completă! '+migrated+' clienți cu documente au fost migrați.\nReîncarcă pagina pentru a vedea documentele.');
+  }).catch(function(e){
+    alert('Eroare la migrare: '+e.message);
   });
 }
 
