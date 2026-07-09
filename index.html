@@ -1754,8 +1754,9 @@ function renderRestanteTab(){
   var sumaTotala=items.reduce(function(s,it){return s+it.totalRestant;},0);
 
   var html='<div class="bday-today" style="justify-content:space-between">'
-    +'<span><i class="ti ti-alert-triangle"></i> '+items.length+' client'+(items.length===1?'':'i')+' cu restan&#539;e</span>'
-    +'<span style="font-weight:700">'+money(sumaTotala)+'</span></div>';
+    +'<span><i class="ti ti-alert-triangle"></i> '+items.length+' client'+(items.length===1?'':'i')+' cu restan&#539;e &mdash; <b>'+money(sumaTotala)+'</b></span>'
+    +'<button type="button" class="btn-add-service" style="font-size:12px" onclick="generateRestantePDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>'
+    +'</div>';
 
   if(!items.length){
     html+='<div class="empty"><i class="ti ti-mood-smile"></i>Niciun client cu sold restant.</div>';
@@ -1782,10 +1783,38 @@ function renderRestanteTab(){
           +'<div class="restanta-luna-header">'
           +'<span class="restanta-luna-label">'+monthLabel(rec.month)+'</span>'
           +'<span class="exp-badge exp-red" style="font-size:11px">'+money(t.soldNou)+' restant</span>'
-          +'</div>'
-          +'<div class="restanta-luna-detaliu">'
-          +'<span>Servicii: '+money(t.serviceTotal)+'</span>'
-          +'<span>Încasat: '+money(t.sumaIncasata)+'</span>'
+          +'</div>';
+
+        // Servicii prestate detaliat
+        var svcLines=[];
+        Object.keys(rec.services||{}).forEach(function(k){
+          var s=rec.services[k];
+          if(!s||!s.qty)return;
+          svcLines.push('<span>'+esc(labelForService(k))+': <b>'+s.qty+' × '+money(s.price)+'</b> = '+money(s.qty*s.price)+'</span>');
+        });
+        (rec.services_pf||{});
+        Object.keys(rec.services_pf||{}).forEach(function(k){
+          var s=rec.services_pf[k];
+          if(!s||!s.qty)return;
+          svcLines.push('<span style="color:#1a6a40">'+esc(labelForService(k))+' (PF): <b>'+s.qty+' × '+money(s.price)+'</b> = '+money(s.qty*s.price)+'</span>');
+        });
+        (rec.diverse||[]).forEach(function(d){
+          if(!d.qty&&!d.price)return;
+          svcLines.push('<span>'+esc(d.desc||'Divers')+': <b>'+d.qty+' × '+money(d.price)+'</b> = '+money(d.qty*d.price)+'</span>');
+        });
+        (rec.services_pf_diverse||[]).forEach(function(d){
+          if(!d.qty&&!d.price)return;
+          svcLines.push('<span style="color:#1a6a40">'+esc(d.desc||'Serviciu PF')+' (PF): <b>'+d.qty+' × '+money(d.price)+'</b> = '+money(d.qty*d.price)+'</span>');
+        });
+
+        if(svcLines.length){
+          html+='<div style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;margin:6px 0 4px;padding:6px 8px;background:rgba(7,33,68,0.03);border-radius:6px">'
+            +svcLines.join('')+'</div>';
+        }
+
+        html+='<div class="restanta-luna-detaliu">'
+          +'<span>Total servicii: <b>'+money(t.serviceTotal)+'</b></span>'
+          +'<span>Încasat: <b>'+money(t.sumaIncasata)+'</b></span>'
           +'</div>'
           +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:6px;font-size:12px" '
           +'onclick="openSvcSheetForMonth(\''+it.c.id+'\',\''+rec.month+'\')">'
@@ -1797,6 +1826,114 @@ function renderRestanteTab(){
   }
   document.getElementById('list').innerHTML=html;
   injectIcons();
+}
+
+function generateRestantePDF(){
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  var margin=18,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64],red=[178,59,59],green=[34,100,60];
+  registerPdfFont(doc);
+  drawLetterhead(doc,margin,pageW);
+
+  function checkP(){if(y>270){doc.addPage();y=20;registerPdfFont(doc);}}
+
+  doc.setFontSize(20);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
+  doc.text('Situa\u021bie Restan\u021be',margin,y);y+=7;
+  doc.setFontSize(12);doc.setFont('CrimsonPro','italic');doc.setTextColor(120,120,120);
+  doc.text('Generat: '+todayRo(),margin,y);y+=8;
+
+  var items=[];
+  clients.forEach(function(c){
+    var luni=clientRestanteLuni(c.id);
+    if(!luni.length)return;
+    var totalRestant=luni.reduce(function(s,r){return s+computeRecordTotal(r).soldNou;},0);
+    items.push({c:c,luni:luni,totalRestant:totalRestant});
+  });
+  items.sort(function(a,b){return b.totalRestant-a.totalRestant;});
+  var sumaTotala=items.reduce(function(s,it){return s+it.totalRestant;},0);
+
+  if(!items.length){
+    doc.setFont('CrimsonPro','italic');doc.setFontSize(13);doc.setTextColor(150,150,150);
+    doc.text('Niciun client cu sold restant.',margin,y);
+    drawFooter(doc,margin,pageW);
+    outputPdf(doc,'restante_'+todayRo().replace(/\./g,'-')+'.pdf');
+    return;
+  }
+
+  // Sumar general
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(14);doc.setTextColor(red[0],red[1],red[2]);
+  doc.text('Total restanțe: '+money(sumaTotala),margin,y);y+=10;
+
+  items.forEach(function(it){
+    checkP();
+    // Header client
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.6);doc.line(margin,y,pageW-margin,y);y+=5;
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(14);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(clientTitleLine(it.c),margin,y);
+    doc.setTextColor(red[0],red[1],red[2]);
+    doc.text(money(it.totalRestant),pageW-margin,y,{align:'right'});
+    y+=6;
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(120,120,120);
+    if(clean(it.c.cnp))doc.text('CNP: '+it.c.cnp,margin,y),y+=5;
+
+    // Detalii pe luni
+    it.luni.forEach(function(rec){
+      checkP();
+      var t=computeRecordTotal(rec);
+      doc.setFont('CrimsonPro','bold');doc.setFontSize(12);doc.setTextColor(navy[0],navy[1],navy[2]);
+      doc.text(monthLabel(rec.month),margin+4,y);
+      doc.setTextColor(red[0],red[1],red[2]);
+      doc.text(money(t.soldNou)+' restant',pageW-margin,y,{align:'right'});
+      y+=5.5;
+
+      // Servicii PJ
+      doc.setFont('CrimsonPro','normal');doc.setFontSize(11);
+      Object.keys(rec.services||{}).forEach(function(k){
+        var s=rec.services[k];if(!s||!s.qty)return;
+        checkP();
+        doc.setTextColor(navy[0],navy[1],navy[2]);
+        doc.text('\u2022 '+labelForService(k),margin+8,y);
+        doc.text(s.qty+' \u00d7 '+money(s.price)+' = '+money(s.qty*s.price),pageW-margin,y,{align:'right'});
+        y+=5;
+      });
+      (rec.diverse||[]).forEach(function(d){
+        if(!d.qty&&!d.price)return;
+        checkP();
+        doc.setTextColor(navy[0],navy[1],navy[2]);
+        doc.text('\u2022 '+(d.desc||'Divers'),margin+8,y);
+        doc.text(d.qty+' \u00d7 '+money(d.price)+' = '+money(d.qty*d.price),pageW-margin,y,{align:'right'});
+        y+=5;
+      });
+      // Servicii PF
+      Object.keys(rec.services_pf||{}).forEach(function(k){
+        var s=rec.services_pf[k];if(!s||!s.qty)return;
+        checkP();
+        doc.setTextColor(green[0],green[1],green[2]);
+        doc.text('\u2022 '+labelForService(k)+' (PF)',margin+8,y);
+        doc.text(s.qty+' \u00d7 '+money(s.price)+' = '+money(s.qty*s.price),pageW-margin,y,{align:'right'});
+        y+=5;
+      });
+      (rec.services_pf_diverse||[]).forEach(function(d){
+        if(!d.qty&&!d.price)return;
+        checkP();
+        doc.setTextColor(green[0],green[1],green[2]);
+        doc.text('\u2022 '+(d.desc||'Serviciu PF')+' (PF)',margin+8,y);
+        doc.text(d.qty+' \u00d7 '+money(d.price)+' = '+money(d.qty*d.price),pageW-margin,y,{align:'right'});
+        y+=5;
+      });
+
+      // Totale lună
+      doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');doc.setFontSize(11);
+      doc.text('Total servicii: '+money(t.serviceTotal)+'  |  Încasat: '+money(t.sumaIncasata),margin+4,y);
+      y+=7;
+    });
+    y+=3;
+  });
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,'restante_'+todayRo().replace(/\./g,'-')+'.pdf');
 }
 
 function toggleRestantaDetail(clientId){
