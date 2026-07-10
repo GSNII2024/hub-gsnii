@@ -2246,11 +2246,8 @@ function render(){
   });
   // Sort: doar alfabetic, fără să țină cont de activ/inactiv
   filtered.sort(function(a,b){
-    var aIsPF=clean(a.cnp)&&!clean(a.cui)?0:1;
-    var bIsPF=clean(b.cnp)&&!clean(b.cui)?0:1;
-    if(aIsPF!==bIsPF)return aIsPF-bIsPF;
-    var aName=(a.nume||clientTitleLine(a)||'').toLowerCase();
-    var bName=(b.nume||clientTitleLine(b)||'').toLowerCase();
+    var aName=(a.nume||'').toLowerCase();
+    var bName=(b.nume||'').toLowerCase();
     return aName.localeCompare(bName,'ro');
   });
   if(!filtered.length){
