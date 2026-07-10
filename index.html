@@ -145,9 +145,9 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .reg-section{background:#fff;border-radius:12px;padding:1rem;margin-bottom:16px}
 .reg-year-header{font-size:12px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:2px;margin:14px 0 8px;border-bottom:1px solid rgba(7,33,68,0.08);padding-bottom:5px}
 .reg-table-wrap{overflow-x:auto;margin-bottom:8px;-webkit-overflow-scrolling:touch}
-.reg-table{width:100%;border-collapse:collapse;font-size:13px}
-.reg-table th{background:rgba(7,33,68,0.05);color:rgba(7,33,68,0.5);font-size:10px;letter-spacing:1px;padding:7px 8px;text-align:left;font-weight:700;white-space:nowrap}
-.reg-table td{padding:9px 8px;border-bottom:1px solid rgba(7,33,68,0.05);color:var(--navy);vertical-align:middle}
+.reg-table{width:100%;border-collapse:collapse;font-size:15px}
+.reg-table th{background:rgba(7,33,68,0.05);color:rgba(7,33,68,0.5);font-size:12px;letter-spacing:1px;padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap}
+.reg-table td{padding:10px;border-bottom:1px solid rgba(7,33,68,0.05);color:var(--navy);vertical-align:middle;font-size:15px}
 .reg-table tr:hover td{background:rgba(7,33,68,0.02)}
 .du-del-btn:hover{background:rgba(180,50,50,0.07)}
 .docs-list{margin-bottom:6px}
@@ -257,18 +257,18 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .view-toolbar input::placeholder{color:rgba(7,33,68,0.4)}
 
 /* ═══ BOTTOM NAV (mobil) ═══ */
-.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:6px 0 0}
-.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(10px,env(safe-area-inset-bottom))}
-.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-family:inherit;padding:4px 6px;font-size:10px;letter-spacing:0.03em;min-width:44px}
-.bnav-btn i{font-size:22px;line-height:1}
+.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:8px 0 0}
+.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-family:inherit;padding:6px 8px;font-size:12px;letter-spacing:0.03em;min-width:52px}
+.bnav-btn i{font-size:26px;line-height:1}
 .bnav-btn.active,.bnav-btn:active{color:var(--gold)}
-.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:46px;height:46px;margin-bottom:4px;justify-content:center;padding:0}
-.bnav-home i{font-size:24px}
+.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:54px;height:54px;margin-bottom:6px;justify-content:center;padding:0}
+.bnav-home i{font-size:28px}
 
 @media (max-width:720px){
   .bottom-nav{display:block}
-  .lp-body{padding-top:3rem;padding-bottom:calc(80px + env(safe-area-inset-bottom))}
-  .list{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  .lp-body{padding-top:3rem;padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+  .list{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
   .lp-tools{margin-top:2rem}
 }
 @media (min-width:721px){
@@ -360,13 +360,21 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-sub">Reprezentanți SPV</div>
         </button>
         <button class="lp-card" onclick="openView('registre')">
-          <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a"><i class="ti ti-books"></i></div>
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5a2d8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
           <div class="lp-card-title">Registre</div>
           <div class="lp-card-sub">Corespondență &amp; Contracte</div>
         </button>
       </div>
       <div id="backup-age-banner" style="display:none;width:100%;padding:8px 12px;background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:8px;font-size:12px;color:#a03030;margin-bottom:4px;text-align:center"></div>
-      <div class="lp-tools">
+      <div style="text-align:center;margin-top:1rem">
+        <button onclick="toggleLpTools()" id="lp-tools-toggle" style="background:none;border:none;color:rgba(7,33,68,0.3);font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Backup &amp; Export
+        </button>
+      </div>
+      <div class="lp-tools" id="lp-tools-panel" style="display:none;margin-top:8px">
         <button onclick="exportFullBackup()"><i class="ti ti-database-export"></i> Backup</button>
         <label><button onclick="document.getElementById('imp-backup').click()"><i class="ti ti-database-import"></i> Restaurează</button></label>
         <input type="file" id="imp-backup" accept=".json" style="display:none">
@@ -1285,6 +1293,15 @@ var VIEW_META={
   registre:{title:'Registre',icon:'ti-books',filter:'registre',toolbar:false}
 };
 
+function toggleLpTools(){
+  var panel=document.getElementById('lp-tools-panel');
+  var btn=document.getElementById('lp-tools-toggle');
+  if(!panel)return;
+  var open=panel.style.display!=='none';
+  panel.style.display=open?'none':'flex';
+  if(btn)btn.style.color=open?'rgba(7,33,68,0.3)':'var(--navy)';
+}
+
 function goHome(){
   currentView='landing';
   document.getElementById('landing-page').style.display='';
@@ -1953,8 +1970,12 @@ function renderRegistreTab(){
       html+='<div class="reg-table-wrap"><table class="reg-table"><thead><tr><th>Nr.</th><th>Dată</th><th>Expeditor</th><th>Destinatar</th><th>Obiect</th><th>Obs.</th><th></th></tr></thead><tbody>';
       aniC[an].forEach(function(r){
         var trashSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+        var editSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
         html+='<tr><td><b>'+r.nr+'</b></td><td>'+esc(r.data||'')+'</td><td>'+esc(r.expeditor||'')+'</td><td>'+esc(r.destinatar||'')+'</td><td>'+esc(r.obiect||'')+'</td><td>'+esc(r.obs||'')+'</td>'
-          +'<td><button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'corespondenta\','+r.nr+')" title="Șterge">'+trashSvg+'</button></td></tr>';
+          +'<td style="white-space:nowrap">'
+          +'<button class="doc-btn" onclick="editRegistruEntry(\'corespondenta\','+r.nr+')" title="Editează">'+editSvg+'</button>'
+          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'corespondenta\','+r.nr+')" title="Șterge">'+trashSvg+'</button>'
+          +'</td></tr>';
       });
       html+='</tbody></table></div>';
     });
@@ -1982,10 +2003,14 @@ function renderRegistreTab(){
         var tipLabel=r.tip==='contract'?'Contract':r.tip==='aditional'?'Act adițional':'Act reziliere';
         var tipColor=r.tip==='contract'?'#1a6a40':r.tip==='aditional'?'#1f5a9a':'#a03030';
         var trashSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+        var editSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
         html+='<tr><td><b style="color:'+tipColor+'">'+esc(serieContract(r.tip,r.nr))+'</b></td><td>'+esc(r.data||'')+'</td>'
           +'<td><span style="font-size:11px;padding:2px 6px;border-radius:10px;background:'+tipColor+'22;color:'+tipColor+';font-weight:700">'+tipLabel+'</span></td>'
           +'<td>'+esc(r.parte||'')+'</td><td>'+esc(r.obiect||'')+'</td><td>'+esc(r.obs||'')+'</td>'
-          +'<td><button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'contracte\','+r.nr+')" title="Șterge">'+trashSvg+'</button></td></tr>';
+          +'<td style="white-space:nowrap">'
+          +'<button class="doc-btn" onclick="editRegistruEntry(\'contracte\','+r.nr+')" title="Editează">'+editSvg+'</button>'
+          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'contracte\','+r.nr+')" title="Șterge">'+trashSvg+'</button>'
+          +'</td></tr>';
       });
       html+='</tbody></table></div>';
     });
@@ -2085,6 +2110,90 @@ function saveContract(nr,year){
   renderRegistreTab();
 }
 
+function editRegistruEntry(tip, nr){
+  var list = registreStore[tip] || [];
+  var r = list.find(function(x){return x.nr===nr;});
+  if(!r)return;
+
+  if(tip==='corespondenta'){
+    var html='<div style="padding:1rem">'
+      +'<div class="section-title" style="margin-bottom:1rem">Editează corespondență nr. <b>'+nr+'</b></div>'
+      +'<div class="field"><label>Dată</label><input type="text" id="cor-data" value="'+esc(r.data||'')+'"></div>'
+      +'<div class="field"><label>Expeditor</label>'
+      +'<button type="button" class="btn-add-service" style="font-size:12px;padding:5px 10px;margin-bottom:6px" onclick="document.getElementById(\'cor-expeditor\').value=\''+GSNII_FIRMA+'\'">'+GSNII_FIRMA+'</button>'
+      +'<input type="text" id="cor-expeditor" value="'+esc(r.expeditor||'')+'"></div>'
+      +'<div class="field"><label>Destinatar</label>'
+      +'<button type="button" class="btn-add-service" style="font-size:12px;padding:5px 10px;margin-bottom:6px" onclick="document.getElementById(\'cor-destinatar\').value=\''+GSNII_FIRMA+'\'">'+GSNII_FIRMA+'</button>'
+      +'<input type="text" id="cor-destinatar" value="'+esc(r.destinatar||'')+'"></div>'
+      +'<div class="field"><label>Obiect</label><input type="text" id="cor-obiect" value="'+esc(r.obiect||'')+'"></div>'
+      +'<div class="field"><label>Observații</label><input type="text" id="cor-obs" value="'+esc(r.obs||'')+'"></div>'
+      +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="updateCorespondenta('+nr+')">'
+      +'<i class="ti ti-check"></i> Salvează modificările</button>'
+      +'</div>';
+    document.getElementById('restanta-picker-body').innerHTML=html;
+    document.getElementById('restanta-picker').querySelector('h2').textContent='Editează corespondență';
+    document.getElementById('restanta-picker').style.display='flex';
+    injectIcons();
+  } else {
+    var opts='<option value="">-- Selectează client --</option>'
+      +clients.map(function(c){return '<option value="'+esc(clientTitleLine(c))+'"'+(clientTitleLine(c)===r.parte?' selected':'')+'>'+esc(clientTitleLine(c))+'</option>';}).join('');
+    var html='<div style="padding:1rem">'
+      +'<div class="section-title" style="margin-bottom:1rem">Editează nr. <b>'+nr+'</b></div>'
+      +'<div class="field"><label>Tip act</label>'
+      +'<select id="ct-tip" onchange="updateSerie('+nr+')" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit">'
+      +'<option value="contract"'+(r.tip==='contract'?' selected':'')+'>Contract prestări servicii</option>'
+      +'<option value="aditional"'+(r.tip==='aditional'?' selected':'')+'>Act adițional</option>'
+      +'<option value="reziliere"'+(r.tip==='reziliere'?' selected':'')+'>Act de reziliere</option>'
+      +'</select></div>'
+      +'<div class="field"><label>Serie</label>'
+      +'<div id="ct-serie-preview" style="font-size:16px;font-weight:700;color:#1a6a40;padding:6px 0">'+esc(r.serie||serieContract(r.tip,r.nr))+'</div></div>'
+      +'<div class="field"><label>Dată</label><input type="text" id="ct-data" value="'+esc(r.data||'')+'"></div>'
+      +'<div class="field"><label>Client / Parte</label>'
+      +'<select id="ct-client-sel" onchange="var v=this.value;if(v)document.getElementById(\'ct-parte\').value=v;" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:6px">'+opts+'</select>'
+      +'<input type="text" id="ct-parte" value="'+esc(r.parte||'')+'"></div>'
+      +'<div class="field"><label>Obiectul actului</label><input type="text" id="ct-obiect" value="'+esc(r.obiect||'')+'"></div>'
+      +'<div class="field"><label>Observații</label><input type="text" id="ct-obs" value="'+esc(r.obs||'')+'"></div>'
+      +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="updateContract('+nr+')">'
+      +'<i class="ti ti-check"></i> Salvează modificările</button>'
+      +'</div>';
+    document.getElementById('restanta-picker-body').innerHTML=html;
+    document.getElementById('restanta-picker').querySelector('h2').textContent='Editează contract';
+    document.getElementById('restanta-picker').style.display='flex';
+    injectIcons();
+  }
+}
+
+function updateCorespondenta(nr){
+  var list=registreStore.corespondenta||[];
+  var idx=list.findIndex(function(x){return x.nr===nr;});
+  if(idx<0)return;
+  list[idx]={nr:nr,
+    data:document.getElementById('cor-data').value.trim(),
+    expeditor:document.getElementById('cor-expeditor').value.trim(),
+    destinatar:document.getElementById('cor-destinatar').value.trim(),
+    obiect:document.getElementById('cor-obiect').value.trim(),
+    obs:document.getElementById('cor-obs').value.trim()};
+  saveRegistre();
+  document.getElementById('restanta-picker').style.display='none';
+  renderRegistreTab();
+}
+
+function updateContract(nr){
+  var list=registreStore.contracte||[];
+  var idx=list.findIndex(function(x){return x.nr===nr;});
+  if(idx<0)return;
+  var tip=document.getElementById('ct-tip').value;
+  var parte=document.getElementById('ct-parte').value.trim()||document.getElementById('ct-client-sel').value;
+  list[idx]={nr:nr,an:list[idx].an,tip:tip,serie:serieContract(tip,nr),
+    data:document.getElementById('ct-data').value.trim(),
+    parte:parte,
+    obiect:document.getElementById('ct-obiect').value.trim(),
+    obs:document.getElementById('ct-obs').value.trim()};
+  saveRegistre();
+  document.getElementById('restanta-picker').style.display='none';
+  renderRegistreTab();
+}
+
 function deleteRegistruEntry(tip,nr){
   if(!confirm('Ștergi înregistrarea nr. '+nr+'?'))return;
   registreStore[tip]=(registreStore[tip]||[]).filter(function(r){return r.nr!==nr;});
@@ -2145,14 +2254,29 @@ function svcShiftMonth(delta){
 var svcSearchQuery='';
 
 function renderServiciiTab(){
-  // Sort: activi alfabetic, inactivi alfabetic
+  var html='<div class="bday-today" style="justify-content:space-between">'
+    +'<span><i class="ti ti-calendar"></i> '+monthLabel(currentServiceMonth)+'</span>'
+    +'<span style="display:flex;gap:6px">'
+    +'<button type="button" class="mo-nav" onclick="svcShiftMonth(-1)">&#8592;</button>'
+    +'<button type="button" class="mo-nav" onclick="svcShiftMonth(1)">&#8594;</button>'
+    +'</span></div>'
+    +'<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
+    +'<input type="text" id="svc-search" placeholder="Caută după nume, firmă, CUI..." value="'+esc(svcSearchQuery)+'"'
+    +' oninput="svcSearchQuery=this.value;renderServiciiList()" style="font-size:15px">'
+    +'</div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:14px" onclick="generateMonthlyTotalPDF()"><i class="ti ti-file-type-pdf"></i> Raport total lunar (PDF)</button>'
+    +'<div id="svc-list-container"></div>';
+  document.getElementById('list').innerHTML=html;
+  injectIcons();
+  renderServiciiList();
+}
+
+function renderServiciiList(){
   var sorted=clients.slice().sort(function(a,b){
     var aA=isActive(a)?0:1, bA=isActive(b)?0:1;
     if(aA!==bA)return aA-bA;
     return (clientTitleLine(a)||'').toLowerCase().localeCompare((clientTitleLine(b)||'').toLowerCase(),'ro');
   });
-
-  // Include toți clienții: PJ (cu CUI) și PF (cu CNP)
   var q=svcSearchQuery.toLowerCase().trim();
   var allClients=sorted.filter(function(c){return clean(c.cui)||clean(c.cnp);});
   var filtered=q?allClients.filter(function(c){
@@ -2162,23 +2286,12 @@ function renderServiciiTab(){
       ||(c.cnp||'').toLowerCase().includes(q);
   }):allClients;
 
-  var html='<div class="bday-today" style="justify-content:space-between">'
-    +'<span><i class="ti ti-calendar"></i> '+monthLabel(currentServiceMonth)+'</span>'
-    +'<span style="display:flex;gap:6px">'
-    +'<button type="button" class="mo-nav" onclick="svcShiftMonth(-1)">&#8592;</button>'
-    +'<button type="button" class="mo-nav" onclick="svcShiftMonth(1)">&#8594;</button>'
-    +'</span></div>';
+  var container=document.getElementById('svc-list-container');
+  if(!container)return;
 
-  // Search bar
-  html+='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
-    +'<input type="text" id="svc-search" placeholder="Caută după nume, firmă, CUI..." value="'+esc(svcSearchQuery)+'"'
-    +' oninput="svcSearchQuery=this.value;renderServiciiTab()" style="font-size:15px">'
-    +'</div>';
-
-  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:14px" onclick="generateMonthlyTotalPDF()"><i class="ti ti-file-type-pdf"></i> Raport total lunar (PDF)</button>';
-
+  var html='';
   if(!filtered.length){
-    html+='<div class="empty"><i class="ti ti-report-money"></i>'+(q?'Niciun rezultat':'Lista goală')+'</div>';
+    html='<div class="empty"><i class="ti ti-report-money"></i>'+(q?'Niciun rezultat':'Lista goală')+'</div>';
   }else{
     filtered.forEach(function(c){
       var rec=getRecord(c.id,currentServiceMonth);
@@ -2199,12 +2312,10 @@ function renderServiciiTab(){
       }
       html+='</div>';
 
-      // Servicii prestate detaliat
       if(rec){
         var lines=[];
         Object.keys(rec.services||{}).forEach(function(k){
-          var it=rec.services[k];
-          if(!it||!it.qty)return;
+          var it=rec.services[k];if(!it||!it.qty)return;
           lines.push(esc(labelForService(k))+': <b>'+it.qty+'</b> × '+money(it.price)+' = <b>'+money(it.qty*it.price)+'</b>');
         });
         (rec.diverse||[]).forEach(function(d){
@@ -2214,20 +2325,16 @@ function renderServiciiTab(){
         if(lines.length){
           html+='<div class="svc-preview-list">'+lines.map(function(l){return '<div class="svc-preview-row">'+l+'</div>';}).join('')+'</div>';
         }
-        // Încasări
         if(rec.incasari&&rec.incasari.length){
           var incLines=rec.incasari.map(function(i){return (i.data?'<span style="color:rgba(7,33,68,0.5)">'+esc(i.data)+'</span> ':'')+esc(i.obs||'Încasat')+': <b>'+money(i.suma)+'</b>';}).join(' &nbsp;·&nbsp; ');
           html+='<div class="svc-preview-inc"><i class="ti ti-cash"></i> '+incLines+'</div>';
         }
-        if(rec.observatii){
-          html+='<div class="obs-snippet">'+esc(rec.observatii)+'</div>';
-        }
+        if(rec.observatii){html+='<div class="obs-snippet">'+esc(rec.observatii)+'</div>';}
       }
-
       html+='</div>';
     });
   }
-  document.getElementById('list').innerHTML=html;
+  container.innerHTML=html;
   injectIcons();
 }
 
