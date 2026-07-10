@@ -1050,17 +1050,73 @@ function addDuYear(clientId){
   input.click();
 }
 
+function loadDocsCatMerged(clientId,category,containerId){
+  var el=document.getElementById(containerId);
+  if(!el)return;
+  sbGet('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    var catMeta=allMeta.filter(function(m){return m.category===category;});
+    if(!catMeta.length){
+      el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';
+      return;
+    }
+    var eyeIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var shareIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+    var trashIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+    el.innerHTML=catMeta.map(function(m){
+      var url=sbStorageUrl(m.path);
+      var urlE=url.replace(/'/g,"\\'");
+      var nameE=(m.name||'').replace(/'/g,"\\'");
+      var pathE=(m.path||'').replace(/'/g,"\\'");
+      return '<div class="doc-row">'
+        +'<div class="doc-row-info">'
+        +'<div class="doc-row-name">'+esc(m.name)+'</div>'
+        +'<div class="doc-row-date">'+esc(m.date||'')+'</div>'
+        +'</div>'
+        +'<div class="doc-row-actions">'
+        +'<button type="button" class="doc-btn" onclick="window.open(\''+urlE+'\',\'_blank\')" title="Vizualizează">'+eyeIcon+'</button>'
+        +'<button type="button" class="doc-btn" onclick="shareDocUrl(\''+urlE+'\',\''+nameE+'\')" title="Distribuie">'+shareIcon+'</button>'
+        +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashIcon+'</button>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+    injectIcons();
+  }).catch(function(){
+    el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';
+  });
+}
+
+function shareDocUrl(url,name){
+  if(navigator.share){navigator.share({title:name,url:url}).catch(function(){});}
+  else{window.open(url,'_blank');}
+}
+
+function deleteCloudDoc(clientId,path,containerId){
+  if(!confirm('Ștergi documentul?'))return;
+  sbStorageDelete([path]).then(function(){
+    sbGet('doc_meta_'+clientId).then(function(meta){
+      if(!meta)return;
+      var allMeta=typeof meta==='string'?JSON.parse(meta):meta;
+      allMeta=allMeta.filter(function(m){return m.path!==path;});
+      sbSet('doc_meta_'+clientId,allMeta).then(function(){
+        var cat=containerId.replace('docs-cat-'+clientId+'-','');
+        loadDocsCatMerged(clientId,cat,containerId);
+      });
+    });
+  }).catch(function(){alert('Eroare la ștergere.');});
+}
+
 function loadDocsList(clientId,containerId){
   if(!clientId||clientId==='__new__')return;
   var cats=['ci','cert','contract'];
   cats.forEach(function(cat){
-    loadDocsCat(clientId,cat,'docs-cat-'+clientId+'-'+cat);
+    loadDocsCatMerged(clientId,cat,'docs-cat-'+clientId+'-'+cat);
   });
   loadDocsDU(clientId);
-  // Categoria liberă se încarcă doar dacă panoul e deschis
   var libreEl=document.getElementById('docs-cat-'+clientId+'-libre');
-  if(libreEl)loadDocsCat(clientId,'libre','docs-cat-'+clientId+'-libre');
+  if(libreEl)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
 }
+
 
 function deleteDocById(id,clientId,containerId){
   if(!confirm('Ştergi documentul?'))return;
