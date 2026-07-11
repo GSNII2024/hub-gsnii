@@ -3129,7 +3129,12 @@ function buildSvcForm(clientId,month){
     SERVICES_PF.forEach(function(s){
       html+=buildServiceRow(s.k+'_pf',s.l,(rec.services_pf&&rec.services_pf[s.k])||{qty:0,price:s.defaultPrice||0},'svc-services-pf-list');
     });
+    // Servicii diverse PF existente
+    (rec.services_pf_diverse||[]).forEach(function(d){
+      html+=buildDiverseRowPF(d);
+    });
     html+='</div>';
+    html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:6px" onclick="addNewServiceTypePF()"><i class="ti ti-plus"></i> Adaugă serviciu PF</button>';
   }
 
   // ── Încasări firmă (PJ) ───────────────────────────────
@@ -3302,6 +3307,27 @@ function addRestantaRow(){
   document.getElementById('restanta-picker-body').innerHTML=html;
   document.getElementById('restanta-picker').style.display='flex';
   injectIcons();
+}
+
+function addNewServiceTypePF(){
+  var name=prompt('Denumire serviciu persoană fizică:');
+  if(!name||!name.trim())return;
+  var price=parseFloat(prompt('Preț unitar (lei):')||'0')||0;
+  var div=document.getElementById('svc-services-pf-list');
+  if(!div)return;
+  div.insertAdjacentHTML('beforeend',buildDiverseRowPF({desc:name.trim(),qty:1,price:price}));
+  injectIcons();recalcSvcTotals();
+}
+
+function buildDiverseRowPF(d){
+  d=d||{desc:'',qty:0,price:0};
+  return '<div class="svc-diverse-row-pf" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
+    +'<input type="text" class="svc-div-desc-pf" value="'+esc(d.desc||'')+'" placeholder="Denumire" style="flex:1;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit">'
+    +'<input type="number" class="svc-div-qty-pf" value="'+(d.qty||1)+'" min="0" style="width:50px;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit" oninput="recalcSvcTotals()">'
+    +'<input type="number" class="svc-div-price-pf" value="'+(d.price||0)+'" min="0" step="0.01" style="width:80px;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit" oninput="recalcSvcTotals()">'
+    +'<button type="button" class="inc-del" onclick="this.closest(\'.svc-diverse-row-pf\').remove();recalcSvcTotals()">'
+    +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+    +'</div>';
 }
 
 function addNewServiceType(){
