@@ -2033,7 +2033,9 @@ function syncFromCloud(){
     sbGet('servicii'),
     sbGet('du_store'),
     sbGet('servicii_custom'),
-    sbGet('du_manual')
+    sbGet('du_manual'),
+    sbGet('inc_diverse'),
+    sbGet('todo')
   ]).then(function(results){
     var changed=false;
     if(results[0]){
@@ -2055,6 +2057,16 @@ function syncFromCloud(){
     if(results[4]){
       var dm=typeof results[4]==='string'?results[4]:JSON.stringify(results[4]);
       localStorage.setItem('crm_du_manual_v1',dm);
+    }
+    if(results[5]){
+      var incDiv=typeof results[5]==='string'?results[5]:JSON.stringify(results[5]);
+      localStorage.setItem('crm_inc_diverse_v1',incDiv);
+      changed=true;
+    }
+    if(results[6]){
+      var td=typeof results[6]==='string'?results[6]:JSON.stringify(results[6]);
+      localStorage.setItem(TODO_KEY,td);
+      changed=true;
     }
     setSyncStatus(true,'Sincronizat: '+new Date().toLocaleTimeString('ro-RO'));
     if(changed){
