@@ -780,7 +780,11 @@ function servicesForClient(c){
   return SERVICES;
 }
 function allServicesForClient(c){
-  return SERVICES.concat(customServices.map(function(s){return {k:'custom_'+s,l:s};}));
+  return SERVICES.concat(customServices.map(function(s){
+    var sk=typeof s==='string'?s:(s.k||'');
+    var sl=typeof s==='string'?s:(s.l||s.k||'');
+    return {k:'custom_'+sk,l:sl};
+  }));
 }
 // svcStore, duStore, customServices și funcțiile de salvare sunt definite în blocul Supabase de mai sus
 
@@ -849,24 +853,24 @@ function dataURLtoBlob(dataURL){
 // Salvare document — IndexedDB local + Supabase Storage
 function saveDoc(clientId,name,type,dataURL,category,duYear){
   // Salvare locală IndexedDB
-  var localPromise=dbTx('readwrite').then(function(store){
+  var localPromise=dbTx("readwrite").then(function(store){
     return new Promise(function(resolve,reject){
       var req=store.add({clientId:clientId,name:name,type:type,data:dataURL,
-        category:category||'general',duYear:duYear||'',date:todayRo()});
+        category:category||"general",duYear:duYear||"",date:todayRo()});
       req.onsuccess=function(){resolve(req.result);};
       req.onerror=function(){reject(req.error);};
     });
   });
 
   // Upload Supabase Storage
-  var path=clientId+'/'+(category||'general')+'/'+(duYear?duYear+'/':'')+Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var path=clientId+'/'+(category||"general")+'/'+(duYear?duYear+'/':'')+Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
   var blob=dataURLtoBlob(dataURL);
   var sbPromise=sbStorageUpload(path,blob,type).then(function(res){
     // Salvăm și metadata în hub_data
     var metaKey='doc_meta_'+clientId;
     return sbGet(metaKey).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
-      meta.push({path:path,name:name,type:type,category:category||'general',duYear:duYear||'',date:todayRo()});
+      meta.push({path:path,name:name,type:type,category:category||"general",duYear:duYear||"",date:todayRo()});
       return sbSet(metaKey,meta);
     });
   }).catch(function(){/* offline - doar local */});
@@ -876,7 +880,7 @@ function saveDoc(clientId,name,type,dataURL,category,duYear){
 
 // Listare documente pentru client — combină local + cloud
 function getDocsForClient(clientId){
-  return dbTx('readonly').then(function(store){
+  return dbTx("readonly").then(function(store){
     return new Promise(function(resolve,reject){
       var idx=store.index('clientId');
       var req=idx.getAll(clientId);
@@ -888,7 +892,7 @@ function getDocsForClient(clientId){
 
 // Ștergere document
 function deleteDoc(id){
-  return dbTx('readwrite').then(function(store){
+  return dbTx("readwrite").then(function(store){
     return new Promise(function(resolve,reject){
       // Mai întâi citim datele ca să știm path-ul Supabase
       var getReq=store.get(id);
@@ -913,21 +917,22 @@ function deleteDoc(id){
 function uploadDocsCat(input,clientId,category,categoryLabel){
   var files=Array.from(input.files);
   if(!files.length)return;
-  var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se încarcă...';
+  var loadEl=document.getElementById("docs-loading-"+clientId);
+  if(loadEl)loadEl.textContent="Se încarcă...";
   var promises=files.map(function(file){
     return new Promise(function(resolve){
       var reader=new FileReader();
       reader.onload=function(e){
-        saveDoc(clientId,file.name,file.type,e.target.result,category,'').then(resolve);
+        saveDoc(clientId,file.name,file.type,e.target.result,category,categoryLabel||"").then(resolve);
       };
       reader.readAsDataURL(file);
     });
   });
   Promise.all(promises).then(function(){
-    if(loadEl)loadEl.textContent='';
-    input.value='';
-    loadDocsCat(clientId,category,'docs-cat-'+clientId+'-'+category);
+    if(loadEl)loadEl.textContent="";
+    input.value="";
+    var containerId="docs-cat-"+clientId+"-"+category;
+    loadDocsCatMerged(clientId,category,containerId);
   });
 }
 
@@ -1057,7 +1062,6 @@ function toggleAddFreeDocCat(clientId){
 function uploadDocsFree(input,clientId){
   var nameEl=document.getElementById('doc-libre-name-'+clientId);
   var catLabel=(nameEl&&nameEl.value.trim())||'Altele';
-  var catKey='libre_'+catLabel.toLowerCase().replace(/[^a-z0-9]/g,'_').substring(0,20)+'_'+Date.now().toString().slice(-5);
   var files=Array.from(input.files);
   if(!files.length)return;
   var loadEl=document.getElementById('docs-loading-'+clientId);
@@ -1075,7 +1079,7 @@ function uploadDocsFree(input,clientId){
     if(loadEl)loadEl.textContent='';
     input.value='';
     if(nameEl)nameEl.value='';
-    loadDocsCat(clientId,'libre','docs-cat-'+clientId+'-libre');
+    loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
   });
 }
 
@@ -1196,6 +1200,7 @@ function computeRecordTotal(rec){
     total+=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
   });
   (rec.diverse||[]).forEach(function(d){total+=(parseFloat(d.qty)||0)*(parseFloat(d.price)||0);});
+  (rec.services_pf_diverse||[]).forEach(function(d){total+=(parseFloat(d.qty)||0)*(parseFloat(d.price)||0);});
   var soldPrecedent=parseFloat(rec.soldPrecedent)||0;
   var sumaIncasata=(rec.incasari?totalIncasari(rec.incasari):0)+(rec.incasari_pf?totalIncasari(rec.incasari_pf):0);
   if(!sumaIncasata)sumaIncasata=parseFloat(rec.sumaIncasata)||0;
@@ -1401,28 +1406,80 @@ function renderBirthdays(){
     var b=cnpToBirthdate(c.cnp);
     if(!b)return;
     var info=nextBirthdayInfo(b);
-    all.push({c:c,b:b,days:info.days,turningAge:info.turningAge});
+    all.push({c:c,b:b,days:info.days,turningAge:info.turningAge,isManual:false});
+  });
+  // Zile de naștere manuale
+  var manualBdays=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+  manualBdays.forEach(function(m){
+    var b=parseDateRo(m.data);
+    if(!b)return;
+    var info=nextBirthdayInfo(b);
+    all.push({name:m.nume,b:b,days:info.days,turningAge:info.turningAge,isManual:true,id:m.id});
   });
   all.sort(function(a,b){return a.days-b.days;});
   var within7Count=all.filter(function(it){return it.days<=7;}).length;
   var showCount=Math.max(within7Count,5);
   var items=all.slice(0,showCount);
-  var html='<div class="bday-today"><i class="ti ti-calendar-event" aria-hidden="true"></i> Ast&#259;zi: '+todayStr+'</div>';
+  var html='<div class="bday-today"><i class="ti ti-calendar-event"></i> Astăzi: '+todayStr+'</div>';
+  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openAddBdayManual()">'
+    +'<i class="ti ti-plus"></i> Adaugă zi de naștere manuală</button>';
   if(!items.length){
-    html+='<div class="empty"><i class="ti ti-cake" aria-hidden="true"></i>Niciun client cu CNP valid pentru calculul zilei de na&#537;tere</div>';
+    html+='<div class="empty"><i class="ti ti-cake"></i>Niciun client cu CNP valid</div>';
   }else{
     items.forEach(function(it){
-      var tag=it.days===0?'Ast&#259;zi!':(it.days===1?'M&#226;ine':'Peste '+it.days+' zile');
+      var tag=it.days===0?'Astăzi!':(it.days===1?'Mâine':'Peste '+it.days+' zile');
       var badgeCls=it.days===0?'bday-badge-today':(it.days<=7?'exp-green':'exp-orange');
+      var name=it.isManual?it.name:(it.c?it.c.nume:'');
       html+='<div class="card bday-card">';
-      html+='<div class="card-top"><div class="avatar">'+initials(it.c.nume)+'</div>';
-      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(it.c.nume||'\u2014')+'</div>';
-      html+='<div class="card-firma">'+fmtBirth(it.b)+' &middot; &#238;mpline&#537;te '+it.turningAge+' ani</div></div>';
+      html+='<div class="card-top"><div class="avatar">'+initials(name)+'</div>';
+      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(name||'—')+(it.isManual?'<span class="tag-inactive" style="background:rgba(7,33,68,0.1);color:var(--navy);margin-left:6px">Manual</span>':'')+'</div>';
+      html+='<div class="card-firma">'+fmtBirth(it.b)+' · împlinește '+it.turningAge+' ani</div></div>';
       html+='<span class="exp-badge '+badgeCls+'">'+tag+'</span>';
+      if(it.isManual){
+        html+='<button type="button" class="doc-btn doc-btn-del" style="margin-left:6px" onclick="deleteBdayManual(\''+it.id+'\')" title="Șterge">'
+          +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+          +'</button>';
+      }
       html+='</div></div>';
     });
   }
   document.getElementById('list').innerHTML=html;
+  injectIcons();
+}
+
+function openAddBdayManual(){
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:1rem">Adaugă zi de naștere manuală</div>'
+    +'<div class="field"><label>Nume și Prenume</label><input type="text" id="bday-manual-nume" placeholder="ex: POPESCU ION"></div>'
+    +'<div class="field"><label>Data nașterii (zz.ll.aaaa)</label><input type="text" id="bday-manual-data" placeholder="ex: 15.03.1990"></div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="saveBdayManual()">'
+    +'<i class="ti ti-plus"></i> Adaugă</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Zi de naștere manuală';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function saveBdayManual(){
+  var nume=(document.getElementById('bday-manual-nume').value||'').trim().toUpperCase();
+  var data=(document.getElementById('bday-manual-data').value||'').trim();
+  if(!nume||!data){alert('Completează numele și data.');return;}
+  if(!parseDateRo(data)){alert('Dată invalidă. Folosește formatul zz.ll.aaaa.');return;}
+  var entries=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+  entries.push({id:Date.now().toString(),nume:nume,data:data});
+  localStorage.setItem('crm_bday_manual_v1',JSON.stringify(entries));
+  document.getElementById('restanta-picker').style.display='none';
+  renderBirthdays();
+}
+
+function deleteBdayManual(id){
+  if(!confirm('Ștergi această înregistrare?'))return;
+  var entries=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+  entries=entries.filter(function(e){return e.id!==id;});
+  localStorage.setItem('crm_bday_manual_v1',JSON.stringify(entries));
+  renderBirthdays();
+}
 }
 
 var currentServiceMonth=currentMonthStr();
@@ -2002,26 +2059,42 @@ function renderIncasariTab(){
     // Încasări firmă
     (rec.incasari||[]).forEach(function(inc){
       if(!inc.suma||parseFloat(inc.suma)===0)return;
-      var dataInc = inc.data||month+'-01';
-      var anInc = inc.data?parseInt(inc.data.split('.')[2]||an):an;
-      var lunaInc = inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+    // Încasări firmă
+    (rec.incasari||[]).forEach(function(inc){
+      if(!inc.suma||parseFloat(inc.suma)===0)return;
+      var dataEf = inc.data||'';
+      var anInc = an, lunaInc = luna;
+      if(dataEf && dataEf.indexOf('.')>0){
+        var partsInc = dataEf.split('.');
+        anInc = parseInt(partsInc[2])||an;
+        lunaInc = parseInt(partsInc[1])||luna;
+      }
       toateIncasarile.push({
         c:c, suma:parseFloat(inc.suma)||0,
-        data:inc.data||'', obs:inc.obs||'',
+        data:dataEf, obs:inc.obs||'',
+        nrFactura:inc.nrFactura||'',
         luna:lunaInc, an:anInc,
-        month:month, tip:'firma'
+        month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,
+        tip:inc.tip||"virament"
       });
     });
     // Încasări PF
     (rec.incasari_pf||[]).forEach(function(inc){
       if(!inc.suma||parseFloat(inc.suma)===0)return;
-      var anInc = inc.data?parseInt(inc.data.split('.')[2]||an):an;
-      var lunaInc = inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+      var dataEfPf = inc.data||'';
+      var anIncPf = an, lunaIncPf = luna;
+      if(dataEfPf && dataEfPf.indexOf('.')>0){
+        var partsIncPf = dataEfPf.split('.');
+        anIncPf = parseInt(partsIncPf[2])||an;
+        lunaIncPf = parseInt(partsIncPf[1])||luna;
+      }
       toateIncasarile.push({
         c:c, suma:parseFloat(inc.suma)||0,
-        data:inc.data||'', obs:inc.obs||'',
-        luna:lunaInc, an:anInc,
-        month:month, tip:'pf'
+        data:dataEfPf, obs:inc.obs||'',
+        nrFactura:inc.nrFactura||'',
+        luna:lunaIncPf, an:anIncPf,
+        month:anIncPf+'-'+(lunaIncPf<10?'0':'')+lunaIncPf,
+        tip:inc.tip||"virament", pfTip:true
       });
     });
   });
@@ -2794,11 +2867,21 @@ function renderServiciiList(){
           if(!d.qty&&!d.price&&!d.desc)return;
           lines.push(esc(d.desc||'Divers')+': <b>'+d.qty+'</b> × '+money(d.price)+' = <b>'+money(d.qty*d.price)+'</b>');
         });
+        // Servicii PF
+        Object.keys(rec.services_pf||{}).forEach(function(k){
+          var it=rec.services_pf[k];if(!it||!it.qty)return;
+          lines.push('<span style="color:#1a6a40">'+esc(labelForService(k))+' (PF): <b>'+it.qty+'</b> × '+money(it.price)+' = <b>'+money(it.qty*it.price)+'</b></span>');
+        });
+        (rec.services_pf_diverse||[]).forEach(function(d){
+          if(!d.qty&&!d.price&&!d.desc)return;
+          lines.push('<span style="color:#1a6a40">'+esc(d.desc||'Serviciu PF')+' (PF): <b>'+d.qty+'</b> × '+money(d.price)+' = <b>'+money(d.qty*d.price)+'</b></span>');
+        });
         if(lines.length){
           html+='<div class="svc-preview-list">'+lines.map(function(l){return '<div class="svc-preview-row">'+l+'</div>';}).join('')+'</div>';
         }
-        if(rec.incasari&&rec.incasari.length){
-          var incLines=rec.incasari.map(function(i){return (i.data?'<span style="color:rgba(7,33,68,0.5)">'+esc(i.data)+'</span> ':'')+esc(i.obs||'Încasat')+': <b>'+money(i.suma)+'</b>';}).join(' &nbsp;·&nbsp; ');
+        var allInc=(rec.incasari||[]).concat(rec.incasari_pf||[]);
+        if(allInc.length){
+          var incLines=allInc.map(function(i){return (i.data?'<span style="color:rgba(7,33,68,0.5)">'+esc(i.data)+'</span> ':'')+esc(i.obs||'Încasat')+': <b>'+money(i.suma)+'</b>';}).join(' &nbsp;·&nbsp; ');
           html+='<div class="svc-preview-inc"><i class="ti ti-cash"></i> '+incLines+'</div>';
         }
         if(rec.observatii){html+='<div class="obs-snippet">'+esc(rec.observatii)+'</div>';}
@@ -3078,7 +3161,7 @@ function closeModal(){document.getElementById('modal-bg').style.display='none';}
 var svcEditClientId=null;
 
 // customServices definit în blocul Supabase
-function allServices(){return SERVICES.concat(SERVICES_PF).concat(customServices.map(function(s){return {k:'custom_'+s,l:s};}));}
+function allServices(){return SERVICES.concat(SERVICES_PF).concat(customServices.map(function(s){var sk=typeof s==='string'?s:(s.k||'');var sl=typeof s==='string'?s:(s.l||s.k||'');return {k:'custom_'+sk,l:sl};}));}
 function labelForService(k){var s=allServices().find(function(x){return x.k===k;});return s?s.l:k;}
 
 function buildServiceRow(k,label,it){
@@ -3190,7 +3273,7 @@ function buildSvcForm(clientId,month){
 function buildIncasareRow(inc,prefix){
   inc=inc||{suma:0,obs:'',data:'',restanta:false};
   var dataVal=inc.data||todayRo();
-  var tipInc=inc.tip||'virament'; // 'factura' sau 'numerar'
+  var tipInc=inc.tip||"virament"; // 'factura' sau 'numerar'
   var nrFactura=inc.nrFactura||'';
   return '<div class="inc-row" data-prefix="'+(prefix||'')+'">'
     +'<div class="inc-row-fields">'
@@ -3257,7 +3340,7 @@ function collectIncasariFromList(listId){
     var restanta=!!(restantaEl&&restantaEl.value==='1');
     var restantaLuna=restantaLunaEl?restantaLunaEl.value:'';
     var tipEl=row.querySelector('.inc-tip');
-    var tip=tipEl?tipEl.value:'virament';
+    var tip=tipEl?tipEl.value:"virament";
     var nrEl=row.querySelector('.inc-nr-factura');
     var nrFactura=nrEl?nrEl.value.trim():'';
     if(suma||obs)list.push({suma:suma,obs:obs,data:data,restanta:restanta,restantaLuna:restantaLuna,tip:tip,nrFactura:nrFactura});
@@ -3271,52 +3354,107 @@ function totalIncasari(incasari){
 }
 
 function addRestantaRow(){
-  // Show popup with client's debt history
   var c=clients.find(function(x){return x.id===svcEditClientId;});
   if(!c)return;
-  // Find all months with positive soldNou (restante)
   var restante=[];
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
     if(rec.clientId!==svcEditClientId)return;
+    if(rec.month>=currentServiceMonth)return;
     var t=computeRecordTotal(rec);
     if(t.soldNou>0.01)restante.push({month:rec.month,total:t});
   });
   restante.sort(function(a,b){return a.month<b.month?-1:1;});
+  if(!restante.length){alert('Nu există restanțe anterioare pentru acest client.');return;}
 
-  if(!restante.length){
-    alert('Nu există restanțe înregistrate pentru acest client.');
-    return;
-  }
-
-  // Build picker modal
   var html='<div style="padding:1rem">'
-    +'<div class="section-title">Alege luna restanței</div>';
+    +'<div class="section-title" style="margin-bottom:12px">Stinge restanțe</div>'
+    +'<div style="font-size:13px;color:rgba(7,33,68,0.5);margin-bottom:12px">Bifează lunile pe care vrei să le stingi:</div>';
+
   restante.forEach(function(r){
-    html+='<div class="card" style="cursor:pointer;margin-bottom:8px" onclick="selectRestantaLuna(\''+r.month+'\',\''+money(r.total.soldNou)+'\')">'
-      +'<div class="card-top">'
-      +'<div style="flex:1"><div class="card-name">'+monthLabel(r.month)+'</div>'
-      +'<div class="card-firma">Sold: '+money(r.total.serviceTotal)+' | Încasat: '+money(r.total.sumaIncasata)+'</div></div>'
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(7,33,68,0.03);border:1px solid rgba(7,33,68,0.1);border-radius:8px;margin-bottom:8px;cursor:pointer">'
+      +'<input type="checkbox" class="restanta-check" data-month="'+r.month+'" data-sold="'+r.total.soldNou.toFixed(2)+'" onchange="updateRestantaTotal()" style="width:18px;height:18px;accent-color:var(--navy)">'
+      +'<div style="flex:1">'
+      +'<div style="font-weight:700;font-size:14px;color:var(--navy)">'+monthLabel(r.month)+'</div>'
+      +'<div style="font-size:12px;color:rgba(7,33,68,0.5)">Servicii: '+money(r.total.serviceTotal)+' · Încasat: '+money(r.total.sumaIncasata)+'</div>'
+      +'</div>'
       +'<span class="exp-badge exp-red">'+money(r.total.soldNou)+'</span>'
-      +'</div></div>';
+      +'</label>';
   });
-  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="selectRestantaLuna(\'manual\',\'\')">'
-    +'<i class="ti ti-edit"></i> Introdu manual (alt\u0103 sum\u0103)</button>'
+
+  html+='<div style="margin:12px 0;padding:12px;background:rgba(34,120,80,0.06);border:1px solid rgba(34,120,80,0.2);border-radius:8px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span style="font-size:13px;color:rgba(7,33,68,0.6)">Total de plată:</span>'
+    +'<span id="restanta-total-sel" style="font-weight:700;font-size:16px;color:var(--navy)">0.00 lei</span>'
+    +'</div>'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Sumă încasată efectiv (lei):</label>'
+    +'<input type="number" id="restanta-suma-efectiva" min="0" step="0.01" placeholder="Suma primită" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Data încasării:</label>'
+    +'<input type="text" id="restanta-data-ef" placeholder="zz.ll.aaaa" value="'+todayRo()+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit">'
+    +'</div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:4px" onclick="aplicaStingereRestante()">'
+    +'<i class="ti ti-check"></i> Aplică plata</button>'
     +'</div>';
 
   document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Stinge restanțe';
   document.getElementById('restanta-picker').style.display='flex';
   injectIcons();
 }
 
+function updateRestantaTotal(){
+  var total=0;
+  document.querySelectorAll('.restanta-check:checked').forEach(function(cb){
+    total+=parseFloat(cb.getAttribute('data-sold'))||0;
+  });
+  var el=document.getElementById('restanta-total-sel');
+  if(el)el.textContent=money(total);
+  var sumaEl=document.getElementById('restanta-suma-efectiva');
+  if(sumaEl)sumaEl.value=total.toFixed(2);
+}
+
+function aplicaStingereRestante(){
+  var checked=document.querySelectorAll('.restanta-check:checked');
+  if(!checked.length){alert('Bifează cel puțin o lună.');return;}
+  var suma=parseFloat(document.getElementById('restanta-suma-efectiva').value)||0;
+  var data=document.getElementById('restanta-data-ef').value.trim()||todayRo();
+  if(!suma){alert('Introdu suma încasată.');return;}
+  var luniSelectate=[];
+  checked.forEach(function(cb){luniSelectate.push(cb.getAttribute('data-month'));});
+  luniSelectate.sort();
+  var sumaRamasa=suma;
+  luniSelectate.forEach(function(month){
+    if(sumaRamasa<=0.005)return;
+    var rec=getRecord(svcEditClientId,month);
+    if(!rec)return;
+    var t=computeRecordTotal(rec);
+    var deplatitAcum=Math.min(sumaRamasa,Math.round(t.soldNou*100)/100);
+    sumaRamasa=Math.round((sumaRamasa-deplatitAcum)*100)/100;
+    if(!rec.incasari)rec.incasari=[];
+    rec.incasari.push({suma:deplatitAcum,obs:'Plată restanță',data:data,restanta:true,restantaLuna:month,tip:'virament'});
+    rec.sumaIncasata=totalIncasari(rec.incasari)+totalIncasari(rec.incasari_pf||[]);
+    svcStore[svcKey(svcEditClientId,month)]=rec;
+  });
+  saveSvcStore();
+  document.getElementById('restanta-picker').style.display='none';
+  alert('Plata de '+money(suma)+' a fost înregistrată pe '+luniSelectate.length+' lun'+(luniSelectate.length===1?'ă':'i')+'.');
+  var content=buildSvcForm(svcEditClientId,currentServiceMonth);
+  document.getElementById('svc-modal-body').innerHTML=content;
+  injectIcons();
+  recalcSvcTotals();
+}
+  injectIcons();
+}
+
 function addNewServiceTypePF(){
-  var name=prompt('Denumire serviciu persoană fizică:');
-  if(!name||!name.trim())return;
-  var price=parseFloat(prompt('Preț unitar (lei):')||'0')||0;
   var div=document.getElementById('svc-services-pf-list');
   if(!div)return;
-  div.insertAdjacentHTML('beforeend',buildDiverseRowPF({desc:name.trim(),qty:1,price:price}));
-  injectIcons();recalcSvcTotals();
+  div.insertAdjacentHTML('beforeend',buildDiverseRowPF({desc:'',qty:1,price:0}));
+  // Focus pe câmpul de denumire nou adăugat
+  var rows=div.querySelectorAll('.svc-diverse-row-pf');
+  var lastRow=rows[rows.length-1];
+  if(lastRow){var inp=lastRow.querySelector('.svc-div-desc-pf');if(inp)inp.focus();}
+  recalcSvcTotals();
 }
 
 function buildDiverseRowPF(d){
@@ -3340,33 +3478,6 @@ function addNewServiceType(){
   saveCustomServices();
   document.getElementById('svc-services-list').insertAdjacentHTML('beforeend',buildServiceRow(k,name,{qty:0,price:0}));
   recalcSvcTotals();
-}
-
-function recalcSvcTotals(){
-  var total=0;
-  document.querySelectorAll('#svc-modal-body .svc-qty').forEach(function(q){
-    var k=q.getAttribute('data-k');
-    var priceEl=document.querySelector('#svc-modal-body .svc-price[data-k="'+k+'"]');
-    var subEl=document.querySelector('#svc-modal-body .svc-subtotal[data-k="'+k+'"]');
-    var qty=parseFloat(q.value)||0,price=priceEl?(parseFloat(priceEl.value)||0):0;
-    var sub=qty*price;
-    if(subEl)subEl.textContent=sub.toFixed(2);
-    total+=sub;
-  });
-  document.querySelectorAll('#svc-modal-body .svc-diverse-row').forEach(function(row){
-    var qty=parseFloat(row.querySelector('.svc-div-qty').value)||0;
-    var price=parseFloat(row.querySelector('.svc-div-price').value)||0;
-    total+=qty*price;
-  });
-  var soldPrecEl=document.getElementById('svc-sold-precedent');
-  var soldPrec=soldPrecEl?(parseFloat(soldPrecEl.value)||0):0;
-  var sumaInc=totalIncasari(collectIncasari());
-  var totalLunaEl=document.getElementById('svc-total-luna');
-  var sumaIncDispEl=document.getElementById('svc-suma-incasata-disp');
-  var totalGenEl=document.getElementById('svc-total-general');
-  if(totalLunaEl)totalLunaEl.textContent=money(total);
-  if(sumaIncDispEl)sumaIncDispEl.textContent=money(sumaInc);
-  if(totalGenEl)totalGenEl.textContent=money(total+soldPrec-sumaInc);
 }
 
 function openSvcSheet(clientId){
@@ -3411,6 +3522,12 @@ function recalcSvcTotals(){
     if(subEl)subEl.textContent=sub.toFixed(2);
     totalPF+=sub;
   });
+  // PF diverse manuale
+  document.querySelectorAll('#svc-services-pf-list .svc-diverse-row-pf').forEach(function(row){
+    var qty=parseFloat(row.querySelector('.svc-div-qty-pf').value)||0;
+    var price=parseFloat(row.querySelector('.svc-div-price-pf').value)||0;
+    totalPF+=qty*price;
+  });
   var total=totalPJ+totalPF;
   var soldPrecEl=document.getElementById('svc-sold-precedent');
   var soldPrec=soldPrecEl?(parseFloat(soldPrecEl.value)||0):0;
@@ -3454,6 +3571,14 @@ function svcBuildRecordFromForm(){
     var k=q.getAttribute('data-k').replace(/_pf$/,'');
     var priceEl=document.querySelector('#svc-services-pf-list .svc-price[data-k="'+k+'_pf"]');
     rec.services_pf[k]={qty:parseFloat(q.value)||0,price:priceEl?(parseFloat(priceEl.value)||0):0};
+  });
+  // PF diverse manuale
+  rec.services_pf_diverse=[];
+  document.querySelectorAll('#svc-services-pf-list .svc-diverse-row-pf').forEach(function(row){
+    var desc=row.querySelector('.svc-div-desc-pf').value.trim();
+    var qty=parseFloat(row.querySelector('.svc-div-qty-pf').value)||0;
+    var price=parseFloat(row.querySelector('.svc-div-price-pf').value)||0;
+    if(desc||qty||price)rec.services_pf_diverse.push({desc:desc,qty:qty,price:price});
   });
   document.querySelectorAll('#svc-modal-body .svc-diverse-row').forEach(function(row){
     var desc=row.querySelector('.svc-div-desc').value.trim();
