@@ -4004,13 +4004,14 @@ function generateFisaIstoric(){
     // Month summary
     checkP();
     doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);doc.setTextColor(navy[0],navy[1],navy[2]);
-    doc.text('Total servicii: '+money(t.serviceTotal),margin+2,y);y+=5.5;
-    doc.text('\u00cencasat: '+money(t.sumaIncasata),margin+2,y);y+=5.5;
+    doc.text('Total servicii: '+money(t.serviceTotal),margin+2,y);doc.text(money(t.serviceTotal),pageW-margin,y,{align:'right'});y+=5.5;
+    doc.text('\u00cencasat: '+money(t.sumaIncasata),margin+2,y);doc.text(money(t.sumaIncasata),pageW-margin,y,{align:'right'});y+=5.5;
     var soldCls=t.soldNou>0.01?[180,40,40]:t.soldNou<-0.01?[34,120,80]:[100,100,100];
     doc.setTextColor(soldCls[0],soldCls[1],soldCls[2]);
-    doc.text('SOLD: '+money(t.soldNou),pageW-margin,y,{align:'right'});
-    doc.setTextColor(navy[0],navy[1],navy[2]);
-    y+=5;
+    doc.setFontSize(13);
+    doc.text('SOLD: '+money(t.soldNou),margin+2,y);doc.text(money(t.soldNou),pageW-margin,y,{align:'right'});
+    doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFontSize(12.5);
+    y+=6;
 
     // Observatii luna
     if(rec.observatii){
