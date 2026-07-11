@@ -3355,6 +3355,7 @@ function renderIncasariTab(){
     var db=(b.data||'').split('.').reverse().join('');
     return db.localeCompare(da);
   });
+  incasariEditRefs=filtrate;
 
   var totalIncasat=filtrate.reduce(function(s,i){return s+i.suma;},0);
   var totalVirament=filtrate.filter(function(i){return i.tip==='virament';}).reduce(function(s,i){return s+i.suma;},0);
@@ -3447,11 +3448,14 @@ function renderIncasariTab(){
         var detalii=grup.incasari.map(function(i){
           var tipLabel=i.tip==='numerar'?'💵':'🏦';
           var nr=i.nrFactura?' ('+esc(i.nrFactura)+')':'';
-          return tipLabel+(i.data?' '+i.data:'')+nr+(i.obs?' · '+esc(i.obs):'')+'<b> '+money(i.suma)+'</b>';
+          var idxG=incasariEditRefs.indexOf(i);
+          return '<span onclick="event.stopPropagation();openEditIncasareByIndex('+idxG+')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Apasă pentru a edita">'
+            +tipLabel+(i.data?' '+i.data:'')+nr+(i.obs?' · '+esc(i.obs):'')+'<b> '+money(i.suma)+'</b></span>';
         }).join(' &nbsp;·&nbsp; ');
         var isDiv=cid.startsWith('__div__');
         var numeAfis=isDiv?(grup.c&&grup.c.nume)||'Persoană fără fișă':clientTitleLine(grup.c);
-        html+='<div class="card" style="margin-bottom:8px'+(isDiv?';border-left:3px solid var(--gold)':'')+'" '+(isDiv?'':('onclick="openEdit(\''+cid+'\')"'))+'>'
+        var srcMonthGrup=grup.incasari[0]&&grup.incasari[0].srcMonth;
+        html+='<div class="card" style="margin-bottom:8px'+(isDiv?';border-left:3px solid var(--gold)':'')+'" '+(isDiv?'':('onclick="openSvcSheetForMonth(\''+cid+'\',\''+srcMonthGrup+'\')"'))+'>'
           +'<div class="card-top"><div class="avatar" style="'+(isDiv?'background:rgba(225,195,64,0.2);color:#8a6e00':'')+'">'+initials(numeAfis)+'</div>'
           +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(numeAfis)+(isDiv?' <span style="font-size:11px;background:rgba(225,195,64,0.2);color:#8a6e00;padding:1px 6px;border-radius:10px;margin-left:4px">fără fișă</span>':'')+'</div>'
           +'<div class="card-firma" style="font-size:12px">'+detalii+'</div></div>'
@@ -3474,15 +3478,15 @@ function getToateIncasarile(){
     if(!c)return;
     var an=parseInt((rec.month||'').split('-')[0]);
     var luna=parseInt((rec.month||'').split('-')[1]);
-    function pushInc(inc,pfTip){
+    function pushInc(inc,pfTip,arr){
       if(!inc.suma||parseFloat(inc.suma)===0)return;
       var dataEf=inc.data||'';
       var anInc=an,lunaInc=luna;
       if(dataEf&&dataEf.indexOf('.')>0){var p=dataEf.split('.');anInc=parseInt(p[2])||an;lunaInc=parseInt(p[1])||luna;}
-      result.push({c:c,suma:parseFloat(inc.suma)||0,data:dataEf,obs:inc.obs||'',nrFactura:inc.nrFactura||'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:inc.tip||'virament',pfTip:!!pfTip,srcMonth:rec.month,srcClientId:rec.clientId});
+      result.push({c:c,suma:parseFloat(inc.suma)||0,data:dataEf,obs:inc.obs||'',nrFactura:inc.nrFactura||'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:inc.tip||'virament',pfTip:!!pfTip,srcMonth:rec.month,srcClientId:rec.clientId,raw:inc,arr:arr,rec:rec});
     }
-    (rec.incasari||[]).forEach(function(i){pushInc(i,false);});
-    (rec.incasari_pf||[]).forEach(function(i){pushInc(i,true);});
+    (rec.incasari||[]).forEach(function(i){pushInc(i,false,rec.incasari);});
+    (rec.incasari_pf||[]).forEach(function(i){pushInc(i,true,rec.incasari_pf);});
   });
   // Încasări diverse (fără fișă client)
   var diverse=JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]');
@@ -3492,13 +3496,92 @@ function getToateIncasarile(){
     var now=new Date();
     var anInc=now.getFullYear(),lunaInc=now.getMonth()+1;
     if(dataEf&&dataEf.indexOf('.')>0){var p=dataEf.split('.');anInc=parseInt(p[2])||anInc;lunaInc=parseInt(p[1])||lunaInc;}
-    result.push({c:{id:'__div__'+d.id,nume:d.nume,firma:'',cui:'',cnp:''},nume:d.nume,suma:parseFloat(d.suma)||0,data:dataEf,obs:d.obs||'',nrFactura:d.nrFactura||'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:d.tip||'virament',isDivers:true,diversId:d.id});
+    result.push({c:{id:'__div__'+d.id,nume:d.nume,firma:'',cui:'',cnp:''},nume:d.nume,suma:parseFloat(d.suma)||0,data:dataEf,obs:d.obs||'',nrFactura:d.nrFactura||'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:d.tip||'virament',isDivers:true,diversId:d.id,raw:d,arr:diverse});
   });
   return result;
 }
 
+// ── Editare / ștergere încasare individuală ───────────────
+function openEditIncasareByIndex(idx){
+  var entry=incasariEditRefs[idx];
+  if(!entry)return;
+  incasareEditIdx=idx;
+  incasareEditTip=entry.raw.tip==='numerar'?'numerar':'virament';
+  var raw=entry.raw;
+  var numeAfis=entry.isDivers?(entry.c&&entry.c.nume)||'':clientTitleLine(entry.c);
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Editează încasare'+(numeAfis?(' &mdash; '+esc(numeAfis)):'')+'</div>'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Sumă:</label>'
+    +'<input type="number" id="inc-edit-suma" min="0" step="0.01" value="'+(parseFloat(raw.suma)||0)+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Data încasării:</label>'
+    +'<input type="text" id="inc-edit-data" value="'+esc(raw.data||'')+'" placeholder="zz.ll.aaaa" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<div style="display:flex;gap:4px;margin-bottom:8px">'
+    +'<button type="button" id="inc-edit-tip-vir" onclick="setIncTipEdit(&quot;virament&quot;)" style="flex:1;font-size:12px;padding:6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(incasareEditTip!=='numerar'?'var(--navy)':'transparent')+';color:'+(incasareEditTip!=='numerar'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">🏦 Virament</button>'
+    +'<button type="button" id="inc-edit-tip-num" onclick="setIncTipEdit(&quot;numerar&quot;)" style="flex:1;font-size:12px;padding:6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(incasareEditTip==='numerar'?'var(--navy)':'transparent')+';color:'+(incasareEditTip==='numerar'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">💵 Numerar</button>'
+    +'</div>'
+    +'<input type="text" id="inc-edit-nrfact" placeholder="Ref. tranzacție / nr. factură (opțional)" value="'+esc(raw.nrFactura||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<input type="text" id="inc-edit-obs" placeholder="Observație (opțional)" value="'+esc(raw.obs||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:14px">'
+    +'<div style="display:flex;gap:8px">'
+    +'<button type="button" class="btn-danger" style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px" onclick="stergeIncasareEdit()"><i class="ti ti-trash"></i> Șterge</button>'
+    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="salveazaEditIncasare()"><i class="ti ti-check"></i> Salvează</button>'
+    +'</div>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Editează încasare';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function setIncTipEdit(tip){
+  incasareEditTip=tip;
+  var vir=document.getElementById('inc-edit-tip-vir'),num=document.getElementById('inc-edit-tip-num');
+  if(vir&&num){
+    if(tip==='virament'){vir.style.background='var(--navy)';vir.style.color='#fff';num.style.background='transparent';num.style.color='rgba(7,33,68,0.5)';}
+    else{num.style.background='var(--navy)';num.style.color='#fff';vir.style.background='transparent';vir.style.color='rgba(7,33,68,0.5)';}
+  }
+}
+
+function persistIncasareEntry(entry){
+  if(entry.rec){
+    entry.rec.sumaIncasata=totalIncasari(entry.rec.incasari||[])+totalIncasari(entry.rec.incasari_pf||[]);
+    saveSvcStore();
+  }else{
+    localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(entry.arr));
+    sbSet('inc_diverse',entry.arr).catch(function(){});
+  }
+}
+
+function salveazaEditIncasare(){
+  var entry=incasariEditRefs[incasareEditIdx];
+  if(!entry)return;
+  var suma=parseFloat(document.getElementById('inc-edit-suma').value)||0;
+  if(!suma){alert('Introdu suma încasată.');return;}
+  entry.raw.suma=suma;
+  entry.raw.data=document.getElementById('inc-edit-data').value.trim();
+  entry.raw.tip=incasareEditTip||'virament';
+  entry.raw.nrFactura=document.getElementById('inc-edit-nrfact').value.trim();
+  entry.raw.obs=document.getElementById('inc-edit-obs').value.trim();
+  persistIncasareEntry(entry);
+  document.getElementById('restanta-picker').style.display='none';
+  renderIncasariTab();
+}
+
+function stergeIncasareEdit(){
+  var entry=incasariEditRefs[incasareEditIdx];
+  if(!entry)return;
+  if(!confirm('Ștergi această încasare? Această acțiune nu poate fi anulată.'))return;
+  var pos=entry.arr.indexOf(entry.raw);
+  if(pos>-1)entry.arr.splice(pos,1);
+  persistIncasareEntry(entry);
+  document.getElementById('restanta-picker').style.display='none';
+  renderIncasariTab();
+}
+
 // ── Modal Adaugă Încasare ─────────────────────────────────
 var incasareClientId=null;
+var incasariEditRefs=[];
+var incasareEditIdx=null;
+var incasareEditTip='virament';
 
 function openAdaugaIncasare(){
   var html='<div style="padding:1rem">'
