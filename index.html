@@ -4030,14 +4030,16 @@ function generateFisaIstoric(){
   // Grand total
   checkP();
   doc.setDrawColor(navy[0],navy[1],navy[2]);doc.setLineWidth(0.8);doc.line(margin,y,pageW-margin,y);y+=6;
-  doc.setFont('CrimsonPro','bold');doc.setFontSize(15);doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text('TOTAL PERIOADĂ',margin,y);
-  doc.text('Servicii: '+money(grandTotal),margin+60,y);
-  doc.text('Încasat: '+money(grandIncasat),margin+110,y);
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(14);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('TOTAL PERIOADĂ',margin,y);y+=6;
+  doc.setFontSize(12.5);
+  doc.text('Total servicii: '+money(grandTotal),margin,y);doc.text(money(grandTotal),pageW-margin,y,{align:'right'});y+=5.5;
+  doc.text('Total \u00eencasat: '+money(grandIncasat),margin,y);doc.text(money(grandIncasat),pageW-margin,y,{align:'right'});y+=5.5;
   var gCls=grandSold>0.01?[180,40,40]:grandSold<-0.01?[34,120,80]:[100,100,100];
-  doc.setTextColor(gCls[0],gCls[1],gCls[2]);
-  doc.text('SOLD: '+money(grandSold),pageW-margin,y,{align:'right'});
-  y+=5;
+  doc.setTextColor(gCls[0],gCls[1],gCls[2]);doc.setFontSize(14);
+  doc.text('SOLD FINAL: '+money(grandSold),margin,y);doc.text(money(grandSold),pageW-margin,y,{align:'right'});
+  doc.setTextColor(navy[0],navy[1],navy[2]);
+  y+=6;
   doc.setFont('CrimsonPro','italic');doc.setFontSize(10.5);doc.setTextColor(170,170,170);
   doc.text('Document generat: '+todayRo(),margin,y+4);
 
