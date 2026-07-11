@@ -249,18 +249,18 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .view-toolbar input::placeholder{color:rgba(7,33,68,0.4)}
 
 /* ═══ BOTTOM NAV (mobil) ═══ */
-.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:6px 0 0}
-.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(10px,env(safe-area-inset-bottom))}
-.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-family:inherit;padding:4px 6px;font-size:10px;letter-spacing:0.03em;min-width:44px}
-.bnav-btn i{font-size:22px;line-height:1}
+.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:9px 0 0}
+.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-family:inherit;padding:6px 8px;font-size:12px;letter-spacing:0.03em;min-width:54px}
+.bnav-btn i{font-size:28px;line-height:1}
 .bnav-btn.active,.bnav-btn:active{color:var(--gold)}
-.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:46px;height:46px;margin-bottom:4px;justify-content:center;padding:0}
-.bnav-home i{font-size:24px}
+.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:58px;height:58px;margin-bottom:6px;justify-content:center;padding:0}
+.bnav-home i{font-size:30px}
 
 @media (max-width:720px){
   .bottom-nav{display:block}
-  .lp-body{padding-top:3rem;padding-bottom:calc(80px + env(safe-area-inset-bottom))}
-  .list{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  .lp-body{padding-top:3rem;padding-bottom:calc(98px + env(safe-area-inset-bottom))}
+  .list{padding-bottom:calc(98px + env(safe-area-inset-bottom))}
   .lp-tools{margin-top:2rem}
 }
 @media (min-width:721px){
@@ -3044,9 +3044,9 @@ function renderRestanteTab(){
         +'<div class="card-name">'+esc(clientTitleLine(it.c))+(isActive(it.c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>'
         +'<div class="card-firma">'+esc(clientSubLine(it.c))+' &middot; '+it.luni.length+' lun'+(it.luni.length===1?'ă':'i')+'</div>'
         +'</div>'
-        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
+        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">'
         +'<span class="exp-badge exp-red">'+money(it.totalRestant)+'</span>'
-        +'<span style="font-size:11px;color:rgba(7,33,68,0.45)">total restant ↓</span>'
+        +'<button type="button" onclick="event.stopPropagation();generateRaportRestante(\''+it.c.id+'\')" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid rgba(7,33,68,0.25);background:#fff;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:4px;font-family:inherit"><i class="ti ti-file-type-pdf" style="font-size:12px"></i> Raport</button>'
         +'</div>'
         +'</div>';
       // Detaliu pe luni (collapsed implicit)
@@ -4130,6 +4130,16 @@ function renderServiciiTab(){
     if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
   });
 
+  // Total servicii prestate pe tot anul selectat (toate lunile, toți clienții)
+  var totalServiciiAn=0;
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||!rec.clientId)return;
+    var anRec=parseInt((rec.month||'').split('-')[0]);
+    if(anRec!==an)return;
+    totalServiciiAn+=computeRecordTotal(rec).serviceTotal;
+  });
+
   // Ani disponibili
   var aniSet={};
   Object.keys(svcStore).forEach(function(key){
@@ -4166,10 +4176,14 @@ function renderServiciiTab(){
   html+='</div>';
 
   // Centralizator luna
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
     +'<div style="background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(7,33,68,0.5);margin-bottom:3px">SERVICII</div><div style="font-size:15px;font-weight:800;color:var(--navy)">'+money(totalServiciiLuna)+'</div></div>'
     +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(34,120,80,0.7);margin-bottom:3px">ÎNCASAT</div><div style="font-size:15px;font-weight:800;color:#1a6a40">'+money(totalIncasatLuna)+'</div></div>'
     +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(178,59,59,0.7);margin-bottom:3px">RESTANȚE</div><div style="font-size:15px;font-weight:800;color:#b23b3b">'+money(totalRestanteLuna)+'</div></div>'
+    +'</div>'
+    +'<div style="background:rgba(7,33,68,0.04);border:1px solid rgba(7,33,68,0.12);border-radius:10px;padding:10px;text-align:center;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:rgba(7,33,68,0.5);margin-bottom:3px">TOTAL SERVICII PRESTATE ÎN '+an+'</div>'
+    +'<div style="font-size:17px;font-weight:800;color:var(--navy)">'+money(totalServiciiAn)+'</div>'
     +'</div>';
 
   html+='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
@@ -5389,6 +5403,175 @@ function openFisaIstoricDialog(){
   }
   document.getElementById('fisa-istoric-picker').style.display='flex';
   injectIcons();
+}
+
+function generateRaportRestante(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c){alert('Client negăsit.');return;}
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+
+  var luni=clientRestanteLuni(clientId);
+  if(!luni.length){alert('Acest client nu are restanțe.');return;}
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  registerPdfFont(doc);
+  var margin=18,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64],red=[180,40,40];
+  doc.setFont('CrimsonPro','normal');
+  drawLetterhead(doc,margin,pageW);
+
+  function checkP(){if(y>268){doc.addPage();registerPdfFont(doc);y=20;}}
+  function drawStatsRow(items,rowY,startX,gap){
+    var x=startX;
+    items.forEach(function(it){
+      doc.setTextColor(it.color[0],it.color[1],it.color[2]);
+      doc.text(it.text,x,rowY);
+      x+=doc.getTextWidth(it.text)+gap;
+    });
+  }
+
+  // Title
+  doc.setFontSize(19);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
+  doc.text('Raport restanțe',margin,y);y+=7;
+  doc.setFontSize(14);doc.setFont('CrimsonPro','italic');doc.setTextColor(110,110,110);
+  doc.text('Generat: '+todayRo(),margin,y);y+=8;
+
+  // Client info block
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text(clean(c.firma)?c.firma:(c.nume||'—'),margin,y);y+=6;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(80,80,80);
+  if(clean(c.cui)){doc.text('CUI: '+c.cui,margin,y);y+=5;}
+  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:''),margin,y);y+=5;}
+  else if(clean(c.cnp)){doc.text('CNP: '+c.cnp,margin,y);y+=5;}
+  y+=4;
+
+  // Antet coloane
+  doc.setFontSize(11.5);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
+  doc.text('SERVICIU',margin,y);
+  doc.text('CANT.',margin+96,y,{align:'right'});
+  doc.text('PREȚ/U.M.',margin+130,y,{align:'right'});
+  doc.text('SUBTOTAL',pageW-margin,y,{align:'right'});
+  y+=2;doc.setDrawColor(200,200,200);doc.setLineWidth(0.2);doc.line(margin,y,pageW-margin,y);y+=5.5;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
+
+  var grandRestant=0;
+
+  luni.forEach(function(rec){
+    checkP();
+    var t=computeRecordTotal(rec);
+
+    // Antet lună
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.5);doc.line(margin,y,pageW-margin,y);y+=5.5;
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(14);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(monthLabel(rec.month),margin,y);
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(11.5);doc.setTextColor(130,130,130);
+    doc.text('Sold precedent: '+money(rec.soldPrecedent),pageW-margin,y,{align:'right'});
+    y+=6.5;
+
+    // Servicii firmă
+    var hasLines=false;
+    Object.keys(rec.services||{}).forEach(function(k){
+      var it=rec.services[k];
+      if(!it||!it.qty)return;
+      checkP();hasLines=true;
+      var sub=(it.qty||0)*(it.price||0);
+      doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
+      doc.text(labelForService(k),margin+2,y);
+      doc.text(String(it.qty||0),margin+100,y,{align:'right'});
+      doc.text(money(it.price),margin+130,y,{align:'right'});
+      doc.text(money(sub),pageW-margin,y,{align:'right'});
+      y+=5.8;
+    });
+    (rec.diverse||[]).forEach(function(d){
+      if(!d.qty&&!d.price&&!d.desc)return;
+      checkP();hasLines=true;
+      var sub=(d.qty||0)*(d.price||0);
+      doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
+      doc.text(d.desc||'Divers',margin+2,y);
+      doc.text(String(d.qty||0),margin+100,y,{align:'right'});
+      doc.text(money(d.price),margin+130,y,{align:'right'});
+      doc.text(money(sub),pageW-margin,y,{align:'right'});
+      y+=5.8;
+    });
+    // Servicii PF
+    var pfKeys=Object.keys(rec.services_pf||{});
+    if(pfKeys.length){
+      checkP();
+      doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
+      doc.text('Persoană fizică:',margin+2,y);y+=4.5;doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
+      pfKeys.forEach(function(k){
+        var it=rec.services_pf[k];
+        if(!it||!it.qty)return;
+        checkP();hasLines=true;
+        var sub=(it.qty||0)*(it.price||0);
+        doc.setTextColor(34,100,60);
+        doc.text(labelForService(k),margin+2,y);
+        doc.text(String(it.qty||0),margin+100,y,{align:'right'});
+        doc.text(money(it.price),margin+130,y,{align:'right'});
+        doc.text(money(sub),pageW-margin,y,{align:'right'});
+        y+=5.8;
+      });
+      doc.setTextColor(navy[0],navy[1],navy[2]);
+    }
+    (rec.services_pf_diverse||[]).forEach(function(d){
+      if(!d.qty&&!d.price&&!d.desc)return;
+      checkP();hasLines=true;
+      var sub=(d.qty||0)*(d.price||0);
+      doc.setTextColor(34,100,60);
+      doc.text(d.desc||'Divers',margin+2,y);
+      doc.text(String(d.qty||0),margin+100,y,{align:'right'});
+      doc.text(money(d.price),margin+130,y,{align:'right'});
+      doc.text(money(sub),pageW-margin,y,{align:'right'});
+      y+=5.8;
+      doc.setTextColor(navy[0],navy[1],navy[2]);
+    });
+    if(!hasLines){
+      doc.setFont('CrimsonPro','italic');doc.setFontSize(11.5);doc.setTextColor(160,160,160);
+      doc.text('Niciun serviciu prestat',margin+2,y);y+=5.5;doc.setFont('CrimsonPro','normal');
+      doc.setTextColor(navy[0],navy[1],navy[2]);
+    }
+
+    // Încasări
+    var incasari=(rec.incasari||[]).concat(rec.incasari_pf||[]);
+    if(incasari.length){
+      checkP();
+      doc.setFont('CrimsonPro','bold');doc.setFontSize(11.5);doc.setTextColor(34,120,80);
+      doc.text('Încasări:',margin+2,y);y+=5;
+      incasari.forEach(function(inc){
+        if(!inc.suma&&!inc.obs)return;
+        checkP();
+        doc.setFont('CrimsonPro','normal');doc.setFontSize(12.5);doc.setTextColor(34,100,70);
+        var incLabel='+ '+money(inc.suma)+(inc.data?' ('+inc.data+')':'')+(inc.obs?' – '+inc.obs:'');
+        doc.text(incLabel,margin+4,y);y+=5;
+      });
+      doc.setTextColor(navy[0],navy[1],navy[2]);
+    }
+
+    // Rezumat lună
+    checkP();
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);
+    drawStatsRow([
+      {text:'Total servicii: '+money(t.serviceTotal),color:navy},
+      {text:'Încasat: '+money(t.sumaIncasata),color:navy},
+      {text:'RESTANT: '+money(t.soldNou),color:red}
+    ],y,margin+2,10);
+    doc.setTextColor(navy[0],navy[1],navy[2]);
+    y+=8;
+
+    grandRestant+=t.soldNou;
+  });
+
+  // Total restant general
+  if(y>250){doc.addPage();registerPdfFont(doc);y=20;}else checkP();
+  doc.setDrawColor(red[0],red[1],red[2]);doc.setLineWidth(0.8);doc.line(margin,y,pageW-margin,y);y+=6.5;
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(red[0],red[1],red[2]);
+  doc.text('TOTAL RESTANT: '+money(grandRestant),margin,y);y+=7;
+  doc.setFont('CrimsonPro','italic');doc.setFontSize(10.5);doc.setTextColor(170,170,170);
+  doc.text('Document generat: '+todayRo(),margin,y+4);
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_raport_restante.pdf');
 }
 
 function generateFisaIstoric(){
