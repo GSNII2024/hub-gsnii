@@ -3464,6 +3464,9 @@ function renderIncasariList(){
   });
   incasariEditRefs=filtrate;
 
+  var pencilSvgIco='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>';
+  var trashSvgIco='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+
   var html='';
   if(!filtrate.length){html='<div class="empty">'+(q?'Niciun rezultat pentru căutarea ta.':'Nicio încasare în perioada selectată.')+'</div>';}
   else{
@@ -3483,18 +3486,24 @@ function renderIncasariList(){
           var tipLabel=i.tip==='numerar'?'💵':'🏦';
           var nr=i.nrFactura?' ('+esc(i.nrFactura)+')':'';
           var idxG=incasariEditRefs.indexOf(i);
-          return '<span onclick="event.stopPropagation();openEditIncasareByIndex('+idxG+')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px" title="Apasă pentru a edita">'
-            +tipLabel+(i.data?' '+i.data:'')+nr+(i.obs?' · '+esc(i.obs):'')+'<b> '+money(i.suma)+'</b></span>';
-        }).join(' &nbsp;·&nbsp; ');
+          return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0">'
+            +'<div style="flex:1;min-width:0">'+tipLabel+(i.data?' '+i.data:'')+nr+(i.obs?' · '+esc(i.obs):'')+' <b>'+money(i.suma)+'</b></div>'
+            +'<div style="display:flex;gap:4px;flex-shrink:0">'
+            +'<button type="button" onclick="event.stopPropagation();openEditIncasareByIndex('+idxG+')" title="Modifică" aria-label="Modifică" style="background:#fff;border:1px solid rgba(7,33,68,0.2);color:var(--navy);border-radius:6px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+pencilSvgIco+'</button>'
+            +'<button type="button" onclick="event.stopPropagation();stergeIncasareDirect('+idxG+')" title="Șterge" aria-label="Șterge" style="background:#fff;border:1px solid rgba(180,50,50,0.4);color:#b23b3b;border-radius:6px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+trashSvgIco+'</button>'
+            +'</div>'
+            +'</div>';
+        }).join('');
         var isDiv=cid.startsWith('__div__');
         var numeAfis=isDiv?(grup.c&&grup.c.nume)||'Persoană fără fișă':clientTitleLine(grup.c);
         var srcMonthGrup=grup.incasari[0]&&grup.incasari[0].srcMonth;
         html+='<div class="card" style="margin-bottom:8px'+(isDiv?';border-left:3px solid var(--gold)':'')+'" '+(isDiv?'':('onclick="openSvcSheetForMonth(\''+cid+'\',\''+srcMonthGrup+'\')"'))+'>'
           +'<div class="card-top"><div class="avatar" style="'+(isDiv?'background:rgba(225,195,64,0.2);color:#8a6e00':'')+'">'+initials(numeAfis)+'</div>'
           +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(numeAfis)+(isDiv?' <span style="font-size:11px;background:rgba(225,195,64,0.2);color:#8a6e00;padding:1px 6px;border-radius:10px;margin-left:4px">fără fișă</span>':'')+'</div>'
-          +'<div class="card-firma" style="font-size:12px">'+detalii+'</div></div>'
           +'<span class="exp-badge exp-green" style="flex-shrink:0">+'+money(grup.total)+'</span>'
-          +'</div></div>';
+          +'</div></div>'
+          +'<div class="card-firma" style="font-size:12px;margin-top:2px">'+detalii+'</div>'
+          +'</div>';
       });
     });
   }
@@ -3617,6 +3626,22 @@ function stergeIncasareEdit(){
   finally{
     if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
     document.getElementById('restanta-picker').style.display='none';
+    renderIncasariTab();
+  }
+}
+
+// Ștergere directă a unei încasări, prin butonul de coș de pe rând (fără să
+// mai deschidă modalul de editare).
+function stergeIncasareDirect(idx){
+  var entry=incasariEditRefs[idx];
+  if(!entry)return;
+  if(!confirm('Ștergi această încasare? Această acțiune nu poate fi anulată.'))return;
+  try{
+    var pos=entry.arr.indexOf(entry.raw);
+    if(pos>-1)entry.arr.splice(pos,1);
+    persistIncasareEntry(entry);
+  }catch(e){console.error('stergeIncasareDirect error:',e);}
+  finally{
     renderIncasariTab();
   }
 }
