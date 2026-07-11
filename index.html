@@ -3342,24 +3342,19 @@ function deleteTodo(id){
 var incasariFilterAn=new Date().getFullYear();
 var incasariFilterLuna=0;
 
+var incasariSearchQuery='';
+
 function renderIncasariTab(){
   var toateIncasarile=getToateIncasarile();
 
-  var filtrate=toateIncasarile.filter(function(i){
-    if(i.an!==incasariFilterAn)return false;
-    if(incasariFilterLuna>0&&i.luna!==incasariFilterLuna)return false;
-    return true;
+  var totalIncasat=0,totalVirament=0,totalNumerar=0;
+  toateIncasarile.forEach(function(i){
+    if(i.an!==incasariFilterAn)return;
+    if(incasariFilterLuna>0&&i.luna!==incasariFilterLuna)return;
+    totalIncasat+=i.suma;
+    if(i.tip==='virament')totalVirament+=i.suma;
+    if(i.tip==='numerar')totalNumerar+=i.suma;
   });
-  filtrate.sort(function(a,b){
-    var da=(a.data||'').split('.').reverse().join('');
-    var db=(b.data||'').split('.').reverse().join('');
-    return db.localeCompare(da);
-  });
-  incasariEditRefs=filtrate;
-
-  var totalIncasat=filtrate.reduce(function(s,i){return s+i.suma;},0);
-  var totalVirament=filtrate.filter(function(i){return i.tip==='virament';}).reduce(function(s,i){return s+i.suma;},0);
-  var totalNumerar=filtrate.filter(function(i){return i.tip==='numerar';}).reduce(function(s,i){return s+i.suma;},0);
   var totalServicii=0,totalRestante=0;
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];if(!rec)return;
@@ -3430,8 +3425,47 @@ function renderIncasariTab(){
     +'</div>'
     +'</div>';
 
-  // Jurnal
-  if(!filtrate.length){html+='<div class="empty">Nicio încasare în perioada selectată.</div>';}
+  // Bară de căutare (client, firmă, CUI, CNP)
+  html+='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
+    +'<input type="text" id="incasari-search" placeholder="Caută după nume, firmă, CUI, CNP..." value="'+esc(incasariSearchQuery)+'"'
+    +' oninput="incasariSearchQuery=this.value;renderIncasariList()" style="font-size:15px">'
+    +'</div>';
+  html+='<div id="incasari-list-container"></div>';
+
+  document.getElementById('list').innerHTML=html;
+  injectIcons();
+  renderIncasariList();
+}
+
+function renderIncasariList(){
+  var container=document.getElementById('incasari-list-container');
+  if(!container)return;
+
+  var toateIncasarile=getToateIncasarile();
+  var q=norm(incasariSearchQuery||'').trim();
+
+  var filtrate=toateIncasarile.filter(function(i){
+    if(i.an!==incasariFilterAn)return false;
+    if(incasariFilterLuna>0&&i.luna!==incasariFilterLuna)return false;
+    if(q){
+      var numeCautare=i.isDivers?(i.c&&i.c.nume)||'':clientTitleLine(i.c);
+      var matches=norm(numeCautare).includes(q)
+        ||norm(i.c&&i.c.firma).includes(q)
+        ||norm(i.c&&i.c.cui).includes(q)
+        ||norm(i.c&&i.c.cnp).includes(q);
+      if(!matches)return false;
+    }
+    return true;
+  });
+  filtrate.sort(function(a,b){
+    var da=(a.data||'').split('.').reverse().join('');
+    var db=(b.data||'').split('.').reverse().join('');
+    return db.localeCompare(da);
+  });
+  incasariEditRefs=filtrate;
+
+  var html='';
+  if(!filtrate.length){html='<div class="empty">'+(q?'Niciun rezultat pentru căutarea ta.':'Nicio încasare în perioada selectată.')+'</div>';}
   else{
     var peL={};
     filtrate.forEach(function(i){if(!peL[i.month])peL[i.month]=[];peL[i.month].push(i);});
@@ -3464,7 +3498,7 @@ function renderIncasariTab(){
       });
     });
   }
-  document.getElementById('list').innerHTML=html;
+  container.innerHTML=html;
   injectIcons();
 }
 
@@ -3556,25 +3590,35 @@ function salveazaEditIncasare(){
   if(!entry)return;
   var suma=parseFloat(document.getElementById('inc-edit-suma').value)||0;
   if(!suma){alert('Introdu suma încasată.');return;}
-  entry.raw.suma=suma;
-  entry.raw.data=document.getElementById('inc-edit-data').value.trim();
-  entry.raw.tip=incasareEditTip||'virament';
-  entry.raw.nrFactura=document.getElementById('inc-edit-nrfact').value.trim();
-  entry.raw.obs=document.getElementById('inc-edit-obs').value.trim();
-  persistIncasareEntry(entry);
-  document.getElementById('restanta-picker').style.display='none';
-  renderIncasariTab();
+  try{
+    entry.raw.suma=suma;
+    entry.raw.data=document.getElementById('inc-edit-data').value.trim();
+    entry.raw.tip=incasareEditTip||'virament';
+    entry.raw.nrFactura=document.getElementById('inc-edit-nrfact').value.trim();
+    entry.raw.obs=document.getElementById('inc-edit-obs').value.trim();
+    persistIncasareEntry(entry);
+  }catch(e){console.error('salveazaEditIncasare error:',e);}
+  finally{
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    document.getElementById('restanta-picker').style.display='none';
+    renderIncasariTab();
+  }
 }
 
 function stergeIncasareEdit(){
   var entry=incasariEditRefs[incasareEditIdx];
   if(!entry)return;
   if(!confirm('Ștergi această încasare? Această acțiune nu poate fi anulată.'))return;
-  var pos=entry.arr.indexOf(entry.raw);
-  if(pos>-1)entry.arr.splice(pos,1);
-  persistIncasareEntry(entry);
-  document.getElementById('restanta-picker').style.display='none';
-  renderIncasariTab();
+  try{
+    var pos=entry.arr.indexOf(entry.raw);
+    if(pos>-1)entry.arr.splice(pos,1);
+    persistIncasareEntry(entry);
+  }catch(e){console.error('stergeIncasareEdit error:',e);}
+  finally{
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    document.getElementById('restanta-picker').style.display='none';
+    renderIncasariTab();
+  }
 }
 
 // ── Modal Adaugă Încasare ─────────────────────────────────
@@ -3584,6 +3628,14 @@ var incasareEditIdx=null;
 var incasareEditTip='virament';
 
 function openAdaugaIncasare(){
+  // Blurez orice input activ (ex. tastatura de pe mobil) și resetez orice
+  // stare rămasă de la o eventuală editare anterioară, ca butonul să
+  // funcționeze de fiecare dată, nu doar prima oară.
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  incasareClientId=null;
+  incasareTipNou='virament';
+  incasareEditIdx=null;
+
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:12px">Încasare nouă</div>'
     +'<div class="field"><label>Caută client</label>'
@@ -3615,11 +3667,11 @@ function openAdaugaIncasare(){
     +'</div>';
   document.getElementById('restanta-picker-body').innerHTML=html;
   document.getElementById('restanta-picker').querySelector('h2').textContent='Adaugă încasare';
+  // Deschid modalul ÎNAINTE de a popula lista de clienți, ca o eventuală
+  // eroare la populare să nu împiedice deschiderea modalului.
   document.getElementById('restanta-picker').style.display='flex';
-  incasareClientId=null;
-  incasareTipNou='virament';
   // Afișează toți clienții cu restanțe implicit
-  incSearchClients('');
+  try{incSearchClients('');}catch(e){console.error('incSearchClients error:',e);}
   injectIcons();
 }
 
@@ -3757,13 +3809,18 @@ function salveazaIncasareNoua(){
   if(incasareClientId==='__ocazional__'){
     var numeOcaz=(document.getElementById('inc-ocazional-nume').value||'').trim();
     if(!numeOcaz){alert('Introdu numele persoanei/firmei.');return;}
-    // Salvez în localStorage ca încasare diversă
-    var incDiverse=JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]');
-    incDiverse.push({id:Date.now().toString(),nume:numeOcaz,suma:suma,data:data,tip:tip,nrFactura:nrFactura,obs:obs});
-    localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(incDiverse));
-    sbSet('inc_diverse',incDiverse).catch(function(){});
-    document.getElementById('restanta-picker').style.display='none';
-    renderIncasariTab();
+    try{
+      // Salvez în localStorage ca încasare diversă
+      var incDiverse=JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]');
+      incDiverse.push({id:Date.now().toString(),nume:numeOcaz,suma:suma,data:data,tip:tip,nrFactura:nrFactura,obs:obs});
+      localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(incDiverse));
+      sbSet('inc_diverse',incDiverse).catch(function(){});
+    }catch(e){console.error('salveazaIncasareNoua (ocazional) error:',e);}
+    finally{
+      if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+      document.getElementById('restanta-picker').style.display='none';
+      renderIncasariTab();
+    }
     return;
   }
 
@@ -3771,27 +3828,32 @@ function salveazaIncasareNoua(){
   var checked=document.querySelectorAll('.inc-luna-check:checked');
   if(!checked.length){alert('Bifează cel puțin o lună.');return;}
 
-  var luniSelectate=[];
-  checked.forEach(function(cb){luniSelectate.push({month:cb.getAttribute('data-month'),sold:parseFloat(cb.getAttribute('data-sold'))||0});});
-  luniSelectate.sort(function(a,b){return a.month.localeCompare(b.month);});
+  try{
+    var luniSelectate=[];
+    checked.forEach(function(cb){luniSelectate.push({month:cb.getAttribute('data-month'),sold:parseFloat(cb.getAttribute('data-sold'))||0});});
+    luniSelectate.sort(function(a,b){return a.month.localeCompare(b.month);});
 
-  var sumaRamasa=suma;
-  luniSelectate.forEach(function(item){
-    if(sumaRamasa<=0.005)return;
-    var rec=getRecord(incasareClientId,item.month);
-    if(!rec)return;
-    var t=computeRecordTotal(rec);
-    var deplatitAcum=Math.min(sumaRamasa,Math.round(t.soldNou*100)/100);
-    sumaRamasa=Math.round((sumaRamasa-deplatitAcum)*100)/100;
-    if(!rec.incasari)rec.incasari=[];
-    rec.incasari.push({suma:deplatitAcum,obs:obs||'Plată',data:data,tip:tip,nrFactura:nrFactura,restanta:item.month<currentServiceMonth,restantaLuna:item.month});
-    rec.sumaIncasata=totalIncasari(rec.incasari)+totalIncasari(rec.incasari_pf||[]);
-    svcStore[svcKey(incasareClientId,item.month)]=rec;
-  });
+    var sumaRamasa=suma;
+    luniSelectate.forEach(function(item){
+      if(sumaRamasa<=0.005)return;
+      var rec=getRecord(incasareClientId,item.month);
+      if(!rec)return;
+      var t=computeRecordTotal(rec);
+      var deplatitAcum=Math.min(sumaRamasa,Math.round(t.soldNou*100)/100);
+      sumaRamasa=Math.round((sumaRamasa-deplatitAcum)*100)/100;
+      if(!rec.incasari)rec.incasari=[];
+      rec.incasari.push({suma:deplatitAcum,obs:obs||'Plată',data:data,tip:tip,nrFactura:nrFactura,restanta:item.month<currentServiceMonth,restantaLuna:item.month});
+      rec.sumaIncasata=totalIncasari(rec.incasari)+totalIncasari(rec.incasari_pf||[]);
+      svcStore[svcKey(incasareClientId,item.month)]=rec;
+    });
 
-  saveSvcStore();
-  document.getElementById('restanta-picker').style.display='none';
-  renderIncasariTab();
+    saveSvcStore();
+  }catch(e){console.error('salveazaIncasareNoua error:',e);}
+  finally{
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    document.getElementById('restanta-picker').style.display='none';
+    renderIncasariTab();
+  }
 }
 
 
