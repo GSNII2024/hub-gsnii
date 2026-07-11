@@ -2045,6 +2045,8 @@ function renderIncasariTab(){
   var totalFacturi = filtrate.filter(function(i){return i.tip==='virament';}).reduce(function(s,i){return s+i.suma;},0);
   var totalNumerar = filtrate.filter(function(i){return i.tip==='numerar';}).reduce(function(s,i){return s+i.suma;},0);
   var totalFacturat = 0;
+  // Restanțe = suma soldurilor pozitive din toate lunile (identic cu tabul Restanțe)
+  var totalRestante = 0;
   Object.keys(svcStore).forEach(function(key){
     var rec = svcStore[key];
     if(!rec)return;
@@ -2055,6 +2057,27 @@ function renderIncasariTab(){
     var t = computeRecordTotal(rec);
     totalFacturat += t.serviceTotal;
   });
+  // Calculez restanțele reale (toate lunile, nu doar perioada selectată)
+  clients.forEach(function(c){
+    var luni = clientRestanteLuni(c.id);
+    luni.forEach(function(rec){
+      var t = computeRecordTotal(rec);
+      if(t.soldNou > 0.01) totalRestante += t.soldNou;
+    });
+  });
+  // Dacă e filtrat pe o perioadă, calculez restanțele doar din acea perioadă
+  if(incasariFilterLuna > 0){
+    totalRestante = 0;
+    Object.keys(svcStore).forEach(function(key){
+      var rec = svcStore[key];
+      if(!rec)return;
+      var an = parseInt((rec.month||'').split('-')[0]);
+      var luna = parseInt((rec.month||'').split('-')[1]);
+      if(an !== incasariFilterAn || luna !== incasariFilterLuna) return;
+      var t = computeRecordTotal(rec);
+      if(t.soldNou > 0.01) totalRestante += t.soldNou;
+    });
+  }
 
   // Ani disponibili - de la primul an cu date până la anul curent
   var aniSet = {};
@@ -2108,7 +2131,7 @@ function renderIncasariTab(){
     +'</div>'
     +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:10px;padding:12px;text-align:center">'
     +'<div style="font-size:11px;color:rgba(178,59,59,0.7);margin-bottom:4px">RESTANȚE</div>'
-    +'<div style="font-size:17px;font-weight:800;color:#b23b3b">'+money(Math.max(0,totalFacturat-totalIncasat))+'</div>'
+    +'<div style="font-size:17px;font-weight:800;color:#b23b3b">'+money(totalRestante)+'</div>'
     +'</div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
