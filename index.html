@@ -3997,7 +3997,8 @@ function renderSpvTab(){
       html+='<div class="card-top"><div class="avatar">'+initials(c.nume)+'</div>';
       html+='<div style="min-width:0;flex:1">';
       html+='<div class="card-name">'+esc(clean(c.firma)||c.nume||'—')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
-      html+='<div class="card-firma">'+esc(c.nume)+(clean(c.cui)?' &middot; CUI: '+esc(c.cui):'')+'</div>';
+      html+='<div class="card-firma">'+esc(c.nume)+'</div>';
+      if(clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
       html+='</div>';
       html+='<span class="exp-badge" style="background:rgba(7,33,68,0.08);color:var(--navy);font-size:11px">'+esc(c.cui)+'</span>';
       html+='</div></div>';
@@ -4173,7 +4174,8 @@ function render(){
     html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
     html+='<div class="card-top"><div class="'+avClass+'">'+initials(c.nume)+'</div>';
     html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
-    if(firma)html+='<div class="card-firma">'+esc(firma)+(clean(c.cui)?' \u00b7 CUI '+esc(c.cui):'')+'</div>';
+    if(firma)html+='<div class="card-firma">'+esc(firma)+'</div>';
+    if(firma&&clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
     html+='</div></div>';
     if(tel||em){
       html+='<div class="card-contact">';
@@ -4455,9 +4457,9 @@ function buildSvcForm(clientId,month){
 
   // ── Secțiunea FIRMĂ (PJ) ──────────────────────────────
   if(hasCUI){
-    html+='<div class="svc-section-header pj-header">'
-      +'<i class="ti ti-building"></i>'
-      +(hasBoth?'<span>'+esc(c.firma||'Firmă')+' <small style="font-weight:400;opacity:0.6">CUI: '+esc(c.cui)+'</small></span>':'<span>Servicii prestate</span>')
+    html+='<div class="svc-section-header pj-header" style="align-items:flex-start;padding-top:9px;padding-bottom:9px">'
+      +'<i class="ti ti-building" style="margin-top:2px"></i>'
+      +(hasBoth?'<span>'+esc(c.firma||'Firmă')+'<br><small style="font-weight:400;opacity:0.6">CUI: '+esc(c.cui)+'</small></span>':'<span>Servicii prestate</span>')
       +'</div>';
     html+='<div id="svc-services-list">';
     SERVICES.forEach(function(s){
@@ -4927,9 +4929,10 @@ function generateClientServicePDF(c,rec){
   doc.text(clean(c.firma)?c.firma:(c.nume||'Client'),margin,y);y+=6.5;
   doc.setFontSize(13.5);doc.setTextColor(110,110,110);doc.setFont('CrimsonPro','italic');
   if(clean(c.firma)){
-    doc.text((c.nume||'\u2014')+(clean(c.cui)?' \u00b7 CUI '+c.cui:''),margin,y);y+=7;
+    if(clean(c.cui)){doc.text('CUI: '+c.cui,margin,y);y+=5.5;}
+    doc.text((c.nume||'\u2014')+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:''),margin,y);y+=7;
   }else{
-    doc.text('Persoan\u0103 fizic\u0103',margin,y);y+=7;
+    doc.text('Persoan\u0103 fizic\u0103'+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:''),margin,y);y+=7;
   }
   doc.setFont('CrimsonPro','normal');
   y+=2;doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.6);doc.line(margin,y,pageW-margin,y);y+=7;
@@ -5223,7 +5226,9 @@ function savePDF(){
   doc.text(c.nume||'Client',margin,y);y+=7;
   if(c.firma&&c.firma!=='-'){
     doc.setFontSize(14);doc.setTextColor(110,110,110);doc.setFont('CrimsonPro','italic');
-    doc.text(c.firma+(c.cui&&c.cui!=='-'?' \u00b7 CUI '+c.cui:''),margin,y);y+=6;doc.setFont('CrimsonPro','normal');
+    doc.text(c.firma,margin,y);y+=6;
+    if(c.cui&&c.cui!=='-'){doc.setFontSize(12);doc.text('CUI: '+c.cui,margin,y);y+=6;}
+    doc.setFont('CrimsonPro','normal');
   }
   addSection('Date personale');
   addLine('CNP',c.cnp);
@@ -5311,6 +5316,18 @@ function generateFisaIstoric(){
 
   function checkP(){if(y>268){doc.addPage();registerPdfFont(doc);y=20;}}
 
+  // Desenează o linie cu mai multe statistici (label+valoare), poziționându-le
+  // dinamic pe baza lățimii reale a textului, ca să nu se suprapună niciodată
+  // indiferent cât de mari sunt sumele.
+  function drawStatsRow(items,rowY,startX,gap){
+    var x=startX;
+    items.forEach(function(it,idx){
+      doc.setTextColor(it.color[0],it.color[1],it.color[2]);
+      doc.text(it.text,x,rowY);
+      x+=doc.getTextWidth(it.text)+gap;
+    });
+  }
+
   // Title
   doc.setFontSize(19);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
   doc.text('Fi\u0219\u0103 servicii prestate',margin,y);y+=7;
@@ -5322,8 +5339,8 @@ function generateFisaIstoric(){
   doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);
   doc.text(clean(c.firma)?c.firma:(c.nume||'—'),margin,y);y+=6;
   doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(80,80,80);
-  if(clean(c.firma))doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:''),margin,y),y+=5;
-  if(clean(c.cui))doc.text('CUI: '+c.cui,margin,y),y+=5;
+  if(clean(c.cui)){doc.text('CUI: '+c.cui,margin,y);y+=5;}
+  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:''),margin,y);y+=5;}
   y+=4;
 
   if(!recs.length){
@@ -5416,13 +5433,16 @@ function generateFisaIstoric(){
 
     // Month summary
     checkP();
-    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);doc.setTextColor(navy[0],navy[1],navy[2]);
-    doc.text('Total servicii: '+money(t.serviceTotal),margin+2,y);
-    doc.text('Încasat: '+money(t.sumaIncasata),margin+70,y);
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);
     var soldCls=t.soldNou>0.01?[180,40,40]:t.soldNou<-0.01?[34,120,80]:[100,100,100];
-    doc.setTextColor(soldCls[0],soldCls[1],soldCls[2]);
-    doc.text('SOLD: '+money(t.soldNou),pageW-margin,y,{align:'right'});
+    drawStatsRow([
+      {text:'Total servicii: '+money(t.serviceTotal),color:navy},
+      {text:'Încasat: '+money(t.sumaIncasata),color:navy},
+      {text:'SOLD: '+money(t.soldNou),color:soldCls}
+    ],y,margin+2,10);
+    doc.setTextColor(navy[0],navy[1],navy[2]);
     y+=5;
+
 
     // Observatii luna
     if(rec.observatii){
@@ -5439,16 +5459,19 @@ function generateFisaIstoric(){
   });
 
   // Grand total
-  checkP();
-  doc.setDrawColor(navy[0],navy[1],navy[2]);doc.setLineWidth(0.8);doc.line(margin,y,pageW-margin,y);y+=6;
+  if(y>250){doc.addPage();registerPdfFont(doc);y=20;}else checkP();
+  doc.setDrawColor(navy[0],navy[1],navy[2]);doc.setLineWidth(0.8);doc.line(margin,y,pageW-margin,y);y+=6.5;
   doc.setFont('CrimsonPro','bold');doc.setFontSize(15);doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text('TOTAL PERIOADĂ',margin,y);
-  doc.text('Servicii: '+money(grandTotal),margin+60,y);
-  doc.text('Încasat: '+money(grandIncasat),margin+110,y);
+  doc.text('TOTAL PERIOADĂ',margin,y);y+=7;
   var gCls=grandSold>0.01?[180,40,40]:grandSold<-0.01?[34,120,80]:[100,100,100];
-  doc.setTextColor(gCls[0],gCls[1],gCls[2]);
-  doc.text('SOLD: '+money(grandSold),pageW-margin,y,{align:'right'});
-  y+=5;
+  doc.setFontSize(13);
+  drawStatsRow([
+    {text:'Servicii: '+money(grandTotal),color:navy},
+    {text:'Încasat: '+money(grandIncasat),color:navy},
+    {text:'SOLD: '+money(grandSold),color:gCls}
+  ],y,margin,10);
+  doc.setTextColor(navy[0],navy[1],navy[2]);
+  y+=6;
   doc.setFont('CrimsonPro','italic');doc.setFontSize(10.5);doc.setTextColor(170,170,170);
   doc.text('Document generat: '+todayRo(),margin,y+4);
 
