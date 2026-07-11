@@ -160,12 +160,12 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .du-year-block{border:1px solid rgba(7,33,68,0.1);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:rgba(34,120,80,0.03)}
 .du-year-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .du-year-label{font-size:13px;font-weight:700;color:#1f6aa0;flex:1}
-.inc-row{display:flex;align-items:center;gap:6px;margin-bottom:7px}
-.inc-row-fields{flex:1;display:flex;gap:6px;min-width:0}
+.inc-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:7px}
+.inc-row-fields{flex:1;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
 .inc-row-suma{width:100px;flex-shrink:0}
 .inc-row-suma input,.inc-row-obs input,.inc-row-data input{width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:7px 8px;font-family:inherit;background:#fff;color:var(--navy)}
 .inc-row-data{width:100px;flex-shrink:0}
-.inc-row-obs{flex:1;min-width:0}
+.inc-row-obs{flex:1;min-width:120px}
 .inc-del{background:#fff;border:1px solid rgba(180,50,50,0.4);color:#b23b3b;border-radius:6px;width:30px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .svc-preview-list{margin-top:8px;border-top:1px solid rgba(7,33,68,0.08);padding-top:8px}
 .svc-section-header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:14px;font-weight:700;margin-bottom:8px}
@@ -4460,9 +4460,20 @@ function buildSvcForm(clientId,month){
       +(hasBoth?'<span>'+esc(c.firma||'Firmă')+' <small style="font-weight:400;opacity:0.6">CUI: '+esc(c.cui)+'</small></span>':'<span>Servicii prestate</span>')
       +'</div>';
     html+='<div id="svc-services-list">';
-    SERVICES.concat(customServices.map(function(s){var sk=typeof s==='string'?s:(s.k||'');var sl=typeof s==='string'?s:(s.l||s.k||'');return {k:'custom_'+sk,l:sl};})).forEach(function(s){
+    SERVICES.forEach(function(s){
       html+=buildServiceRow(s.k,s.l,rec.services[s.k]);
     });
+    // Servicii custom mai vechi, salvate deja pe ACEASTĂ fișă (client+lună) — rămân vizibile aici,
+    // dar nu se mai propagă ca poziții noi pe fișele celorlalți clienți.
+    Object.keys(rec.services||{}).forEach(function(k){
+      if(k.indexOf('custom_')!==0)return;
+      var it=rec.services[k];
+      if(!it||((parseFloat(it.qty)||0)===0&&(parseFloat(it.price)||0)===0))return;
+      var cs=customServices.find(function(s){return (typeof s==='string'?'custom_'+s:s.k)===k;});
+      var label=cs?(typeof cs==='string'?cs:(cs.l||cs.k||k)):k;
+      html+=buildServiceRow(k,label,it);
+    });
+    (rec.diverse||[]).forEach(function(d){html+=buildDiverseRow(d);});
     html+='</div>';
     html+='<button type="button" class="btn-add-service" onclick="addNewServiceType()"><i class="ti ti-plus"></i> Adaugă serviciu nou</button>';
   }
@@ -4544,7 +4555,7 @@ function buildIncasareRow(inc,prefix){
     +'<div class="inc-row-suma"><input type="number" min="0" step="0.01" class="inc-suma" placeholder="Sumă (lei)" value="'+(inc.suma||'')+'" oninput="recalcSvcTotals()"></div>'
     +'<div class="inc-row-obs"><input type="text" class="inc-obs" placeholder="Observație..." value="'+esc(inc.obs||'')+'"></div>'
     +'<div style="display:flex;gap:4px;margin-top:4px;width:100%">'
-    +'<button type="button" class="inc-tip-btn'+(tipInc==='virament'?' active':'')+'" data-tip="virament" onclick="toggleIncTip(this)" style="flex:1;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(tipInc==='virament'?'var(--navy)':'transparent')+';color:'+(tipInc==='virament'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">🏦 Virament bancar</button>'
+    +'<button type="button" class="inc-tip-btn'+(tipInc==='virament'?' active':'')+'" data-tip="virament" onclick="toggleIncTip(this)" style="flex:1;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(tipInc==='virament'?'var(--navy)':'transparent')+';color:'+(tipInc==='virament'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">🏦 Virament</button>'
     +'<button type="button" class="inc-tip-btn'+(tipInc==='numerar'?' active':'')+'" data-tip="numerar" onclick="toggleIncTip(this)" style="flex:1;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(tipInc==='numerar'?'var(--navy)':'transparent')+';color:'+(tipInc==='numerar'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">💵 Numerar</button>'
     +'<input type="hidden" class="inc-tip" value="'+tipInc+'">'
     +'</div>'
@@ -4711,17 +4722,29 @@ function buildDiverseRowPF(d){
     +'</div>';
 }
 
+// Rând "serviciu nou" — la fel ca la PF: rămâne salvat DOAR pe fișa acestui client/lună,
+// nu devine o poziție nouă globală care apare pe toate fișele.
+function buildDiverseRow(d){
+  d=d||{desc:'',qty:0,price:0};
+  return '<div class="svc-diverse-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
+    +'<input type="text" class="svc-div-desc" value="'+esc(d.desc||'')+'" placeholder="Denumire serviciu" style="flex:1;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit">'
+    +'<input type="number" class="svc-div-qty" value="'+(d.qty||1)+'" min="0" style="width:50px;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit" oninput="recalcSvcTotals()">'
+    +'<input type="number" class="svc-div-price" value="'+(d.price||0)+'" min="0" step="0.01" style="width:80px;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:6px;padding:6px 8px;font-family:inherit" oninput="recalcSvcTotals()">'
+    +'<button type="button" class="inc-del" onclick="this.closest(\'.svc-diverse-row\').remove();recalcSvcTotals()">'
+    +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+    +'</div>';
+}
+
 function addNewServiceType(){
-  var name=prompt('Numele noului serviciu (ex: Depunere declara\u021bii ANAF):');
-  if(!name)return;
-  name=name.trim();
-  if(!name)return;
-  var k='custom_'+Date.now();
-  customServices.push({k:k,l:name});
-  saveCustomServices();
-  document.getElementById('svc-services-list').insertAdjacentHTML('beforeend',buildServiceRow(k,name,{qty:0,price:0}));
+  var div=document.getElementById('svc-services-list');
+  if(!div)return;
+  div.insertAdjacentHTML('beforeend',buildDiverseRow({desc:'',qty:1,price:0}));
+  var rows=div.querySelectorAll('.svc-diverse-row');
+  var lastRow=rows[rows.length-1];
+  if(lastRow){var inp=lastRow.querySelector('.svc-div-desc');if(inp)inp.focus();}
   recalcSvcTotals();
 }
+
 
 
 function openSvcSheet(clientId){
