@@ -1267,7 +1267,7 @@ function setDuStatusFromPill(clientId,newStatus){
   renderDuTab();
 }
 function initials(n){var p=(n||'?').trim().split(' ');return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():(n||'?').slice(0,2).toUpperCase();}
-function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return (s===null||s===undefined?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function clean(s){return (!s||s==='-'||s==='\u2013')?'':s.trim();}
 
 function cnpToBirthdate(cnp){
@@ -3112,7 +3112,7 @@ function buildSvcForm(clientId,month){
       +(hasBoth?'<span>'+esc(c.firma||'Firmă')+' <small style="font-weight:400;opacity:0.6">CUI: '+esc(c.cui)+'</small></span>':'<span>Servicii prestate</span>')
       +'</div>';
     html+='<div id="svc-services-list">';
-    SERVICES.concat(customServices.map(function(s){return {k:'custom_'+s,l:s};})).forEach(function(s){
+    SERVICES.concat(customServices.map(function(s){return {k:'custom_'+(typeof s==='string'?s:s.k||''), l:(typeof s==='string'?s:s.l||s.k||'')};})).forEach(function(s){
       html+=buildServiceRow(s.k,s.l,rec.services[s.k]);
     });
     html+='</div>';
