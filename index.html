@@ -359,6 +359,13 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-title">Listă SPV</div>
           <div class="lp-card-sub">Reprezentanți SPV</div>
         </button>
+        <button class="lp-card" onclick="openView('incasari')">
+          <div class="lp-card-icon" style="background:rgba(34,120,80,0.12);color:#1a6a40">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a6a40" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          </div>
+          <div class="lp-card-title">Încasări</div>
+          <div class="lp-card-sub">Jurnal plăți primite</div>
+        </button>
         <button class="lp-card" onclick="openView('registre')">
           <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5a2d8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -1290,7 +1297,8 @@ var VIEW_META={
   restante:{title:'Restanțe',icon:'ti-coin-off',filter:'restante',toolbar:false},
   expirari:{title:'Expirări',icon:'ti-calendar-x',filter:'expirari',toolbar:false},
   spv:{title:'Listă SPV',icon:'ti-id-badge-2',filter:'spv',toolbar:false},
-  registre:{title:'Registre',icon:'ti-books',filter:'registre',toolbar:false}
+  registre:{title:'Registre',icon:'ti-books',filter:'registre',toolbar:false},
+  incasari:{title:'Încasări',icon:'ti-cash',filter:'incasari',toolbar:false}
 };
 
 function toggleLpTools(){
@@ -1948,6 +1956,263 @@ function getNextNrCorespondenta(){var l=registreStore.corespondenta||[];return l
 function getNextNrContract(){var year=new Date().getFullYear();var prefix=String(year).slice(2);var l=(registreStore.contracte||[]).filter(function(r){return r.an===year;});if(!l.length)return parseInt(prefix+'001');return Math.max.apply(null,l.map(function(r){return r.nr||0;}))+1;}
 function serieContract(tip,nr){var m={contract:'C',aditional:'A',reziliere:'R'};return 'GSNII/'+(m[tip]||'C')+'/'+nr;}
 
+// ══════════════════════════════════════════════════════════
+// ÎNCASĂRI
+// ══════════════════════════════════════════════════════════
+var incasariFilterAn = new Date().getFullYear();
+var incasariFilterLuna = 0; // 0 = tot anul
+
+function renderIncasariTab(){
+  // Colectez toate încasările din svcStore
+  var toateIncasarile = [];
+  Object.keys(svcStore).forEach(function(key){
+    var rec = svcStore[key];
+    if(!rec||!rec.clientId)return;
+    var c = clients.find(function(x){return x.id===rec.clientId;});
+    if(!c)return;
+    var month = rec.month; // format YYYY-MM
+    var an = parseInt(month.split('-')[0]);
+    var luna = parseInt(month.split('-')[1]);
+
+    // Încasări firmă
+    (rec.incasari||[]).forEach(function(inc){
+      if(!inc.suma||parseFloat(inc.suma)===0)return;
+      var dataInc = inc.data||month+'-01';
+      var anInc = inc.data?parseInt(inc.data.split('.')[2]||an):an;
+      var lunaInc = inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+      toateIncasarile.push({
+        c:c, suma:parseFloat(inc.suma)||0,
+        data:inc.data||'', obs:inc.obs||'',
+        luna:lunaInc, an:anInc,
+        month:month, tip:'firma'
+      });
+    });
+    // Încasări PF
+    (rec.incasari_pf||[]).forEach(function(inc){
+      if(!inc.suma||parseFloat(inc.suma)===0)return;
+      var anInc = inc.data?parseInt(inc.data.split('.')[2]||an):an;
+      var lunaInc = inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+      toateIncasarile.push({
+        c:c, suma:parseFloat(inc.suma)||0,
+        data:inc.data||'', obs:inc.obs||'',
+        luna:lunaInc, an:anInc,
+        month:month, tip:'pf'
+      });
+    });
+  });
+
+  // Filtrare după an
+  var filtrate = toateIncasarile.filter(function(i){
+    if(i.an !== incasariFilterAn) return false;
+    if(incasariFilterLuna > 0 && i.luna !== incasariFilterLuna) return false;
+    return true;
+  });
+
+  // Sortare cronologică descrescătoare
+  filtrate.sort(function(a,b){
+    var da = a.data.split('.').reverse().join('');
+    var db = b.data.split('.').reverse().join('');
+    return db.localeCompare(da);
+  });
+
+  // Statistici
+  var totalIncasat = filtrate.reduce(function(s,i){return s+i.suma;},0);
+  var totalFacturat = 0;
+  Object.keys(svcStore).forEach(function(key){
+    var rec = svcStore[key];
+    if(!rec)return;
+    var an = parseInt((rec.month||'').split('-')[0]);
+    var luna = parseInt((rec.month||'').split('-')[1]);
+    if(an !== incasariFilterAn) return;
+    if(incasariFilterLuna > 0 && luna !== incasariFilterLuna) return;
+    var t = computeRecordTotal(rec);
+    totalFacturat += t.serviceTotal;
+  });
+
+  // Ani disponibili - de la primul an cu date până la anul curent
+  var aniSet = {};
+  toateIncasarile.forEach(function(i){aniSet[i.an]=1;});
+  Object.keys(svcStore).forEach(function(key){
+    var rec = svcStore[key];
+    if(rec&&rec.month) aniSet[parseInt(rec.month.split('-')[0])]=1;
+  });
+  var anCurent = new Date().getFullYear();
+  // Adăugăm și anii fără date, de la primul an cu date până la cel curent
+  var aniArr = Object.keys(aniSet).map(Number);
+  if(aniArr.length){
+    var anMin = Math.min.apply(null, aniArr);
+    for(var a = anMin; a <= anCurent; a++) aniSet[a] = 1;
+  } else {
+    aniSet[anCurent] = 1;
+  }
+  var ani = Object.keys(aniSet).map(Number).sort().reverse();
+
+  // Luni
+  var luniRo = ['','Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'];
+
+  // HTML
+  var html = '<div class="bday-today" style="justify-content:space-between">'
+    +'<span style="display:flex;align-items:center;gap:8px">'
+    +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>'
+    +'Jurnal încasări</span>'
+    +'<button class="btn-add-service" style="font-size:12px" onclick="generateIncasariPDF()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF</button>'
+    +'</div>';
+
+  // Filtre an + lună
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+  ani.forEach(function(an){
+    html += '<button onclick="incasariFilterAn='+an+';incasariFilterLuna=0;renderIncasariTab()" '
+      +'style="padding:5px 12px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(incasariFilterAn==an?'var(--navy)':'#fff')+';color:'+(incasariFilterAn==an?'#fff':'var(--navy)')+';font-size:13px;cursor:pointer;font-family:inherit">'+an+'</button>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">';
+  html += '<button onclick="incasariFilterLuna=0;renderIncasariTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(incasariFilterLuna===0?'var(--navy)':'#fff')+';color:'+(incasariFilterLuna===0?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">Tot anul</button>';
+  for(var m=1;m<=12;m++){
+    var activ = incasariFilterLuna===m;
+    html += '<button onclick="incasariFilterLuna='+m+';renderIncasariTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(activ?'var(--navy)':'#fff')+';color:'+(activ?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">'+luniRo[m]+'</button>';
+  }
+  html += '</div>';
+
+  // Statistici
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">'
+    +'<div style="background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:10px;padding:12px;text-align:center">'
+    +'<div style="font-size:11px;color:rgba(7,33,68,0.5);margin-bottom:4px">FACTURAT</div>'
+    +'<div style="font-size:17px;font-weight:800;color:var(--navy)">'+money(totalFacturat)+'</div>'
+    +'</div>'
+    +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.2);border-radius:10px;padding:12px;text-align:center">'
+    +'<div style="font-size:11px;color:rgba(34,120,80,0.7);margin-bottom:4px">ÎNCASAT</div>'
+    +'<div style="font-size:17px;font-weight:800;color:#1a6a40">'+money(totalIncasat)+'</div>'
+    +'</div>'
+    +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:10px;padding:12px;text-align:center">'
+    +'<div style="font-size:11px;color:rgba(178,59,59,0.7);margin-bottom:4px">RESTANȚE</div>'
+    +'<div style="font-size:17px;font-weight:800;color:#b23b3b">'+money(Math.max(0,totalFacturat-totalIncasat))+'</div>'
+    +'</div>'
+    +'</div>';
+
+  // Lista încasărilor
+  if(!filtrate.length){
+    html += '<div class="empty">Nicio încasare în perioada selectată.</div>';
+  } else {
+    // Grupat pe luni
+    var peL = {};
+    filtrate.forEach(function(i){
+      var k = i.an+'-'+(i.luna<10?'0':'')+i.luna;
+      if(!peL[k])peL[k]=[];
+      peL[k].push(i);
+    });
+    Object.keys(peL).sort().reverse().forEach(function(k){
+      var lista = peL[k];
+      var totalL = lista.reduce(function(s,i){return s+i.suma;},0);
+      var parts = k.split('-');
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">'
+        +'<div style="font-size:12px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:2px">'+monthLabel(k)+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:#1a6a40">'+money(totalL)+'</div>'
+        +'</div>';
+      lista.forEach(function(i){
+        html += '<div class="card" style="margin-bottom:8px" onclick="openEdit(\''+i.c.id+'\')">'
+          +'<div class="card-top">'
+          +'<div class="avatar">'+initials(i.c.nume)+'</div>'
+          +'<div style="min-width:0;flex:1">'
+          +'<div class="card-name">'+esc(clientTitleLine(i.c))+'</div>'
+          +'<div class="card-firma">'+(i.data||monthLabel(i.month))+(i.obs?' · '+esc(i.obs):'')+(i.tip==='pf'?' · <span style="color:#1a6a40">PF</span>':'')+'</div>'
+          +'</div>'
+          +'<span class="exp-badge exp-green" style="flex-shrink:0">+'+money(i.suma)+'</span>'
+          +'</div>'
+          +'</div>';
+      });
+    });
+  }
+
+  document.getElementById('list').innerHTML = html;
+  injectIcons();
+}
+
+function generateIncasariPDF(){
+  if(typeof window.jspdf==='undefined'){alert('PDF se încarcă, încearcă din nou.');return;}
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  var margin=18,y=42,pageW=210;
+  var navy=[7,33,68],green=[34,100,60],gold=[225,195,64];
+  registerPdfFont(doc);
+  drawLetterhead(doc,margin,pageW);
+  function checkP(){if(y>270){doc.addPage();y=20;registerPdfFont(doc);}}
+
+  var luniRo=['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+  var titlu='Jurnal încasări — '+incasariFilterAn+(incasariFilterLuna>0?' '+luniRo[incasariFilterLuna]:'');
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text(titlu,margin,y);y+=8;
+  doc.setFont('CrimsonPro','italic');doc.setFontSize(11);doc.setTextColor(150,150,150);
+  doc.text('Generat: '+todayRo(),margin,y);y+=10;
+
+  // Colectez și filtrez
+  var filtrate=[];
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];if(!rec||!rec.clientId)return;
+    var c=clients.find(function(x){return x.id===rec.clientId;});if(!c)return;
+    var an=parseInt((rec.month||'').split('-')[0]);
+    var luna=parseInt((rec.month||'').split('-')[1]);
+    if(an!==incasariFilterAn)return;
+    if(incasariFilterLuna>0&&luna!==incasariFilterLuna)return;
+    (rec.incasari||[]).forEach(function(inc){
+      if(!inc.suma||parseFloat(inc.suma)===0)return;
+      var anInc=inc.data?parseInt(inc.data.split('.')[2]||an):an;
+      var lunaInc=inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+      filtrate.push({c:c,suma:parseFloat(inc.suma)||0,data:inc.data||'',obs:inc.obs||'',luna:lunaInc,an:anInc,month:rec.month,tip:'firma'});
+    });
+    (rec.incasari_pf||[]).forEach(function(inc){
+      if(!inc.suma||parseFloat(inc.suma)===0)return;
+      var anInc=inc.data?parseInt(inc.data.split('.')[2]||an):an;
+      var lunaInc=inc.data?parseInt(inc.data.split('.')[1]||luna):luna;
+      filtrate.push({c:c,suma:parseFloat(inc.suma)||0,data:inc.data||'',obs:inc.obs||'',luna:lunaInc,an:anInc,month:rec.month,tip:'pf'});
+    });
+  });
+  filtrate.sort(function(a,b){
+    var da=a.data.split('.').reverse().join('');
+    var db=b.data.split('.').reverse().join('');
+    return da.localeCompare(db);
+  });
+
+  var totalIncasat=filtrate.reduce(function(s,i){return s+i.suma;},0);
+
+  // Sumar
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(13);doc.setTextColor(green[0],green[1],green[2]);
+  doc.text('Total încasat: '+money(totalIncasat),margin,y);y+=10;
+
+  // Grupat pe luni
+  var peL={};
+  filtrate.forEach(function(i){
+    var k=i.an+'-'+(i.luna<10?'0':'')+i.luna;
+    if(!peL[k])peL[k]=[];peL[k].push(i);
+  });
+
+  Object.keys(peL).sort().forEach(function(k){
+    var lista=peL[k];
+    var totalL=lista.reduce(function(s,i){return s+i.suma;},0);
+    checkP();
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.5);doc.line(margin,y,pageW-margin,y);y+=5;
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(monthLabel(k),margin,y);
+    doc.text(money(totalL),pageW-margin,y,{align:'right'});y+=6;
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(12);
+    lista.forEach(function(i){
+      checkP();
+      doc.setTextColor(navy[0],navy[1],navy[2]);
+      var label=clientTitleLine(i.c)+(i.tip==='pf'?' (PF)':'');
+      doc.text(label,margin+2,y);
+      if(i.data)doc.text(i.data,margin+110,y,{align:'right'});
+      if(i.obs){doc.setTextColor(150,150,150);doc.setFontSize(10);doc.text(i.obs,margin+2,y+4);doc.setFontSize(12);}
+      doc.setTextColor(green[0],green[1],green[2]);doc.setFont('CrimsonPro','bold');
+      doc.text('+'+money(i.suma),pageW-margin,y,{align:'right'});
+      doc.setFont('CrimsonPro','normal');doc.setTextColor(navy[0],navy[1],navy[2]);
+      y+=i.obs?9:6;
+    });
+    y+=3;
+  });
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,'incasari_'+incasariFilterAn+(incasariFilterLuna>0?'_'+incasariFilterLuna:'')+'.pdf');
+}
+
 function renderRegistreTab(){
   var html='<div class="bday-today" style="justify-content:space-between"><span><i class="ti ti-books"></i> Registre</span></div>';
 
@@ -2347,6 +2612,7 @@ function render(){
   if(currentFilter==='expirari'){renderExpirariTab();return;}
   if(currentFilter==='spv'){renderSpvTab();return;}
   if(currentFilter==='registre'){renderRegistreTab();return;}
+  if(currentFilter==='incasari'){renderIncasariTab();return;}
   var q=document.getElementById('search').value.toLowerCase();
   var filtered=clients.filter(function(c){
     return keys.some(function(k){return (c[k]||'').toLowerCase().includes(q);});
@@ -3006,7 +3272,7 @@ function generateClientServicePDF(c,rec){
   doc.setFontSize(14.5);doc.setFont('CrimsonPro','italic');doc.setTextColor(110,110,110);
   doc.text(monthLabel(rec.month),margin,y);y+=8;doc.setFont('CrimsonPro','normal');
   doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
-  doc.text(clean(c.firma)?c.firma:(c.nume||'Client'),margin,y);y+=6.5;
+  doc.text(clean(c.firma)?(c.firma+(clean(c.cui)?' · CUI '+c.cui:'')):(c.nume||'Client'),margin,y);y+=6.5;
   doc.setFontSize(13.5);doc.setTextColor(110,110,110);doc.setFont('CrimsonPro','italic');
   if(clean(c.firma)){
     doc.text((c.nume||'\u2014')+(clean(c.cui)?' \u00b7 CUI '+c.cui:''),margin,y);y+=7;
@@ -3402,7 +3668,7 @@ function generateFisaIstoric(){
 
   // Client info block
   doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text(clean(c.firma)?c.firma:(c.nume||'—'),margin,y);y+=6;
+  doc.text(clean(c.firma)?(c.firma+(clean(c.cui)?' · CUI '+c.cui:'')):(c.nume||'—'),margin,y);y+=6;
   doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(80,80,80);
   if(clean(c.firma))doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:''),margin,y),y+=5;
   if(clean(c.cui))doc.text('CUI: '+c.cui,margin,y),y+=5;
@@ -3457,14 +3723,13 @@ function generateFisaIstoric(){
       y+=5.8;
     });
     // PF services
-    var pfKeys=Object.keys(rec.services_pf||{});
+    var pfKeys=Object.keys(rec.services_pf||{}).filter(function(k){return rec.services_pf[k]&&rec.services_pf[k].qty;});
     if(pfKeys.length){
       checkP();
       doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
       doc.text('Persoan\u0103 fizic\u0103:',margin+2,y);y+=4.5;doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
       pfKeys.forEach(function(k){
         var it=rec.services_pf[k];
-        if(!it||!it.qty)return;
         checkP();hasLines=true;
         var sub=(it.qty||0)*(it.price||0);
         doc.setTextColor(34,100,60);
@@ -3499,11 +3764,12 @@ function generateFisaIstoric(){
     // Month summary
     checkP();
     doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);doc.setTextColor(navy[0],navy[1],navy[2]);
-    doc.text('Total servicii: '+money(t.serviceTotal),margin+2,y);
-    doc.text('Încasat: '+money(t.sumaIncasata),margin+70,y);
+    doc.text('Total servicii: '+money(t.serviceTotal),margin+2,y);y+=5.5;
+    doc.text('\u00cencasat: '+money(t.sumaIncasata),margin+2,y);y+=5.5;
     var soldCls=t.soldNou>0.01?[180,40,40]:t.soldNou<-0.01?[34,120,80]:[100,100,100];
     doc.setTextColor(soldCls[0],soldCls[1],soldCls[2]);
     doc.text('SOLD: '+money(t.soldNou),pageW-margin,y,{align:'right'});
+    doc.setTextColor(navy[0],navy[1],navy[2]);
     y+=5;
 
     // Observatii luna
