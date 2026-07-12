@@ -6659,9 +6659,17 @@ function renderSemnariListaIncurs(list){
       +'</div>';
     html+='<div style="margin-top:10px">';
     d.signers.forEach(function(s){
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid rgba(7,33,68,0.06)">'
-        +'<div style="font-size:13px"><b>'+esc(s.nume)+'</b> '+(s.status==='semnat'?'<span style="color:#1a6a40">&#10003; semnat</span>':'<span style="color:rgba(7,33,68,0.4)">în așteptare</span>')+'</div>'
-        +(s.status==='semnat'?'':'<button type="button" onclick="openTrimiteSemnare(\''+d.id+'\',\''+s.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);cursor:pointer;font-family:inherit">📨 Trimite</button>')
+      var statusLine=s.status==='semnat'
+        ?'<span style="color:#1a6a40">&#10003; semnat'+(s.semnatAt?(' &middot; '+new Date(s.semnatAt).toLocaleString('ro-RO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'</span>'
+        :(s.deschisAt
+          ?'<span style="color:#8a6e00">&#128065; a deschis link-ul: '+new Date(s.deschisAt).toLocaleString('ro-RO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>'
+          :'<span style="color:rgba(7,33,68,0.4)">în așteptare &middot; link nedeschis încă</span>');
+      html+='<div style="padding:7px 0;border-top:1px solid rgba(7,33,68,0.06)">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+        +'<div style="min-width:0"><div style="font-size:13px;font-weight:700">'+esc(s.nume)+'</div>'
+        +'<div style="font-size:11.5px;margin-top:2px">'+statusLine+'</div></div>'
+        +(s.status==='semnat'?'':'<button type="button" onclick="openTrimiteSemnare(\''+d.id+'\',\''+s.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);cursor:pointer;font-family:inherit;flex-shrink:0">📨 Trimite</button>')
+        +'</div>'
         +'</div>';
     });
     html+='</div>';
@@ -6845,6 +6853,11 @@ function initSignPage(token){
     if(signer.status==='semnat'){
       container.innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ai semnat deja acest document.</div><div style="margin-top:8px;color:rgba(7,33,68,0.5)">Mulțumim!</div></div>';
       return;
+    }
+    if(!signer.deschisAt){
+      signer.deschisAt=Date.now();
+      try{localStorage.setItem('crm_semnari_v1',JSON.stringify(list));}catch(e){}
+      sbSet('semnari',list).catch(function(){});
     }
     renderSignUI(doc,signer);
   }).catch(function(){
