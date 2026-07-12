@@ -6690,15 +6690,13 @@ function buildMesajSemnare(doc,signer,limba){
       +'Elküldöm Önnek a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
       +'Kérem, nyissa meg az alábbi linket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'
       +'👉 Aláírás itt: '+link+'\n\n'
-      +'Köszönöm a gyors ügyintézést!\n\n'
-      +'Tisztelettel,\nGál Norbert, a Gál S. Norbert Î.I. alapítója';
+      +'Köszönöm a gyors ügyintézést!';
   }
   return 'Bună ziua, '+signer.nume+',\n\n'
     +'Vă trimit documentul „'+doc.titlu+'” pentru semnare.\n\n'
     +'Vă rog să accesați link-ul de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'
     +'👉 Semnează aici: '+link+'\n\n'
-    +'Vă mulțumesc pentru promptitudine!\n\n'
-    +'Cu stimă,\nGál Norbert, fondatorul Gál S. Norbert Î.I.';
+    +'Vă mulțumesc pentru promptitudine!';
 }
 
 function openTrimiteSemnare(docId,signerId){
@@ -6721,12 +6719,12 @@ function renderTrimiteSemnareModal(docId,signerId){
     +'<button type="button" onclick="semnMesajLimba=\'hu\';renderTrimiteSemnareModal(\''+docId+'\',\''+signerId+'\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMesajLimba==='hu'?'var(--navy)':'#fff')+';color:'+(semnMesajLimba==='hu'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇭🇺 Magyar</button>'
     +'</div>'
     +'<textarea readonly style="width:100%;min-height:190px;font-size:12.5px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px;font-family:inherit;color:var(--navy);background:rgba(7,33,68,0.02);resize:vertical">'+esc(mesaj)+'</textarea>'
-    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +(typeof navigator.share==='function'
+      ?'<button type="button" onclick="distribuieMesajSemnare(\''+docId+'\',\''+signerId+'\')" style="width:100%;margin-top:12px;padding:12px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">📤 Distribuie (WhatsApp, SMS, Mail...)</button>'
+      :'')
+    +'<div style="display:flex;gap:8px;margin-top:10px">'
     +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px" onclick="copiazaMesajSemnare(\''+docId+'\',\''+signerId+'\')"><i class="ti ti-file-text"></i> Copiază mesaj</button>'
-    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="trimiteEmailSemnare(\''+docId+'\',\''+signerId+'\')"><i class="ti ti-mail"></i> Zoho Mail</button>'
-    +'</div>'
-    +'<div style="text-align:center;margin-top:6px">'
-    +'<button type="button" onclick="trimiteEmailImplicit(\''+docId+'\',\''+signerId+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);font-size:11.5px;font-family:inherit;cursor:pointer;text-decoration:underline">nu se deschide Zoho? încearcă aplicația de mail implicită</button>'
+    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px" onclick="trimiteEmailSemnare(\''+docId+'\',\''+signerId+'\')"><i class="ti ti-mail"></i> Email</button>'
     +'</div>'
     +'<button type="button" onclick="copiazaDoarLinkSemnare(\''+link+'\')" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🔗 Copiază doar link-ul</button>'
     +'</div>';
@@ -6759,6 +6757,21 @@ function copiazaMesajSemnare(docId,signerId){
   }
 }
 
+// Deschide fereastra nativă de distribuire a telefonului/laptopului, ca să
+// alegi direct din aplicațiile instalate (WhatsApp, Mesaje, Mail etc.).
+function distribuieMesajSemnare(docId,signerId){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(!doc){alert('Documentul nu a fost găsit.');return;}
+  var signer=doc.signers.find(function(s){return s.id===signerId;});
+  if(!signer){alert('Semnatarul nu a fost găsit.');return;}
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  if(navigator.share){
+    navigator.share({title:doc.titlu,text:mesaj}).catch(function(){});
+  }else{
+    alert('Distribuirea nu este suportată de acest browser. Folosește "Copiază mesaj" în schimb.');
+  }
+}
+
 // Deschide clientul de email implicit, cu subiect și mesaj precompletate.
 // Dacă semnatarul e un client existent cu adresă de email salvată, o completează automat.
 function trimiteEmailSemnare(docId,signerId){
@@ -6766,27 +6779,6 @@ function trimiteEmailSemnare(docId,signerId){
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
-  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
-  var subiect=semnMesajLimba==='hu'?('Aláírásra váró dokumentum: '+doc.titlu):('Document pentru semnare: '+doc.titlu);
-  var emailDest='';
-  if(signer.tip==='client'&&signer.clientId){
-    var c=(clients||[]).find(function(x){return x.id===signer.clientId;});
-    if(c&&clean(c.email))emailDest=c.email;
-  }
-  // Deschide direct compunerea în Zoho Mail (webmail), cu destinatar/subiect/mesaj precompletate.
-  // Format oficial Zoho: link-ul mailto standard e "învelit" în URL-ul de compunere Zoho.
-  var mailtoInner='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
-  var zohoUrl='https://zmail.zoho.com/mail/compose.do?extsrc=mailto&mode=compose&tp=zb&ct='+encodeURIComponent(mailtoInner);
-  window.open(zohoUrl,'_blank');
-}
-
-// Variantă de rezervă: deschide aplicația de mail implicită a dispozitivului
-// (utilă dacă Zoho Mail folosește alt domeniu regional, ex. zoho.eu / zoho.in).
-function trimiteEmailImplicit(docId,signerId){
-  var doc=getSemnari().find(function(d){return d.id===docId;});
-  if(!doc)return;
-  var signer=doc.signers.find(function(s){return s.id===signerId;});
-  if(!signer)return;
   var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
   var subiect=semnMesajLimba==='hu'?('Aláírásra váró dokumentum: '+doc.titlu):('Document pentru semnare: '+doc.titlu);
   var emailDest='';
