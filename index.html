@@ -5513,14 +5513,6 @@ function generateRaportRestante(clientId){
   drawLetterhead(doc,margin,pageW);
 
   function checkP(){if(y>268){doc.addPage();registerPdfFont(doc);y=20;}}
-  function drawStatsRow(items,rowY,startX,gap){
-    var x=startX;
-    items.forEach(function(it){
-      doc.setTextColor(it.color[0],it.color[1],it.color[2]);
-      doc.text(it.text,x,rowY);
-      x+=doc.getTextWidth(it.text)+gap;
-    });
-  }
 
   // Title
   doc.setFontSize(19);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
@@ -5624,30 +5616,10 @@ function generateRaportRestante(clientId){
       doc.setTextColor(navy[0],navy[1],navy[2]);
     }
 
-    // Încasări
-    var incasari=(rec.incasari||[]).concat(rec.incasari_pf||[]);
-    if(incasari.length){
-      checkP();
-      doc.setFont('CrimsonPro','bold');doc.setFontSize(11.5);doc.setTextColor(34,120,80);
-      doc.text('Încasări:',margin+2,y);y+=5;
-      incasari.forEach(function(inc){
-        if(!inc.suma&&!inc.obs)return;
-        checkP();
-        doc.setFont('CrimsonPro','normal');doc.setFontSize(12.5);doc.setTextColor(34,100,70);
-        var incLabel='+ '+money(inc.suma)+(inc.data?' ('+inc.data+')':'')+(inc.obs?' – '+inc.obs:'');
-        doc.text(incLabel,margin+4,y);y+=5;
-      });
-      doc.setTextColor(navy[0],navy[1],navy[2]);
-    }
-
-    // Rezumat lună
+    // Rezumat lună — strict ce nu este încasat (nu afișăm încasările făcute)
     checkP();
-    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);
-    drawStatsRow([
-      {text:'Total servicii: '+money(t.serviceTotal),color:navy},
-      {text:'Încasat: '+money(t.sumaIncasata),color:navy},
-      {text:'RESTANT: '+money(t.soldNou),color:red}
-    ],y,margin+2,10);
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(13);doc.setTextColor(red[0],red[1],red[2]);
+    doc.text('RESTANT: '+money(t.soldNou),pageW-margin,y,{align:'right'});
     doc.setTextColor(navy[0],navy[1],navy[2]);
     y+=8;
 
