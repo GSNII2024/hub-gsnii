@@ -321,8 +321,16 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
 
 <!-- ═══ PAGINĂ PUBLICĂ DE SEMNAT (fără parolă) ═══ -->
 <div id="sign-page" style="display:none;position:fixed;inset:0;z-index:10000;background:var(--cream);overflow-y:auto">
-  <div style="background:var(--navy);border-bottom:2px solid var(--gold);padding:14px 20px;text-align:center">
-    <span style="color:var(--gold);font-weight:700;font-size:15px;letter-spacing:0.03em">GÁL S. NORBERT Î.I.</span>
+  <div style="background:var(--navy);border-bottom:2px solid var(--gold);padding:14px 16px;display:flex;align-items:center;gap:12px">
+    <div style="background:var(--cream);border:1.5px solid var(--gold);border-radius:8px;padding:4px 8px;flex-shrink:0">
+      <img src="" id="sign-header-logo" alt="Logo" style="height:38px;width:auto;display:block">
+    </div>
+    <div style="min-width:0">
+      <div style="color:var(--gold);font-weight:700;font-size:14px;letter-spacing:0.02em;line-height:1.3">GÁL S. NORBERT ÎNTREPRINDERE INDIVIDUALĂ</div>
+      <div style="color:rgba(225,195,64,0.75);font-size:10.5px;line-height:1.4;margin-top:2px">Sat Valea Pomilor (com. Șamșud), nr. 3, jud. Sălaj &middot; CUI: 50166396 &middot; RC: F2024000210315</div>
+      <div style="color:rgba(225,195,64,0.6);font-size:10.5px;line-height:1.4">Tel: 0727.949.763 &middot; contact@gsnii.ro</div>
+      <div style="color:rgba(225,195,64,0.5);font-size:10px;line-height:1.4">BCR &middot; IBAN: RO94 RNCB 0214 1846 5951 0001</div>
+    </div>
   </div>
   <div id="sign-page-content" style="max-width:600px;margin:0 auto;padding:20px 16px 60px"></div>
 </div>
@@ -6786,6 +6794,8 @@ function initSignPage(token){
   var appEl=document.getElementById('app');
   if(appEl)appEl.style.display='none';
   document.getElementById('sign-page').style.display='block';
+  var logoEl=document.getElementById('sign-header-logo');
+  if(logoEl&&typeof LOGO_B64!=='undefined')logoEl.src=LOGO_B64;
   var container=document.getElementById('sign-page-content');
   container.innerHTML='<div style="text-align:center;padding:60px 20px;color:rgba(7,33,68,0.5)">Se încarcă documentul...</div>';
 
