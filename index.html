@@ -222,7 +222,8 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .lp-sub{color:rgba(225,195,64,0.55);font-size:10px;letter-spacing:0.02em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lp-body{padding:2.5rem 1rem 6rem}
 .lp-stats-row{display:flex;gap:10px;margin-bottom:1.2rem;flex-wrap:wrap}
-.lp-stat{background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;box-shadow:0 1px 3px rgba(7,33,68,0.06)}
+.lp-stat{background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;box-shadow:0 1px 3px rgba(7,33,68,0.06);cursor:pointer;transition:all 0.15s}
+.lp-stat:active{background:rgba(7,33,68,0.04);transform:scale(0.97)}
 .lp-stat-val{font-size:22px;font-weight:700;color:var(--navy);line-height:1}
 .lp-stat-lbl{font-size:11px;color:rgba(7,33,68,0.5);margin-top:3px}
 .lp-stat.warn .lp-stat-val{color:#b23b3b}
@@ -249,18 +250,18 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .view-toolbar input::placeholder{color:rgba(7,33,68,0.4)}
 
 /* ═══ BOTTOM NAV (mobil) ═══ */
-.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:9px 0 0}
-.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(14px,env(safe-area-inset-bottom))}
-.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-family:inherit;padding:6px 8px;font-size:12px;letter-spacing:0.03em;min-width:54px}
-.bnav-btn i{font-size:28px;line-height:1}
+.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:11px 0 0}
+.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:7px 9px;font-size:13.5px;letter-spacing:0.03em;min-width:60px}
+.bnav-btn i{font-size:34px;line-height:1}
 .bnav-btn.active,.bnav-btn:active{color:var(--gold)}
-.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:58px;height:58px;margin-bottom:6px;justify-content:center;padding:0}
-.bnav-home i{font-size:30px}
+.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:68px;height:68px;margin-bottom:7px;justify-content:center;padding:0}
+.bnav-home i{font-size:36px}
 
 @media (max-width:720px){
   .bottom-nav{display:block}
-  .lp-body{padding-top:3rem;padding-bottom:calc(98px + env(safe-area-inset-bottom))}
-  .list{padding-bottom:calc(98px + env(safe-area-inset-bottom))}
+  .lp-body{padding-top:3rem;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+  .list{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
   .lp-tools{margin-top:2rem}
 }
 @media (min-width:721px){
@@ -2035,7 +2036,8 @@ function syncFromCloud(){
     sbGet('servicii_custom'),
     sbGet('du_manual'),
     sbGet('inc_diverse'),
-    sbGet('todo')
+    sbGet('todo'),
+    sbGet('bday_manual')
   ]).then(function(results){
     var changed=false;
     if(results[0]){
@@ -2066,6 +2068,11 @@ function syncFromCloud(){
     if(results[6]){
       var td=typeof results[6]==='string'?results[6]:JSON.stringify(results[6]);
       localStorage.setItem(TODO_KEY,td);
+      changed=true;
+    }
+    if(results[7]){
+      var bm=typeof results[7]==='string'?results[7]:JSON.stringify(results[7]);
+      localStorage.setItem('crm_bday_manual_v1',bm);
       changed=true;
     }
     setSyncStatus(true,'Sincronizat: '+new Date().toLocaleTimeString('ro-RO'));
@@ -2638,10 +2645,10 @@ function updateLpStats(){
   var el=document.getElementById('lp-stats');
   if(!el)return;
   el.innerHTML=
-    '<div class="lp-stat"><div class="lp-stat-val">'+clients.filter(function(c){return isActive(c);}).length+'</div><div class="lp-stat-lbl">Clienți activi</div></div>'+
-    (restanteCount?'<div class="lp-stat warn"><div class="lp-stat-val">'+restanteCount+'</div><div class="lp-stat-lbl">Restanțe</div></div>':'')+
-    (expCount?'<div class="lp-stat warn"><div class="lp-stat-val">'+expCount+'</div><div class="lp-stat-lbl">Expirări</div></div>':'')+
-    (bdayCount?'<div class="lp-stat gold"><div class="lp-stat-val">'+bdayCount+'</div><div class="lp-stat-lbl">Zile de naștere</div></div>':'');
+    '<div class="lp-stat" onclick="openView(\'clienti\')" style="cursor:pointer"><div class="lp-stat-val">'+clients.filter(function(c){return isActive(c);}).length+'</div><div class="lp-stat-lbl">Clienți activi</div></div>'+
+    (restanteCount?'<div class="lp-stat warn" onclick="openView(\'restante\')" style="cursor:pointer"><div class="lp-stat-val">'+restanteCount+'</div><div class="lp-stat-lbl">Restanțe</div></div>':'')+
+    (expCount?'<div class="lp-stat warn" onclick="openView(\'expirari\')" style="cursor:pointer"><div class="lp-stat-val">'+expCount+'</div><div class="lp-stat-lbl">Expirări</div></div>':'')+
+    (bdayCount?'<div class="lp-stat gold" onclick="openView(\'birthdays\')" style="cursor:pointer"><div class="lp-stat-val">'+bdayCount+'</div><div class="lp-stat-lbl">Zile de naștere</div></div>':'');
 }
 
 function setFilter(f){
@@ -2657,13 +2664,22 @@ function renderBirthdays(){
     var b=cnpToBirthdate(c.cnp);
     if(!b)return;
     var info=nextBirthdayInfo(b);
-    all.push({c:c,b:b,days:info.days,turningAge:info.turningAge});
+    all.push({c:c,b:b,days:info.days,turningAge:info.turningAge,isManual:false});
+  });
+  var manualEntries=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+  manualEntries.forEach(function(m){
+    var b={day:m.day,month:m.month,year:m.year};
+    var info=nextBirthdayInfo(b);
+    all.push({c:{nume:m.nume},b:b,days:info.days,turningAge:info.turningAge,isManual:true,manualId:m.id});
   });
   all.sort(function(a,b){return a.days-b.days;});
   var within7Count=all.filter(function(it){return it.days<=7;}).length;
   var showCount=Math.max(within7Count,5);
   var items=all.slice(0,showCount);
-  var html='<div class="bday-today"><i class="ti ti-calendar-event" aria-hidden="true"></i> Ast&#259;zi: '+todayStr+'</div>';
+  var html='<div class="bday-today" style="justify-content:space-between">'
+    +'<span><i class="ti ti-calendar-event" aria-hidden="true"></i> Ast&#259;zi: '+todayStr+'</span>'
+    +'<button type="button" class="btn-add-service" style="font-size:12px" onclick="openAddBdayManual()"><i class="ti ti-plus"></i> Adaugă</button>'
+    +'</div>';
   if(!items.length){
     html+='<div class="empty"><i class="ti ti-cake" aria-hidden="true"></i>Niciun client cu CNP valid pentru calculul zilei de na&#537;tere</div>';
   }else{
@@ -2672,13 +2688,66 @@ function renderBirthdays(){
       var badgeCls=it.days===0?'bday-badge-today':(it.days<=7?'exp-green':'exp-orange');
       html+='<div class="card bday-card">';
       html+='<div class="card-top"><div class="avatar">'+initials(it.c.nume)+'</div>';
-      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(it.c.nume||'\u2014')+'</div>';
+      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(it.c.nume||'\u2014')+(it.isManual?' <span class="tag-inactive" style="background:rgba(7,33,68,0.1);color:var(--navy)">Manual</span>':'')+'</div>';
       html+='<div class="card-firma">'+fmtBirth(it.b)+' &middot; &#238;mpline&#537;te '+it.turningAge+' ani</div></div>';
+      html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">';
       html+='<span class="exp-badge '+badgeCls+'">'+tag+'</span>';
+      if(it.isManual)html+='<button type="button" onclick="event.stopPropagation();stergeBdayManual(\''+it.manualId+'\')" style="background:none;border:none;color:rgba(178,59,59,0.6);cursor:pointer;padding:2px;font-size:11px;display:flex;align-items:center;gap:3px"><i class="ti ti-trash" style="font-size:13px"></i></button>';
+      html+='</div>';
       html+='</div></div>';
     });
   }
   document.getElementById('list').innerHTML=html;
+  injectIcons();
+}
+
+function openAddBdayManual(){
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Adaugă zi de naștere</div>'
+    +'<div class="field"><label>Nume</label><input type="text" id="bday-manual-nume" placeholder="ex: POPESCU ION"></div>'
+    +'<div class="field"><label>Data nașterii (zz.ll.aaaa)</label><input type="text" id="bday-manual-data" placeholder="ex: 15.03.1985"></div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="salveazaBdayManual()">'
+    +'<i class="ti ti-plus"></i> Adaugă</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Adaugă zi de naștere';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function salveazaBdayManual(){
+  var numeEl=document.getElementById('bday-manual-nume');
+  var dataEl=document.getElementById('bday-manual-data');
+  var nume=(numeEl?numeEl.value:'').trim();
+  var dataStr=(dataEl?dataEl.value:'').trim();
+  if(!nume){alert('Introdu numele.');return;}
+  var parts=dataStr.split('.');
+  if(parts.length!==3){alert('Data trebuie introdusă în formatul zz.ll.aaaa.');return;}
+  var day=parseInt(parts[0],10),month=parseInt(parts[1],10),year=parseInt(parts[2],10);
+  if(!day||!month||!year||day<1||day>31||month<1||month>12||year<1900||year>2100){alert('Dată invalidă. Folosește formatul zz.ll.aaaa.');return;}
+  try{
+    var entries=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+    entries.push({id:Date.now().toString(),nume:nume,day:day,month:month,year:year});
+    localStorage.setItem('crm_bday_manual_v1',JSON.stringify(entries));
+    sbSet('bday_manual',entries).catch(function(){setSyncStatus(false,'Eroare sync zile de naștere');});
+  }catch(e){console.error('salveazaBdayManual error:',e);}
+  finally{
+    document.getElementById('restanta-picker').style.display='none';
+    renderBirthdays();
+  }
+}
+
+function stergeBdayManual(id){
+  if(!confirm('Ștergi această zi de naștere?'))return;
+  try{
+    var entries=JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]');
+    entries=entries.filter(function(e){return e.id!==id;});
+    localStorage.setItem('crm_bday_manual_v1',JSON.stringify(entries));
+    sbSet('bday_manual',entries).catch(function(){setSyncStatus(false,'Eroare sync zile de naștere');});
+  }catch(e){console.error('stergeBdayManual error:',e);}
+  finally{
+    renderBirthdays();
+  }
 }
 
 var currentServiceMonth=currentMonthStr();
@@ -2907,7 +2976,7 @@ function saveDuManual(){
   var newEntry={id:Date.now().toString(),nume:nume,cnp:cnp};
   entries.push(newEntry);
   localStorage.setItem('crm_du_manual_v1',JSON.stringify(entries));
-  sbSet('du_manual',entries).catch(function(){});
+  sbSet('du_manual',entries).catch(function(){setSyncStatus(false,'Eroare sync DU manual');});
   document.getElementById('restanta-picker').style.display='none';
   renderDuTab();
 }
@@ -2917,7 +2986,7 @@ function deleteDuManual(id){
   var entries=JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]');
   entries=entries.filter(function(e){return e.id!==id;});
   localStorage.setItem('crm_du_manual_v1',JSON.stringify(entries));
-  sbSet('du_manual',entries).catch(function(){});
+  sbSet('du_manual',entries).catch(function(){setSyncStatus(false,'Eroare sync DU manual');});
   renderDuTab();
 }
 
@@ -3285,7 +3354,7 @@ function toggleLpTools(){
 var TODO_KEY='crm_todo_v1';
 var todoTab='active';
 function getTodos(){try{return JSON.parse(localStorage.getItem(TODO_KEY)||'[]');}catch(e){return [];}}
-function saveTodos(list){localStorage.setItem(TODO_KEY,JSON.stringify(list));sbSet('todo',list).catch(function(){});}
+function saveTodos(list){localStorage.setItem(TODO_KEY,JSON.stringify(list));sbSet('todo',list).then(function(){setSyncStatus(true,'To-do sincronizat');}).catch(function(){setSyncStatus(false,'Eroare sync to-do — verifică internetul');});}
 function cleanExpiredTodos(){
   var list=getTodos();
   var now=Date.now();
@@ -3316,8 +3385,11 @@ function renderTodoTab(){
       if(t.done&&t.doneAt){var days=Math.ceil((30*24*60*60*1000-(Date.now()-t.doneAt))/(24*60*60*1000));daysLeft=' · se șterge în '+days+' zile';}
       html+='<div class="todo-item'+(t.done?' done':'')+'">'
         +'<button class="todo-toggle'+(t.done?' done':'')+'" onclick="toggleTodo(\''+t.id+'\')">'+doneSvg+'</button>'
-        +'<div style="flex:1;min-width:0"><div class="todo-text'+(t.done?' done':'')+'" >'+esc(t.text)+'</div>'
+        +'<div style="flex:1;min-width:0"><div class="todo-text'+(t.done?' done':'')+'" id="todo-text-'+t.id+'">'+esc(t.text)+'</div>'
         +'<div class="todo-meta">'+new Date(t.createdAt).toLocaleDateString('ro-RO')+daysLeft+'</div></div>'
+        +'<button onclick="startEditTodo(\''+t.id+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:4px;flex-shrink:0" title="Modifică">'
+        +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>'
+        +'</button>'
         +'<button onclick="deleteTodo(\''+t.id+'\')" style="background:none;border:none;color:rgba(178,59,59,0.4);cursor:pointer;padding:4px;flex-shrink:0" title="Șterge">'
         +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
         +'</button></div>';
@@ -3346,6 +3418,25 @@ function deleteTodo(id){
   if(!confirm('Ștergi această sarcină?'))return;
   var list=getTodos().filter(function(t){return t.id!==id;});
   saveTodos(list);renderTodoTab();
+}
+function startEditTodo(id){
+  var textEl=document.getElementById('todo-text-'+id);
+  if(!textEl)return;
+  var list=getTodos();
+  var t=list.find(function(x){return x.id===id;});
+  if(!t)return;
+  textEl.outerHTML='<input type="text" id="todo-edit-'+id+'" value="'+esc(t.text)+'" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.3);border-radius:6px;padding:5px 7px;font-family:inherit" onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\')renderTodoTab()" onblur="saveTodoEdit(\''+id+'\')">';
+  var inp=document.getElementById('todo-edit-'+id);
+  if(inp){inp.focus();inp.select();}
+}
+function saveTodoEdit(id){
+  var inp=document.getElementById('todo-edit-'+id);
+  if(!inp)return;
+  var newText=inp.value.trim();
+  var list=getTodos();
+  var t=list.find(function(x){return x.id===id;});
+  if(t&&newText){t.text=newText;saveTodos(list);}
+  renderTodoTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3602,7 +3693,7 @@ function persistIncasareEntry(entry){
     saveSvcStore();
   }else{
     localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(entry.arr));
-    sbSet('inc_diverse',entry.arr).catch(function(){});
+    sbSet('inc_diverse',entry.arr).catch(function(){setSyncStatus(false,'Eroare sync încasări');});
   }
 }
 
@@ -3851,7 +3942,7 @@ function salveazaIncasareNoua(){
       var incDiverse=JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]');
       incDiverse.push({id:Date.now().toString(),nume:numeOcaz,suma:suma,data:data,tip:tip,nrFactura:nrFactura,obs:obs});
       localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(incDiverse));
-      sbSet('inc_diverse',incDiverse).catch(function(){});
+      sbSet('inc_diverse',incDiverse).catch(function(){setSyncStatus(false,'Eroare sync încasări');});
     }catch(e){console.error('salveazaIncasareNoua (ocazional) error:',e);}
     finally{
       if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
@@ -5496,7 +5587,8 @@ function generateRaportRestante(clientId){
     });
     // Servicii PF
     var pfKeys=Object.keys(rec.services_pf||{});
-    if(pfKeys.length){
+    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;});
+    if(hasPfServices){
       checkP();
       doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
       doc.text('Persoană fizică:',margin+2,y);y+=4.5;doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
@@ -5675,7 +5767,8 @@ function generateFisaIstoric(){
     });
     // PF services
     var pfKeys=Object.keys(rec.services_pf||{});
-    if(pfKeys.length){
+    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;});
+    if(hasPfServices){
       checkP();
       doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
       doc.text('Persoan\u0103 fizic\u0103:',margin+2,y);y+=4.5;doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
@@ -5770,7 +5863,8 @@ function exportFullBackup(){
     servicii:svcStore,
     declaratieUnica:duStore,
     serviciiCustom:customServices,
-    duManual:JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]')
+    duManual:JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]'),
+    bdayManual:JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]')
   };
   var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   var url=URL.createObjectURL(blob);
@@ -5794,7 +5888,8 @@ function buildBackupData(){
     servicii:svcStore,
     declaratieUnica:duStore,
     serviciiCustom:customServices,
-    duManual:JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]')
+    duManual:JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]'),
+    bdayManual:JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]')
   };
 }
 
@@ -5852,6 +5947,7 @@ function restoreAutoBackup(){
         if(data.declaratieUnica)duStore=data.declaratieUnica;
         if(data.serviciiCustom)customServices=data.serviciiCustom;
         if(data.duManual)localStorage.setItem('crm_du_manual_v1',JSON.stringify(data.duManual));
+        if(data.bdayManual)localStorage.setItem('crm_bday_manual_v1',JSON.stringify(data.bdayManual));
         save();saveSvcStore();saveDuStore();saveCustomServices();
         alert('Restaurare reușită! '+( data.clienti?data.clienti.length+' clienți restaurați.':''));
         goHome();updateLpStats();
