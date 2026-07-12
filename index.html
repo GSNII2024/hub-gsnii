@@ -399,6 +399,20 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-title">Restanțe</div>
           <div class="lp-card-sub">Solduri neachitate</div>
         </button>
+        <button class="lp-card" onclick="openView('registre')">
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5a2d8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <div class="lp-card-title">Registre</div>
+          <div class="lp-card-sub">Corespondență &amp; Contracte</div>
+        </button>
+        <button class="lp-card" onclick="openView('semnari')">
+          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4.5-1.5L18 5a2.121 2.121 0 013 3L10.5 18.5 9 19l.5-1.5"/><path d="M3 21h18"/></svg>
+          </div>
+          <div class="lp-card-title">Semnări</div>
+          <div class="lp-card-sub">Documente de semnat</div>
+        </button>
         <button class="lp-card" onclick="openView('spv')">
           <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-id-badge-2"></i></div>
           <div class="lp-card-title">Listă SPV</div>
@@ -418,20 +432,6 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-icon" style="background:rgba(220,80,80,0.12);color:#b83030"><i class="ti ti-cake"></i></div>
           <div class="lp-card-title">Zile de naștere</div>
           <div class="lp-card-sub">Următoarele aniversări</div>
-        </button>
-        <button class="lp-card" onclick="openView('registre')">
-          <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5a2d8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          </div>
-          <div class="lp-card-title">Registre</div>
-          <div class="lp-card-sub">Corespondență &amp; Contracte</div>
-        </button>
-        <button class="lp-card" onclick="openView('semnari')">
-          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4.5-1.5L18 5a2.121 2.121 0 013 3L10.5 18.5 9 19l.5-1.5"/><path d="M3 21h18"/></svg>
-          </div>
-          <div class="lp-card-title">Semnări</div>
-          <div class="lp-card-sub">Documente de semnat</div>
         </button>
       </div>
       <div id="backup-age-banner" style="display:none;width:100%;padding:8px 12px;background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:8px;font-size:12px;color:#a03030;margin-bottom:4px;text-align:center"></div>
@@ -6651,10 +6651,9 @@ function renderSemnariListaIncurs(list){
       +'</div>';
     html+='<div style="margin-top:10px">';
     d.signers.forEach(function(s){
-      var link=location.origin+location.pathname+'?semneaza='+s.token;
       html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid rgba(7,33,68,0.06)">'
         +'<div style="font-size:13px"><b>'+esc(s.nume)+'</b> '+(s.status==='semnat'?'<span style="color:#1a6a40">&#10003; semnat</span>':'<span style="color:rgba(7,33,68,0.4)">în așteptare</span>')+'</div>'
-        +(s.status==='semnat'?'':'<button type="button" onclick="copiazaLinkSemnare(\''+link+'\')" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);cursor:pointer;font-family:inherit">Copiază link</button>')
+        +(s.status==='semnat'?'':'<button type="button" onclick="openTrimiteSemnare(\''+d.id+'\',\''+s.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);cursor:pointer;font-family:inherit">📨 Trimite</button>')
         +'</div>';
     });
     html+='</div>';
@@ -6665,12 +6664,88 @@ function renderSemnariListaIncurs(list){
   injectIcons();
 }
 
-function copiazaLinkSemnare(link){
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(link).then(function(){alert('Link copiat! Trimite-l semnatarului (WhatsApp, SMS, email).');}).catch(function(){prompt('Copiază acest link:',link);});
-  }else{
-    prompt('Copiază acest link:',link);
+// ── Mesaj formal de trimis semnatarului (RO / HU la alegere) ──────────────
+var semnMesajLimba='ro';
+
+function buildMesajSemnare(doc,signer,limba){
+  var link=location.origin+location.pathname+'?semneaza='+signer.token;
+  if(limba==='hu'){
+    return 'Tisztelt '+signer.nume+'!\n\n'
+      +'Elküldjük Önnek a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
+      +'Kérjük, nyissa meg az alábbi linket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'
+      +'👉 Aláírás itt: '+link+'\n\n'
+      +'Köszönjük a gyors ügyintézést!\n\n'
+      +'Tisztelettel,\nGÁL S. NORBERT Î.I.';
   }
+  return 'Bună ziua, '+signer.nume+',\n\n'
+    +'Vă transmitem documentul „'+doc.titlu+'” pentru semnare.\n\n'
+    +'Vă rugăm să accesați link-ul de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'
+    +'👉 Semnează aici: '+link+'\n\n'
+    +'Vă mulțumim pentru promptitudine!\n\n'
+    +'Cu stimă,\nGÁL S. NORBERT Î.I.';
+}
+
+function openTrimiteSemnare(docId,signerId){
+  semnMesajLimba='ro';
+  renderTrimiteSemnareModal(docId,signerId);
+}
+
+function renderTrimiteSemnareModal(docId,signerId){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(!doc){alert('Documentul nu a fost găsit.');return;}
+  var signer=doc.signers.find(function(s){return s.id===signerId;});
+  if(!signer){alert('Semnatarul nu a fost găsit.');return;}
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Trimite spre semnare</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+    +'<button type="button" onclick="semnMesajLimba=\'ro\';renderTrimiteSemnareModal(\''+docId+'\',\''+signerId+'\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMesajLimba==='ro'?'var(--navy)':'#fff')+';color:'+(semnMesajLimba==='ro'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇷🇴 Română</button>'
+    +'<button type="button" onclick="semnMesajLimba=\'hu\';renderTrimiteSemnareModal(\''+docId+'\',\''+signerId+'\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMesajLimba==='hu'?'var(--navy)':'#fff')+';color:'+(semnMesajLimba==='hu'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇭🇺 Magyar</button>'
+    +'</div>'
+    +'<textarea readonly style="width:100%;min-height:190px;font-size:12.5px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px;font-family:inherit;color:var(--navy);background:rgba(7,33,68,0.02);resize:vertical">'+esc(mesaj)+'</textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px" onclick="copiazaMesajSemnare(\''+docId+'\',\''+signerId+'\')"><i class="ti ti-file-text"></i> Copiază</button>'
+    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="trimiteEmailSemnare(\''+docId+'\',\''+signerId+'\')"><i class="ti ti-mail"></i> Email</button>'
+    +'</div>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Trimite spre semnare';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+// Construiește un mesaj formal, gata de trimis (WhatsApp, SMS, email), care
+// include un link către pagina de semnat, introdus natural în text ("semnează aici").
+function copiazaMesajSemnare(docId,signerId){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(!doc){alert('Documentul nu a fost găsit.');return;}
+  var signer=doc.signers.find(function(s){return s.id===signerId;});
+  if(!signer){alert('Semnatarul nu a fost găsit.');return;}
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(mesaj).then(function(){alert('Mesaj copiat! Îl poți lipi direct în WhatsApp, SMS sau email.');}).catch(function(){prompt('Copiază acest mesaj:',mesaj);});
+  }else{
+    prompt('Copiază acest mesaj:',mesaj);
+  }
+}
+
+// Deschide clientul de email implicit, cu subiect și mesaj precompletate.
+// Dacă semnatarul e un client existent cu adresă de email salvată, o completează automat.
+function trimiteEmailSemnare(docId,signerId){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(!doc){alert('Documentul nu a fost găsit.');return;}
+  var signer=doc.signers.find(function(s){return s.id===signerId;});
+  if(!signer){alert('Semnatarul nu a fost găsit.');return;}
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var subiect=semnMesajLimba==='hu'?('Aláírásra váró dokumentum: '+doc.titlu):('Document pentru semnare: '+doc.titlu);
+  var emailDest='';
+  if(signer.tip==='client'&&signer.clientId){
+    var c=(clients||[]).find(function(x){return x.id===signer.clientId;});
+    if(c&&clean(c.email))emailDest=c.email;
+  }
+  var mailto='mailto:'+encodeURIComponent(emailDest)+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
+  window.location.href=mailto;
 }
 
 function stergeDocumentSemnare(docId){
@@ -6908,6 +6983,62 @@ function imbunatatesteSemnatura(){
   signPadHasContent=true;
 }
 
+// Convertește un chenar marcat vizual (procente relative la pagina AȘA CUM
+// A FOST VĂZUTĂ la marcare, adică ținând cont de orice rotație PDF) în
+// coordonate native ale paginii pdf-lib (care ignoră rotația /Rotate).
+// Fără asta, paginile landscape (de obicei o pagină portret cu rotație de
+// 90°/270°) primesc semnătura într-un loc greșit.
+function nativeBoxForZone(z,page){
+  var pw0=page.getWidth(),ph0=page.getHeight();
+  var rotation=((page.getRotation().angle%360)+360)%360;
+  var visW=(rotation===90||rotation===270)?ph0:pw0;
+  var visH=(rotation===90||rotation===270)?pw0:ph0;
+
+  var vx0=z.xPct*visW, vy0=z.yPct*visH;
+  var vx1=(z.xPct+z.wPct)*visW, vy1=(z.yPct+z.hPct)*visH;
+
+  function toNative(X,Y){
+    if(rotation===90)return{x:Y,y:X};
+    if(rotation===180)return{x:pw0-X,y:Y};
+    if(rotation===270)return{x:pw0-Y,y:ph0-X};
+    return{x:X,y:ph0-Y};
+  }
+
+  var corners=[toNative(vx0,vy0),toNative(vx1,vy0),toNative(vx0,vy1),toNative(vx1,vy1)];
+  var xs=corners.map(function(c){return c.x;});
+  var ys=corners.map(function(c){return c.y;});
+  var xMin=Math.min.apply(null,xs), xMax=Math.max.apply(null,xs);
+  var yMin=Math.min.apply(null,ys), yMax=Math.max.apply(null,ys);
+  return {x:xMin,y:yMin,width:xMax-xMin,height:yMax-yMin};
+}
+
+// Rotește imaginea (data URL) cu un unghi de 0/90/180/270 grade, în sensul
+// acelor de ceasornic. Necesar pentru pagini rotite (landscape): pdf-lib
+// desenează imaginea "dreaptă" în spațiul nativ (nerotit) al paginii, iar
+// dacă nu o rotim invers, la afișare (când vizualizatorul aplică rotația
+// paginii) semnătura ar apărea răsucită și deplasată față de chenar.
+function rotateImageDataUrl(dataUrl,degrees){
+  return new Promise(function(resolve,reject){
+    var deg=((degrees%360)+360)%360;
+    if(deg===0){resolve(dataUrl);return;}
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var w=img.width,h=img.height;
+      if(deg===90||deg===270){canvas.width=h;canvas.height=w;}
+      else{canvas.width=w;canvas.height=h;}
+      var ctx=canvas.getContext('2d');
+      if(deg===90){ctx.translate(canvas.width,0);ctx.rotate(Math.PI/2);}
+      else if(deg===180){ctx.translate(canvas.width,canvas.height);ctx.rotate(Math.PI);}
+      else if(deg===270){ctx.translate(0,canvas.height);ctx.rotate(-Math.PI/2);}
+      ctx.drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror=function(){reject(new Error('Nu am putut roti imaginea semnăturii.'));};
+    img.src=dataUrl;
+  });
+}
+
 function submitSemnatura(docId,signerId){
   if(!signPadHasContent){alert('Te rugăm să desenezi semnătura înainte de a trimite.');return;}
   // Aplic automat îmbunătățirea de cerneală înainte de trimitere, dacă nu a fost deja apăsat butonul.
@@ -6928,24 +7059,30 @@ function submitSemnatura(docId,signerId){
 
     return fetch(semnPdfUrl(doc.lucruPdfPath)).then(function(r){return r.arrayBuffer();}).then(function(pdfBytes){
       return PDFLib.PDFDocument.load(pdfBytes).then(function(pdfDoc){
-        return pdfDoc.embedPng(signatureDataUrl).then(function(pngImage){
-          var myZones=doc.zones.filter(function(z){return z.signerId===signerId;});
-          myZones.forEach(function(z){
-            var page=pdfDoc.getPage(z.page);
-            var pw=page.getWidth(),ph=page.getHeight();
-            var boxW=z.wPct*pw,boxH=z.hPct*ph;
-            var boxX=z.xPct*pw;
-            var boxY=ph-(z.yPct*ph)-boxH;
-            var imgRatio=pngImage.width/pngImage.height;
-            var boxRatio=boxW/boxH;
-            var drawW=boxW,drawH=boxH;
-            if(imgRatio>boxRatio){drawH=boxW/imgRatio;}else{drawW=boxH*imgRatio;}
-            var drawX=boxX+(boxW-drawW)/2;
-            var drawY=boxY+(boxH-drawH)/2;
-            page.drawImage(pngImage,{x:drawX,y:drawY,width:drawW,height:drawH});
+        var myZones=doc.zones.filter(function(z){return z.signerId===signerId;});
+        var rotatedCache={};
+        function getRotatedDataUrl(compAngle){
+          if(!rotatedCache[compAngle])rotatedCache[compAngle]=rotateImageDataUrl(signatureDataUrl,compAngle);
+          return rotatedCache[compAngle];
+        }
+        var zonePromises=myZones.map(function(z){
+          var page=pdfDoc.getPage(z.page);
+          var rotation=((page.getRotation().angle%360)+360)%360;
+          var compAngle=(360-rotation)%360; // compensare inversă rotației paginii
+          return getRotatedDataUrl(compAngle).then(function(rotDataUrl){
+            return pdfDoc.embedPng(rotDataUrl).then(function(pngImage){
+              var box=nativeBoxForZone(z,page);
+              var imgRatio=pngImage.width/pngImage.height;
+              var boxRatio=box.width/box.height;
+              var drawW=box.width,drawH=box.height;
+              if(imgRatio>boxRatio){drawH=box.width/imgRatio;}else{drawW=box.height*imgRatio;}
+              var drawX=box.x+(box.width-drawW)/2;
+              var drawY=box.y+(box.height-drawH)/2;
+              page.drawImage(pngImage,{x:drawX,y:drawY,width:drawW,height:drawH});
+            });
           });
-          return pdfDoc.save();
         });
+        return Promise.all(zonePromises).then(function(){return pdfDoc.save();});
       }).then(function(newPdfBytes){
         var blob=new Blob([newPdfBytes],{type:'application/pdf'});
         return sbStorageUpload(doc.lucruPdfPath,blob,'application/pdf').then(function(){
