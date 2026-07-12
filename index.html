@@ -419,7 +419,7 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4.5-1.5L18 5a2.121 2.121 0 013 3L10.5 18.5 9 19l.5-1.5"/><path d="M3 21h18"/></svg>
           </div>
           <div class="lp-card-title">Semnări</div>
-          <div class="lp-card-sub">Documente de semnat</div>
+          <div class="lp-card-sub">DOCUMENTE DE SEMNAT</div>
         </button>
         <button class="lp-card" onclick="openView('spv')">
           <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-id-badge-2"></i></div>
@@ -6196,7 +6196,7 @@ function renderSemnariTab(){
   var inCurs=docs.filter(function(d){return d.status!=='semnat';});
   var semnate=docs.filter(function(d){return d.status==='semnat';});
 
-  var html='<div class="bday-today"><i class="ti ti-pencil"></i> Documente de semnat</div>';
+  var html='<div class="bday-today"><i class="ti ti-pencil"></i> DOCUMENTE DE SEMNAT</div>';
   html+='<div class="todo-tabs" style="margin-bottom:14px">'
     +'<button class="todo-tab'+(semnariSubTab==='nou'?' active':'')+'" onclick="semnariSubTab=\'nou\';renderSemnariTab()">Semnare nouă</button>'
     +'<button class="todo-tab'+(semnariSubTab==='incurs'?' active':'')+'" onclick="semnariSubTab=\'incurs\';renderSemnariTab()">În curs ('+inCurs.length+')</button>'
@@ -6759,14 +6759,27 @@ function copiazaMesajSemnare(docId,signerId){
 
 // Deschide fereastra nativă de distribuire a telefonului/laptopului, ca să
 // alegi direct din aplicațiile instalate (WhatsApp, Mesaje, Mail etc.).
+// Subiectul standard (RO/HU) folosit atât la Email cât și la Distribuire.
+function buildSubiectSemnare(doc,limba){
+  return limba==='hu'?('Aláírásra váró dokumentum: '+doc.titlu):('Document pentru semnare: '+doc.titlu);
+}
+function gasesteEmailSemnatar(signer){
+  if(signer.tip==='client'&&signer.clientId){
+    var c=(clients||[]).find(function(x){return x.id===signer.clientId;});
+    if(c&&clean(c.email))return c.email;
+  }
+  return '';
+}
+
 function distribuieMesajSemnare(docId,signerId){
   var doc=getSemnari().find(function(d){return d.id===docId;});
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
   var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var subiect=buildSubiectSemnare(doc,semnMesajLimba);
   if(navigator.share){
-    navigator.share({title:doc.titlu,text:mesaj}).catch(function(){});
+    navigator.share({title:subiect,text:mesaj}).catch(function(){});
   }else{
     alert('Distribuirea nu este suportată de acest browser. Folosește "Copiază mesaj" în schimb.');
   }
@@ -6780,12 +6793,8 @@ function trimiteEmailSemnare(docId,signerId){
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
   var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
-  var subiect=semnMesajLimba==='hu'?('Aláírásra váró dokumentum: '+doc.titlu):('Document pentru semnare: '+doc.titlu);
-  var emailDest='';
-  if(signer.tip==='client'&&signer.clientId){
-    var c=(clients||[]).find(function(x){return x.id===signer.clientId;});
-    if(c&&clean(c.email))emailDest=c.email;
-  }
+  var subiect=buildSubiectSemnare(doc,semnMesajLimba);
+  var emailDest=gasesteEmailSemnatar(signer);
   window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
 }
 
