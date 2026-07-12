@@ -250,18 +250,18 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .view-toolbar input::placeholder{color:rgba(7,33,68,0.4)}
 
 /* ═══ BOTTOM NAV (mobil) ═══ */
-.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:11px 0 0}
-.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(16px,env(safe-area-inset-bottom))}
-.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:7px 9px;font-size:13.5px;letter-spacing:0.03em;min-width:60px}
-.bnav-btn i{font-size:34px;line-height:1}
+.bottom-nav{display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:720px;background:var(--navy);border-top:2px solid var(--gold);z-index:10;padding:13px 0 0}
+.bottom-nav-inner{display:flex;justify-content:space-around;align-items:flex-end;padding-bottom:max(18px,env(safe-area-inset-bottom))}
+.bnav-btn{background:none;border:none;color:rgba(225,195,64,0.55);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:8px 10px;font-size:14.5px;letter-spacing:0.03em;min-width:64px}
+.bnav-btn i{font-size:38px;line-height:1}
 .bnav-btn.active,.bnav-btn:active{color:var(--gold)}
-.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:68px;height:68px;margin-bottom:7px;justify-content:center;padding:0}
-.bnav-home i{font-size:36px}
+.bnav-home{background:var(--gold);color:var(--navy)!important;border-radius:50%;width:74px;height:74px;margin-bottom:8px;justify-content:center;padding:0}
+.bnav-home i{font-size:40px}
 
 @media (max-width:720px){
   .bottom-nav{display:block}
-  .lp-body{padding-top:3rem;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
-  .list{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+  .lp-body{padding-top:3rem;padding-bottom:calc(122px + env(safe-area-inset-bottom))}
+  .list{padding-bottom:calc(122px + env(safe-area-inset-bottom))}
   .lp-tools{margin-top:2rem}
 }
 @media (min-width:721px){
@@ -527,7 +527,7 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
     <button class="bnav-btn" onclick="openView('clienti')" id="bnav-clienti"><i class="ti ti-address-book"></i><span>Clienți</span></button>
     <button class="bnav-btn" onclick="openView('servicii')" id="bnav-servicii"><i class="ti ti-receipt"></i><span>Servicii</span></button>
     <button class="bnav-btn bnav-home" onclick="goHome()" id="bnav-home" aria-label="Acasă"><i class="ti ti-home"></i></button>
-    <button class="bnav-btn" onclick="openView('du')" id="bnav-du"><i class="ti ti-clipboard-check"></i><span>DU</span></button>
+    <button class="bnav-btn" onclick="openView('incasari')" id="bnav-incasari"><i class="ti ti-report-money"></i><span>Încasări</span></button>
     <button class="bnav-btn" onclick="openView('restante')" id="bnav-restante"><i class="ti ti-coin-off"></i><span>Restanțe</span></button>
   </div>
 </nav>
@@ -2621,7 +2621,7 @@ function openView(view){
 }
 
 function updateBnav(view){
-  ['clienti','servicii','du','restante','home'].forEach(function(k){
+  ['clienti','servicii','incasari','restante','home'].forEach(function(k){
     var el=document.getElementById('bnav-'+k);
     if(el)el.classList.toggle('active', view===k);
   });
@@ -2751,6 +2751,7 @@ function stergeBdayManual(id){
 }
 
 var currentServiceMonth=currentMonthStr();
+var svcStatsWholeYear=false;
 var currentDuYear=2026;
 var currentDuFilter='all'; // 'all' | 'depusa' | 'nedepusa' | 'nu_este_cazul'
 
@@ -2828,8 +2829,7 @@ function renderDuTab(){
       html+='<div class="card-top">'
         +'<div class="avatar '+(isDep?'':'soon')+'">'+initials(entry.nume)+'</div>'
         +'<div style="min-width:0;flex:1">'
-        +'<div class="card-name">'+esc(entry.nume||'\u2014')+(entry.isManual?'<span class="tag-inactive" style="background:rgba(7,33,68,0.1);color:var(--navy)">Manual</span>':'')
-        +(!entry.isManual&&entry.c&&!isActive(entry.c)?'<span class="tag-inactive">Inactiv</span>':'')+'</div>'
+        +'<div class="card-name">'+esc(entry.nume||'\u2014')+(entry.isManual?'<span class="tag-inactive" style="background:rgba(7,33,68,0.1);color:var(--navy)">Manual</span>':'')+'</div>'
         +'<div class="du-cnp-line">CNP: <b>'+esc(entry.cnp)+'</b></div>'
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
@@ -3110,7 +3110,7 @@ function renderRestanteTab(){
       html+='<div class="card-top" onclick="toggleRestantaDetail(\''+it.c.id+'\')" style="cursor:pointer">'
         +'<div class="avatar exp">'+initials(it.c.nume)+'</div>'
         +'<div style="min-width:0;flex:1">'
-        +'<div class="card-name">'+esc(clientTitleLine(it.c))+(isActive(it.c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>'
+        +'<div class="card-name">'+esc(clientTitleLine(it.c))+'</div>'
         +'<div class="card-firma">'+esc(clientSubLine(it.c))+' &middot; '+it.luni.length+' lun'+(it.luni.length===1?'ă':'i')+'</div>'
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">'
@@ -3247,10 +3247,11 @@ function renderExpirariTab(){
     items.forEach(function(it){
       h+='<div class="card" onclick="openEdit(\''+it.c.id+'\')" style="border-left-color:'+(it.cls==='exp-red'?'#B23B3B':it.cls==='exp-orange'?'#C98A00':'var(--gold)')+'">';
       h+='<div class="card-top"><div class="avatar '+(it.cls==='exp-red'?'exp':it.cls==='exp-orange'?'soon':'')+'">'+initials(it.c.nume)+'</div>';
-      h+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+(isActive(it.c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
+      h+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+'</div>';
       h+='<div class="card-firma">'+esc(clientSubLine(it.c))+'</div></div>';
-      h+='<span class="exp-badge '+it.cls+'">'+expBadgeLabel(it.days,it.dateStr)+'</span>';
-      h+='</div></div>';
+      h+='</div>';
+      h+='<div style="margin-top:8px;display:flex;justify-content:flex-end"><span class="exp-badge '+it.cls+'">'+expBadgeLabel(it.days,it.dateStr)+'</span></div>';
+      h+='</div>';
     });
     return h;
   }
@@ -3284,12 +3285,13 @@ function renderExpirariTab(){
       var cls=it.days===null?'exp-orange':it.days<=7?'exp-red':it.days<=30?'exp-orange':'exp-green';
       html+='<div class="card" onclick="openEdit(\''+it.c.id+'\')">';
       html+='<div class="card-top"><div class="avatar soon">'+initials(it.c.nume)+'</div>';
-      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+(isActive(it.c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
+      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+'</div>';
       html+='<div class="card-firma">'+esc(clientSubLine(it.c))+'</div>';
       html+='<div style="font-size:11px;color:rgba(7,33,68,0.5);margin-top:2px">Suspendat din: '+(it.s.start||'—')+'</div>';
       html+='</div>';
-      html+='<span class="exp-badge '+cls+'">'+label+'</span>';
-      html+='</div></div>';
+      html+='</div>';
+      html+='<div style="margin-top:8px;display:flex;justify-content:flex-end"><span class="exp-badge '+cls+'">'+label+'</span></div>';
+      html+='</div>';
     });
   }
 
@@ -4170,7 +4172,7 @@ function renderSpvTab(){
       html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
       html+='<div class="card-top"><div class="avatar">'+initials(c.nume)+'</div>';
       html+='<div style="min-width:0;flex:1">';
-      html+='<div class="card-name">'+esc(c.nume||'—')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
+      html+='<div class="card-name">'+esc(c.nume||'—')+'</div>';
       html+='<div class="card-firma">'+esc(clientSubLine(c))+'</div>';
       html+='</div>';
       html+='<span class="exp-badge" style="background:rgba(7,33,68,0.08);color:var(--navy);font-size:11px">'+esc(c.cnp)+'</span>';
@@ -4186,7 +4188,7 @@ function renderSpvTab(){
       html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
       html+='<div class="card-top"><div class="avatar">'+initials(c.nume)+'</div>';
       html+='<div style="min-width:0;flex:1">';
-      html+='<div class="card-name">'+esc(clean(c.firma)||c.nume||'—')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
+      html+='<div class="card-name">'+esc(clean(c.firma)||c.nume||'—')+'</div>';
       html+='<div class="card-firma">'+esc(c.nume)+'</div>';
       if(clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
       html+='</div>';
@@ -4200,17 +4202,18 @@ function renderSpvTab(){
 
 function svcShiftMonth(delta){
   currentServiceMonth=shiftMonth(currentServiceMonth,delta);
+  svcStatsWholeYear=false;
   renderServiciiTab();
 }
 
 var svcSearchQuery='';
 
 function renderServiciiTab(){
-  // Calculez statistici pentru luna curentă
-  var totalServiciiLuna=0, totalIncasatLuna=0, totalRestanteLuna=0;
   var an=parseInt(currentServiceMonth.split('-')[0]);
   var luna=parseInt(currentServiceMonth.split('-')[1]);
 
+  // Statistici pentru luna curentă
+  var totalServiciiLuna=0, totalIncasatLuna=0, totalRestanteLuna=0;
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
     if(!rec||!rec.clientId)return;
@@ -4221,14 +4224,17 @@ function renderServiciiTab(){
     if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
   });
 
-  // Total servicii prestate pe tot anul selectat (toate lunile, toți clienții)
-  var totalServiciiAn=0;
+  // Statistici pentru tot anul selectat (toate lunile, toți clienții)
+  var totalServiciiAn=0, totalIncasatAn=0, totalRestanteAn=0;
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
     if(!rec||!rec.clientId)return;
     var anRec=parseInt((rec.month||'').split('-')[0]);
     if(anRec!==an)return;
-    totalServiciiAn+=computeRecordTotal(rec).serviceTotal;
+    var t=computeRecordTotal(rec);
+    totalServiciiAn+=t.serviceTotal;
+    totalIncasatAn+=t.sumaIncasata;
+    if(t.soldNou>0.01)totalRestanteAn+=t.soldNou;
   });
 
   // Ani disponibili
@@ -4258,23 +4264,27 @@ function renderServiciiTab(){
     html+='<button onclick="currentServiceMonth=\''+a+'-'+(lunaSel<10?'0':'')+lunaSel+'\';renderServiciiTab()" style="padding:5px 12px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(anSel==a?'var(--navy)':'#fff')+';color:'+(anSel==a?'#fff':'var(--navy)')+';font-size:13px;cursor:pointer;font-family:inherit">'+a+'</button>';
   });
   html+='</div>';
-  // Filtre luni
-  html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">';
+  // Filtre luni (+ Tot anul)
+  html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">';
+  html+='<button onclick="svcStatsWholeYear=true;renderServiciiTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(svcStatsWholeYear?'var(--navy)':'#fff')+';color:'+(svcStatsWholeYear?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">Tot anul</button>';
   for(var m=1;m<=12;m++){
-    var activ=lunaSel===m;
-    html+='<button onclick="currentServiceMonth=\''+anSel+'-'+(m<10?'0':'')+m+'\';renderServiciiTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(activ?'var(--navy)':'#fff')+';color:'+(activ?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">'+luniRo[m]+'</button>';
+    var activ=!svcStatsWholeYear&&lunaSel===m;
+    html+='<button onclick="svcStatsWholeYear=false;currentServiceMonth=\''+anSel+'-'+(m<10?'0':'')+m+'\';renderServiciiTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(activ?'var(--navy)':'#fff')+';color:'+(activ?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">'+luniRo[m]+'</button>';
   }
   html+='</div>';
 
-  // Centralizator luna
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-    +'<div style="background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(7,33,68,0.5);margin-bottom:3px">SERVICII</div><div style="font-size:15px;font-weight:800;color:var(--navy)">'+money(totalServiciiLuna)+'</div></div>'
-    +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(34,120,80,0.7);margin-bottom:3px">ÎNCASAT</div><div style="font-size:15px;font-weight:800;color:#1a6a40">'+money(totalIncasatLuna)+'</div></div>'
-    +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(178,59,59,0.7);margin-bottom:3px">RESTANȚE</div><div style="font-size:15px;font-weight:800;color:#b23b3b">'+money(totalRestanteLuna)+'</div></div>'
+  // Centralizator — adaptiv: luna selectată SAU tot anul, la fel ca la Încasări
+  var perioadaLabel=svcStatsWholeYear?'An '+anSel:monthLabel(currentServiceMonth);
+  var sServicii=svcStatsWholeYear?totalServiciiAn:totalServiciiLuna;
+  var sIncasat=svcStatsWholeYear?totalIncasatAn:totalIncasatLuna;
+  var sRestante=svcStatsWholeYear?totalRestanteAn:totalRestanteLuna;
+  html+='<div style="background:rgba(7,33,68,0.03);border:1px solid rgba(7,33,68,0.08);border-radius:12px;padding:12px;margin-bottom:12px">'
+    +'<div style="font-size:11px;color:rgba(7,33,68,0.4);font-weight:700;letter-spacing:1px;margin-bottom:10px">'+perioadaLabel.toUpperCase()+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+    +'<div style="background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(7,33,68,0.5);margin-bottom:3px">SERVICII</div><div style="font-size:15px;font-weight:800;color:var(--navy)">'+money(sServicii)+'</div></div>'
+    +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(34,120,80,0.7);margin-bottom:3px">ÎNCASAT</div><div style="font-size:15px;font-weight:800;color:#1a6a40">'+money(sIncasat)+'</div></div>'
+    +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(178,59,59,0.7);margin-bottom:3px">RESTANȚE</div><div style="font-size:15px;font-weight:800;color:#b23b3b">'+money(sRestante)+'</div></div>'
     +'</div>'
-    +'<div style="background:rgba(7,33,68,0.04);border:1px solid rgba(7,33,68,0.12);border-radius:10px;padding:10px;text-align:center;margin-bottom:12px">'
-    +'<div style="font-size:10px;color:rgba(7,33,68,0.5);margin-bottom:3px">TOTAL SERVICII PRESTATE ÎN '+an+'</div>'
-    +'<div style="font-size:17px;font-weight:800;color:var(--navy)">'+money(totalServiciiAn)+'</div>'
     +'</div>';
 
   html+='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
@@ -4377,7 +4387,7 @@ function render(){
     var avClass=worst==='exp-red'?'avatar exp':worst==='exp-orange'?'avatar soon':'avatar';
     html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
     html+='<div class="card-top"><div class="'+avClass+'">'+initials(c.nume)+'</div>';
-    html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>';
+    html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+'</div>';
     if(firma)html+='<div class="card-firma">'+esc(firma)+'</div>';
     if(firma&&clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
     html+='</div></div>';
