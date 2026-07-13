@@ -2262,26 +2262,42 @@ function gdriveRenameClientFolder(numeVechi,numeNou){
     .then(function(r){return r.json();}).catch(function(){return null;});
 }
 
-// URL care servește fișierul direct (bytes reali), nu pagina de vizualizare Google Drive.
-function gdriveFileUrl(path){
-  return GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path);
+// Descarcă fișierul (codificat text de către script) și îl reconstituie ca Blob în browser.
+function gdriveFetchFileBlob(path){
+  return fetch(GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(!res||res.error||!res.base64)throw new Error('not_found');
+      var byteChars=atob(res.base64);
+      var byteNumbers=new Array(byteChars.length);
+      for(var i=0;i<byteChars.length;i++)byteNumbers[i]=byteChars.charCodeAt(i);
+      var byteArray=new Uint8Array(byteNumbers);
+      return new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
+    });
+}
+
+// Deschide documentul direct (nu pagina de vizualizare Google Drive).
+function viewDocDirect(path){
+  gdriveFetchFileBlob(path).then(function(blob){
+    var url=URL.createObjectURL(blob);
+    window.open(url,'_blank');
+  }).catch(function(){alert('Nu am putut deschide documentul. Verifică internetul și încearcă din nou.');});
 }
 
 // Distribuie fișierul PROPRIU-ZIS (nu doar un link) prin fereastra nativă de distribuire,
 // dacă browserul suportă asta; altfel revine la deschiderea link-ului.
 function shareDocFile(path,name,mimeType){
-  var url=gdriveFileUrl(path);
   if(navigator.canShare){
-    fetch(url).then(function(r){return r.blob();}).then(function(blob){
+    gdriveFetchFileBlob(path).then(function(blob){
       var file=new File([blob],name,{type:mimeType||blob.type||'application/octet-stream'});
       if(navigator.canShare({files:[file]})){
         navigator.share({files:[file],title:name}).catch(function(){});
       }else{
-        shareDocUrl(url,name);
+        viewDocDirect(path);
       }
-    }).catch(function(){shareDocUrl(url,name);});
+    }).catch(function(){alert('Nu am putut pregăti fișierul pentru distribuire.');});
   }else{
-    shareDocUrl(url,name);
+    viewDocDirect(path);
   }
 }
 
@@ -2470,13 +2486,12 @@ function loadDocsDU(clientId){
         +'</div>'
         +'<div class="docs-list">'
         +years[year].map(function(m){
-          var urlE=gdriveFileUrl(m.path).replace(/'/g,"\\'");
           var pathE=(m.path||'').replace(/'/g,"\\'");
           var nameE=(m.name||'').replace(/'/g,"\\'");
           var typeE=(m.type||'').replace(/'/g,"\\'");
           return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
             +'<div class="doc-row-actions">'
-            +'<button type="button" class="doc-btn" onclick="window.open(\''+urlE+'\',\'_blank\')" title="Vizualizează">'+eyeSvg+'</button>'
+            +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
             +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
             +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDocDU(\''+clientId+'\',\''+pathE+'\')" title="Șterge">'+trashSvg+'</button>'
             +'</div></div>';
@@ -2973,11 +2988,10 @@ function loadDuDocs(clientId,year){
     if(!duDocs.length){container.innerHTML='';return;}
     container.innerHTML=duDocs.map(function(doc){
       var isRec=doc.duYear.endsWith('_recipisa');
-      var urlE=gdriveFileUrl(doc.path).replace(/'/g,"\\'");
       var pathE=(doc.path||'').replace(/'/g,"\\'");
       return '<span class="du-doc-chip" title="'+esc(doc.name)+'">'
         +(isRec?'<i class="ti ti-receipt"></i>':'<i class="ti ti-file-type-pdf"></i>')
-        +' <button onclick="window.open(\''+urlE+'\',\'_blank\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
+        +' <button onclick="viewDocDirect(\''+pathE+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
         +' <button onclick="deleteDuDocDrive(\''+clientId+'\',\''+pathE+'\','+year+')" style="background:none;border:none;cursor:pointer;color:#b23b3b;font-size:11px">✕</button>'
         +'</span>';
     }).join('');
@@ -3387,13 +3401,12 @@ function loadDocsCatMerged(clientId,category,containerId){
     var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
     var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
     el.innerHTML=catMeta.map(function(m){
-      var urlE=gdriveFileUrl(m.path).replace(/'/g,"\\'");
       var nameE=(m.name||'').replace(/'/g,"\\'");
       var pathE=(m.path||'').replace(/'/g,"\\'");
       var typeE=(m.type||'').replace(/'/g,"\\'");
       return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
         +'<div class="doc-row-actions">'
-        +'<button type="button" class="doc-btn" onclick="window.open(\''+urlE+'\',\'_blank\')" title="Vizualizează">'+eyeSvg+'</button>'
+        +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
         +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
         +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
         +'</div></div>';
