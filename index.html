@@ -2017,21 +2017,11 @@ function sbInitTables(){
     }).catch(function(){});
 }
 
-function sbGet(key){
-  return fetch(SUPABASE_URL+'/rest/v1/hub_data?key=eq.'+encodeURIComponent(key)+'&select=value',{headers:sbHeaders})
-    .then(function(r){return r.json();})
-    .then(function(rows){return (rows&&rows[0])?rows[0].value:null;})
-    .catch(function(){return null;});
-}
-
-function sbSet(key,value){
-  var payload={key:key,value:typeof value==='string'?value:JSON.stringify(value),updated_at:new Date().toISOString()};
-  return fetch(SUPABASE_URL+'/rest/v1/hub_data',{
-    method:'POST',
-    headers:Object.assign({},sbHeaders,{'Prefer':'resolution=merge-duplicates'}),
-    body:JSON.stringify(payload)
-  }).catch(function(){});
-}
+// Datele aplicației (clienți, servicii, încasări, restanțe, semnări etc.) au fost
+// migrate de pe Supabase pe Google Drive. sbGet/sbSet rămân cu același nume
+// (folosite în zeci de locuri în cod) dar acum vorbesc cu Drive.
+function sbGet(key){return gdriveGet(key);}
+function sbSet(key,value){return gdriveSet(key,value);}
 
 // Indicator sync
 var sbOnline=false;
@@ -2260,6 +2250,31 @@ function gdriveRenameClientFolder(numeVechi,numeNou){
   if(!numeVechi||!numeNou||numeVechi===numeNou)return Promise.resolve();
   return fetch(GDRIVE_SCRIPT_URL+'?action=renameClientFolder&numeVechi='+encodeURIComponent(numeVechi)+'&numeNou='+encodeURIComponent(numeNou),{method:'POST'})
     .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
+// Încarcă un Blob (nu doar un dataURL) — necesar pentru Semnări (PDF-uri generate în memorie).
+function gdriveUploadBlob(folderPath,filename,blob,mimeType){
+  return blob.arrayBuffer().then(function(buf){
+    var bytes=new Uint8Array(buf);
+    var binary='';
+    for(var i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+    var base64=btoa(binary);
+    return fetch(GDRIVE_SCRIPT_URL+'?action=upload&folderPath='+encodeURIComponent(folderPath)+'&filename='+encodeURIComponent(filename)+'&mimeType='+encodeURIComponent(mimeType||blob.type||'application/octet-stream'),{
+      method:'POST',
+      body:base64
+    }).then(function(r){return r.json();});
+  });
+}
+// La fel, dar primind un path complet (folder+nume combinate într-un singur string).
+function gdriveUploadBlobPath(fullPath,blob,mimeType){
+  var parts=fullPath.split('/');
+  var filename=parts.pop();
+  var folderPath=parts.join('/');
+  return gdriveUploadBlob(folderPath,filename,blob,mimeType);
+}
+// Obține bytes-ii unui fișier direct ca ArrayBuffer (pentru pdf-lib).
+function gdriveFetchArrayBuffer(path){
+  return gdriveFetchFileBlob(path).then(function(blob){return blob.arrayBuffer();});
 }
 
 // Descarcă fișierul (codificat text de către script) și îl reconstituie ca Blob în browser.
@@ -6334,8 +6349,8 @@ function checkSession(){
 function initApp(){
   goHome();
   document.getElementById('cnt').textContent = clients.length + ' client' + (clients.length === 1 ? '' : 'i');
-  // Sync din cloud la pornire
-  sbInitTables().then(function(){syncFromCloud();});
+  // Sync din cloud (Google Drive) la pornire
+  syncFromCloud();
   // Backup automat silențios
   if(clients.length > 0){
     setTimeout(function(){ autoSaveBackup(); }, 5000);
@@ -6371,7 +6386,6 @@ function genSemnToken(){return Date.now().toString(36)+Math.random().toString(36
 // Adaugă un parametru anti-cache: fișierul de lucru se suprascrie de mai multe
 // ori (o dată per semnatar), iar fără asta browserul/CDN-ul ar putea servi
 // o versiune veche, fără ultima semnătură inserată.
-function semnPdfUrl(path){return sbStorageUrl(path)+'?v='+Date.now();}
 
 function renderSemnariTab(){
   var docs=getSemnari();
@@ -6802,13 +6816,15 @@ function salveazaSemnareNoua(){
 
   var docId='doc'+Date.now();
   var blob=new Blob([semnareDraft.pdfBytes],{type:'application/pdf'});
-  sbStorageUpload('semnari/'+docId+'/original.pdf',blob,'application/pdf').then(function(){
-    return sbStorageUpload('semnari/'+docId+'/lucru.pdf',blob,'application/pdf');
-  }).then(function(){
+  gdriveUploadBlob('Semnări/'+docId,'original.pdf',blob,'application/pdf').then(function(res){
+    if(!res||!res.success)throw new Error('upload_failed');
+    return gdriveUploadBlob('Semnări/'+docId,'lucru.pdf',blob,'application/pdf');
+  }).then(function(res){
+    if(!res||!res.success)throw new Error('upload_failed');
     var doc={
       id:docId,titlu:titlu,createdAt:Date.now(),
-      pdfPath:'semnari/'+docId+'/original.pdf',
-      lucruPdfPath:'semnari/'+docId+'/lucru.pdf',
+      pdfPath:'Semnări/'+docId+'/original.pdf',
+      lucruPdfPath:'Semnări/'+docId+'/lucru.pdf',
       semnatPdfPath:null,
       signers:semnareDraft.signers,
       zones:semnareDraft.zones,
@@ -7000,7 +7016,7 @@ function renderSemnariListaSemnate(list){
       +'<div class="card-top"><div class="avatar" style="background:rgba(34,120,80,0.15);color:#1a6a40"><i class="ti ti-check"></i></div>'
       +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(d.titlu)+'</div>'
       +'<div class="card-firma">Semnat de: '+d.signers.map(function(s){return esc(s.nume);}).join(', ')+'</div></div>'
-      +'<a href="'+semnPdfUrl(d.semnatPdfPath||d.lucruPdfPath)+'" target="_blank" class="doc-btn" style="text-decoration:none;display:flex;align-items:center;justify-content:center"><i class="ti ti-file-type-pdf"></i></a>'
+      +'<button type="button" onclick="viewDocDirect(\''+(d.semnatPdfPath||d.lucruPdfPath).replace(/'/g,"\\'")+'\')" class="doc-btn" style="border:none"><i class="ti ti-file-type-pdf"></i></button>'
       +'</div>'
       +'<button type="button" onclick="stergeDocumentSemnare(\''+d.id+'\')" style="margin-top:10px;font-size:12px;color:rgba(178,59,59,0.6);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge documentul</button>'
       +'</div>';
@@ -7070,7 +7086,7 @@ function renderSignUI(doc,signer){
 
   setupSignaturePad();
 
-  fetch(semnPdfUrl(doc.lucruPdfPath)).then(function(r){return r.arrayBuffer();}).then(function(buf){
+  gdriveFetchArrayBuffer(doc.lucruPdfPath).then(function(buf){
     renderSignPdfPages(doc,signer,buf);
   }).catch(function(){
     var el=document.getElementById('sign-pdf-pages');
@@ -7298,7 +7314,7 @@ function submitSemnatura(docId,signerId){
     if(!signer)throw new Error('Semnatar negăsit');
     if(signer.status==='semnat')return{list:list,alreadySigned:true};
 
-    return fetch(semnPdfUrl(doc.lucruPdfPath)).then(function(r){return r.arrayBuffer();}).then(function(pdfBytes){
+    return gdriveFetchArrayBuffer(doc.lucruPdfPath).then(function(pdfBytes){
       return PDFLib.PDFDocument.load(pdfBytes).then(function(pdfDoc){
         var myZones=doc.zones.filter(function(z){return z.signerId===signerId;});
         var rotatedCache={};
@@ -7326,7 +7342,7 @@ function submitSemnatura(docId,signerId){
         return Promise.all(zonePromises).then(function(){return pdfDoc.save();});
       }).then(function(newPdfBytes){
         var blob=new Blob([newPdfBytes],{type:'application/pdf'});
-        return sbStorageUpload(doc.lucruPdfPath,blob,'application/pdf').then(function(){
+        return gdriveUploadBlobPath(doc.lucruPdfPath,blob,'application/pdf').then(function(){
           signer.status='semnat';
           signer.semnatAt=Date.now();
           var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
