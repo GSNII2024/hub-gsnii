@@ -2292,6 +2292,26 @@ function gdriveFetchFileBlob(path){
     });
 }
 
+// Extrage un link direct (servit chiar de Google, instant) din viewUrl-ul deja
+// salvat în metadate — mult mai rapid decât să trecem prin scriptul nostru de
+// fiecare dată. Se folosește doar pentru DESCHIDERE (nu pentru distribuire,
+// care tot are nevoie de fișierul propriu-zis descărcat în memorie).
+function fastDriveViewUrl(viewUrlSalvat){
+  if(!viewUrlSalvat)return null;
+  var m=viewUrlSalvat.match(/\/file\/d\/([^\/]+)\//);
+  if(m)return 'https://drive.google.com/uc?export=view&id='+m[1];
+  if(viewUrlSalvat.indexOf('uc?export=view')>-1)return viewUrlSalvat;
+  return null;
+}
+
+// Deschide documentul: instant, dacă avem deja adresa directă salvată;
+// altfel (fallback) trece prin scriptul nostru (mai lent, dar sigur).
+function viewDocFast(path,viewUrlSalvat){
+  var fast=fastDriveViewUrl(viewUrlSalvat);
+  if(fast){window.open(fast,'_blank');return;}
+  viewDocDirect(path);
+}
+
 // Deschide documentul direct (nu pagina de vizualizare Google Drive).
 function viewDocDirect(path){
   gdriveFetchFileBlob(path).then(function(blob){
@@ -2601,9 +2621,10 @@ function loadDocsDU(clientId){
           var pathE=(m.path||'').replace(/'/g,"\\'");
           var nameE=(m.name||'').replace(/'/g,"\\'");
           var typeE=(m.type||'').replace(/'/g,"\\'");
+          var viewUrlE=(m.viewUrl||'').replace(/'/g,"\\'");
           return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
             +'<div class="doc-row-actions">'
-            +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
+            +'<button type="button" class="doc-btn" onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
             +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
             +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDocDU(\''+clientId+'\',\''+pathE+'\')" title="Șterge">'+trashSvg+'</button>'
             +'</div></div>';
@@ -3101,9 +3122,10 @@ function loadDuDocs(clientId,year){
     container.innerHTML=duDocs.map(function(doc){
       var isRec=doc.duYear.endsWith('_recipisa');
       var pathE=(doc.path||'').replace(/'/g,"\\'");
+      var viewUrlE=(doc.viewUrl||'').replace(/'/g,"\\'");
       return '<span class="du-doc-chip" title="'+esc(doc.name)+'">'
         +(isRec?'<i class="ti ti-receipt"></i>':'<i class="ti ti-file-type-pdf"></i>')
-        +' <button onclick="viewDocDirect(\''+pathE+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
+        +' <button onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
         +' <button onclick="deleteDuDocDrive(\''+clientId+'\',\''+pathE+'\','+year+')" style="background:none;border:none;cursor:pointer;color:#b23b3b;font-size:11px">✕</button>'
         +'</span>';
     }).join('');
@@ -3516,9 +3538,10 @@ function loadDocsCatMerged(clientId,category,containerId){
       var nameE=(m.name||'').replace(/'/g,"\\'");
       var pathE=(m.path||'').replace(/'/g,"\\'");
       var typeE=(m.type||'').replace(/'/g,"\\'");
+      var viewUrlE=(m.viewUrl||'').replace(/'/g,"\\'");
       return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
         +'<div class="doc-row-actions">'
-        +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
+        +'<button type="button" class="doc-btn" onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
         +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
         +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
         +'</div></div>';
