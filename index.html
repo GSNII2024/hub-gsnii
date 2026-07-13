@@ -2047,6 +2047,51 @@ if(!clients){
 
 var svcStore=JSON.parse(localStorage.getItem('crm_servicii_v1')||'{}');
 var duStore=JSON.parse(localStorage.getItem('crm_du_v1')||'{}');
+var registreStore=JSON.parse(localStorage.getItem('crm_registre_v1')||'{"corespondenta":[],"contracte":[]}');
+function saveRegistre(){
+  localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));
+  sbSet('registre',registreStore).then(function(){setSyncStatus(true,'Registre sincronizate');}).catch(function(){setSyncStatus(false,'Eroare sync registre — verifică internetul');});
+}
+function getNextNrCorespondenta(){
+  var list=registreStore.corespondenta||[];
+  if(!list.length)return 1;
+  return Math.max.apply(null,list.map(function(r){return r.nr||0;}))+1;
+}
+function importaContracte2026(){
+  if(!confirm('Importă cele 23 de contracte din 2026 (GSNII/C/26001-26023)?'))return;
+  var noi=[{"nr": 26001, "an": 2026, "tip": "contract", "serie": "GSNII/C/26001", "data": "09.01.2026", "parte": "MIHALY BARBARA ERIKA PERSOANĂ FIZICĂ AUTORIZATĂ (BODA BARBARA-ERIKA PERSOANĂ FIZICĂ AUTORIZATĂ)", "obiect": "Actualizare CAEN, Schimbare Denumire, etc", "obs": ""}, {"nr": 26002, "an": 2026, "tip": "contract", "serie": "GSNII/C/26002", "data": "17.01.2026", "parte": "SZABÓ RENÁTA-TÜNDE", "obiect": "Înființare PFA + D.U.", "obs": ""}, {"nr": 26003, "an": 2026, "tip": "contract", "serie": "GSNII/C/26003", "data": "24.01.2026", "parte": "DEAY COM SRL", "obiect": "Actualizare CAEN, Schimbare sediu, majorare capital social", "obs": ""}, {"nr": 26004, "an": 2026, "tip": "contract", "serie": "GSNII/C/26004", "data": "31.01.2026", "parte": "TOLNAI LUKÁCS PFA", "obiect": "Înscriere mențiuni", "obs": ""}, {"nr": 26005, "an": 2026, "tip": "contract", "serie": "GSNII/C/26005", "data": "07.02.2026", "parte": "BARTA NIKOLETTA-JUSZTINA", "obiect": "Înființare PFA + D.U.", "obs": ""}, {"nr": 26006, "an": 2026, "tip": "contract", "serie": "GSNII/C/26006", "data": "16.02.2026", "parte": "KINETOMED FACILITY SRL", "obiect": "Schimbare sediu, Cesiune părți sociale, etc", "obs": ""}, {"nr": 26007, "an": 2026, "tip": "contract", "serie": "GSNII/C/26007", "data": "21.02.2026", "parte": "BODA MÁTÉ-TIBOR", "obiect": "Înființare Î.I. + D.U.", "obs": ""}, {"nr": 26008, "an": 2026, "tip": "contract", "serie": "GSNII/C/26008", "data": "21.02.2026", "parte": "BARTA NIKOLETTA-JUSZTINA PFA", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26009, "an": 2026, "tip": "contract", "serie": "GSNII/C/26009", "data": "04.03.2026", "parte": "NAGY BRIGITTA-KRISZTA PFA", "obiect": "Consultanță, Secretariat etc", "obs": ""}, {"nr": 26010, "an": 2026, "tip": "contract", "serie": "GSNII/C/26010", "data": "07.03.2026", "parte": "BODA MÁTÉ-TIBOR Î.I.", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26011, "an": 2026, "tip": "contract", "serie": "GSNII/C/26011", "data": "14.03.2026", "parte": "SÓLYOM FERENC", "obiect": "Înmatriculare SRL", "obs": ""}, {"nr": 26012, "an": 2026, "tip": "contract", "serie": "GSNII/C/26012", "data": "15.03.2026", "parte": "GOMBOS ERZSÉBET", "obiect": "Înscriere mențiuni ONRC", "obs": ""}, {"nr": 26013, "an": 2026, "tip": "contract", "serie": "GSNII/C/26013", "data": "31.03.2026", "parte": "TĂMĂȘAN TUDOR-ANDREI", "obiect": "Înmatriculare SRL", "obs": ""}, {"nr": 26014, "an": 2026, "tip": "contract", "serie": "GSNII/C/26014", "data": "27.04.2026", "parte": "BONE-SZILÁGYI ANETT-ANNA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26015, "an": 2026, "tip": "contract", "serie": "GSNII/C/26015", "data": "13.05.2026", "parte": "GÁL HENRIETTA-ERIKA", "obiect": "Înființare P.F.A.+ D.U.", "obs": ""}, {"nr": 26016, "an": 2026, "tip": "contract", "serie": "GSNII/C/26016", "data": "13.05.2026", "parte": "BONE-SZILÁGYI ANETT-ANNA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26017, "an": 2026, "tip": "contract", "serie": "GSNII/C/26017", "data": "23.05.2026", "parte": "SZEGEDI KALUDIA-ERIKA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26018, "an": 2026, "tip": "contract", "serie": "GSNII/C/26018", "data": "07.06.2026", "parte": "GÁL HENRIETTA-ERIKA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26019, "an": 2026, "tip": "contract", "serie": "GSNII/C/26019", "data": "13.06.2026", "parte": "SZEGEDI KALUDIA-ERIKA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26020, "an": 2026, "tip": "contract", "serie": "GSNII/C/26020", "data": "13.06.2026", "parte": "BUŞECAN IONUŢ-LUCIAN", "obiect": "Înființare P.F.A.", "obs": ""}, {"nr": 26021, "an": 2026, "tip": "contract", "serie": "GSNII/C/26021", "data": "13.06.2026", "parte": "INCZE BRIGHITA", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26022, "an": 2026, "tip": "contract", "serie": "GSNII/C/26022", "data": "20.06.2026", "parte": "GAL TAMARA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26023, "an": 2026, "tip": "contract", "serie": "GSNII/C/26023", "data": "27.06.2026", "parte": "TOLNAI KETRIN", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}];
+  var existente=(registreStore.contracte||[]).map(function(r){return r.nr;});
+  var adaugate=0;
+  noi.forEach(function(e){
+    if(existente.indexOf(e.nr)>-1)return;
+    if(!registreStore.contracte)registreStore.contracte=[];
+    registreStore.contracte.push(e);
+    adaugate++;
+  });
+  saveRegistre();
+  renderRegistreTab();
+  alert('Import complet: '+adaugate+' contracte adăugate.');
+}
+
+function getNextNrContract(){
+  var an=new Date().getFullYear();
+  var list=(registreStore.contracte||[]).filter(function(r){return r.an===an;});
+  if(!list.length)return 1;
+  return Math.max.apply(null,list.map(function(r){return r.nr||0;}))+1;
+}
+function serieContract(tip,nr){
+  var m={contract:'C',aditional:'A',reziliere:'R'};
+  return 'GSNII/'+(m[tip]||'C')+'/'+nr;
+}
+function obiecteContractSugestii(){
+  var seen={},out=[];
+  (registreStore.contracte||[]).forEach(function(r){
+    var o=(r.obiect||'').trim();
+    if(o&&!seen[o]){seen[o]=true;out.push(o);}
+  });
+  return out;
+}
+var GSNII_FIRMA='GÁL S. NORBERT Î.I.';
 var customServices=JSON.parse(localStorage.getItem('crm_custom_services_v1')||'[]');
 
 function save(){
@@ -2078,7 +2123,8 @@ function syncFromCloud(){
     sbGet('todo'),
     sbGet('bday_manual'),
     sbGet('semnari'),
-    sbGet('servicii_diverse')
+    sbGet('servicii_diverse'),
+    sbGet('registre')
   ]).then(function(results){
     var changed=false;
     if(results[0]){
@@ -2125,6 +2171,10 @@ function syncFromCloud(){
       var svd=typeof results[9]==='string'?results[9]:JSON.stringify(results[9]);
       localStorage.setItem('crm_servicii_diverse_v1',svd);
       changed=true;
+    }
+    if(results[10]){
+      var rg=typeof results[10]==='string'?JSON.parse(results[10]):results[10];
+      if(rg){registreStore=rg;localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));changed=true;}
     }
     setSyncStatus(true,'Sincronizat: '+new Date().toLocaleTimeString('ro-RO'));
     if(changed){
@@ -2247,6 +2297,12 @@ function gdriveDelete(path){
     .then(function(r){return r.json();}).catch(function(){return null;});
 }
 
+// Mută la Trash folderul întreg al unui client (cu tot ce e în el), din Drive.
+function gdriveDeleteFolder(path){
+  return fetch(GDRIVE_SCRIPT_URL+'?action=deleteFolder&path='+encodeURIComponent(path),{method:'POST'})
+    .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
 function gdriveRenameClientFolder(numeVechi,numeNou){
   if(!numeVechi||!numeNou||numeVechi===numeNou)return Promise.resolve();
   return fetch(GDRIVE_SCRIPT_URL+'?action=renameClientFolder&numeVechi='+encodeURIComponent(numeVechi)+'&numeNou='+encodeURIComponent(numeNou),{method:'POST'})
@@ -2290,26 +2346,6 @@ function gdriveFetchFileBlob(path){
       var byteArray=new Uint8Array(byteNumbers);
       return new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
     });
-}
-
-// Extrage un link direct (servit chiar de Google, instant) din viewUrl-ul deja
-// salvat în metadate — mult mai rapid decât să trecem prin scriptul nostru de
-// fiecare dată. Se folosește doar pentru DESCHIDERE (nu pentru distribuire,
-// care tot are nevoie de fișierul propriu-zis descărcat în memorie).
-function fastDriveViewUrl(viewUrlSalvat){
-  if(!viewUrlSalvat)return null;
-  var m=viewUrlSalvat.match(/\/file\/d\/([^\/]+)\//);
-  if(m)return 'https://drive.google.com/uc?export=view&id='+m[1];
-  if(viewUrlSalvat.indexOf('uc?export=view')>-1)return viewUrlSalvat;
-  return null;
-}
-
-// Deschide documentul: instant, dacă avem deja adresa directă salvată;
-// altfel (fallback) trece prin scriptul nostru (mai lent, dar sigur).
-function viewDocFast(path,viewUrlSalvat){
-  var fast=fastDriveViewUrl(viewUrlSalvat);
-  if(fast){window.open(fast,'_blank');return;}
-  viewDocDirect(path);
 }
 
 // Deschide documentul direct (nu pagina de vizualizare Google Drive).
@@ -2621,10 +2657,9 @@ function loadDocsDU(clientId){
           var pathE=(m.path||'').replace(/'/g,"\\'");
           var nameE=(m.name||'').replace(/'/g,"\\'");
           var typeE=(m.type||'').replace(/'/g,"\\'");
-          var viewUrlE=(m.viewUrl||'').replace(/'/g,"\\'");
           return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
             +'<div class="doc-row-actions">'
-            +'<button type="button" class="doc-btn" onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
+            +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
             +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
             +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDocDU(\''+clientId+'\',\''+pathE+'\')" title="Șterge">'+trashSvg+'</button>'
             +'</div></div>';
@@ -3122,10 +3157,9 @@ function loadDuDocs(clientId,year){
     container.innerHTML=duDocs.map(function(doc){
       var isRec=doc.duYear.endsWith('_recipisa');
       var pathE=(doc.path||'').replace(/'/g,"\\'");
-      var viewUrlE=(doc.viewUrl||'').replace(/'/g,"\\'");
       return '<span class="du-doc-chip" title="'+esc(doc.name)+'">'
         +(isRec?'<i class="ti ti-receipt"></i>':'<i class="ti ti-file-type-pdf"></i>')
-        +' <button onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
+        +' <button onclick="viewDocDirect(\''+pathE+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
         +' <button onclick="deleteDuDocDrive(\''+clientId+'\',\''+pathE+'\','+year+')" style="background:none;border:none;cursor:pointer;color:#b23b3b;font-size:11px">✕</button>'
         +'</span>';
     }).join('');
@@ -3462,17 +3496,25 @@ function renderExpirariTab(){
   var ciShow=ciList.slice(0,5);
   var sediuShow=sediuList.slice(0,5);
 
-  function renderSection(title,icon,items){
+  function renderSection(title,icon,items,mode){
     var h='<div class="section-title"><i class="ti '+icon+'" style="margin-right:5px"></i>'+title+'</div>';
     if(!items.length){
       h+='<div class="card-firma" style="margin:4px 0 14px 2px;font-style:italic;color:rgba(7,33,68,0.45)">Nicio dat&#259; de expirare \u00eenregistrat&#259;.</div>';
       return h;
     }
     items.forEach(function(it){
+      var numeLine,subLine;
+      if(mode==='personal'){
+        numeLine=it.c.nume||'Client';
+        subLine=clean(it.c.cnp)?('CNP: '+it.c.cnp):'';
+      }else{
+        numeLine=clean(it.c.firma)?it.c.firma:(it.c.nume||'Client');
+        subLine=clean(it.c.cui)?('CUI: '+it.c.cui):'';
+      }
       h+='<div class="card" onclick="openEdit(\''+it.c.id+'\')" style="border-left-color:'+(it.cls==='exp-red'?'#B23B3B':it.cls==='exp-orange'?'#C98A00':'var(--gold)')+'">';
       h+='<div class="card-top"><div class="avatar '+(it.cls==='exp-red'?'exp':it.cls==='exp-orange'?'soon':'')+'">'+initials(it.c.nume)+'</div>';
-      h+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+'</div>';
-      h+='<div class="card-firma">'+esc(clientSubLine(it.c))+'</div></div>';
+      h+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(numeLine)+'</div>';
+      h+='<div class="card-firma">'+esc(subLine)+'</div></div>';
       h+='</div>';
       h+='<div style="margin-top:8px;display:flex;justify-content:flex-end"><span class="exp-badge '+it.cls+'">'+expBadgeLabel(it.days,it.dateStr)+'</span></div>';
       h+='</div>';
@@ -3496,8 +3538,8 @@ function renderExpirariTab(){
   });
 
   var html='<div class="bday-today"><i class="ti ti-calendar-x"></i> Urm\u0103toarele 5 expir\u0103ri</div>';
-  html+=renderSection('C\u0103r\u021bi de identitate','ti-id',ciShow);
-  html+=renderSection('Sedii sociale','ti-building',sediuShow);
+  html+=renderSection('C\u0103r\u021bi de identitate','ti-id',ciShow,'personal');
+  html+=renderSection('Sedii sociale','ti-building',sediuShow,'company');
 
   if(suspList.length){
     html+='<div class="section-title"><i class="ti ti-player-pause" style="margin-right:5px"></i>Activit\u0103\u021bi suspendate active</div>';
@@ -3507,10 +3549,12 @@ function renderExpirariTab(){
         :it.days===0?'Suspendare se \u00eencheie azi!'
         :'Suspendare se \u00eencheie \u00een '+it.days+' zile ('+it.s.end+')';
       var cls=it.days===null?'exp-orange':it.days<=7?'exp-red':it.days<=30?'exp-orange':'exp-green';
+      var numeLineSusp=clean(it.c.firma)?it.c.firma:(it.c.nume||'Client');
+      var subLineSusp=clean(it.c.cui)?('CUI: '+it.c.cui):'';
       html+='<div class="card" onclick="openEdit(\''+it.c.id+'\')">';
       html+='<div class="card-top"><div class="avatar soon">'+initials(it.c.nume)+'</div>';
-      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(it.c))+'</div>';
-      html+='<div class="card-firma">'+esc(clientSubLine(it.c))+'</div>';
+      html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(numeLineSusp)+'</div>';
+      html+='<div class="card-firma">'+esc(subLineSusp)+'</div>';
       html+='<div style="font-size:11px;color:rgba(7,33,68,0.5);margin-top:2px">Suspendat din: '+(it.s.start||'—')+'</div>';
       html+='</div>';
       html+='</div>';
@@ -3538,10 +3582,9 @@ function loadDocsCatMerged(clientId,category,containerId){
       var nameE=(m.name||'').replace(/'/g,"\\'");
       var pathE=(m.path||'').replace(/'/g,"\\'");
       var typeE=(m.type||'').replace(/'/g,"\\'");
-      var viewUrlE=(m.viewUrl||'').replace(/'/g,"\\'");
       return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
         +'<div class="doc-row-actions">'
-        +'<button type="button" class="doc-btn" onclick="viewDocFast(\''+pathE+'\',\''+viewUrlE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
+        +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\')" title="Vizualizează">'+eyeSvg+'</button>'
         +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
         +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
         +'</div></div>';
@@ -4233,7 +4276,10 @@ function renderRegistreTab(){
   html+='<div class="reg-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
     +'<div style="display:flex;align-items:center;gap:8px"><div style="width:34px;height:34px;background:rgba(34,120,80,0.1);border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1a6a40" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>'
     +'<div class="section-title" style="margin:0">Registru contracte</div></div>'
-    +'<button class="btn-add-service" onclick="openAddContract()"><i class="ti ti-plus"></i> Nou</button></div>';
+    +'<div style="display:flex;gap:6px">'
+    +((registreStore.contracte||[]).some(function(r){return r.nr===26001;})?'':'<button class="btn-add-service" style="background:#fff;color:var(--navy)" onclick="importaContracte2026()"><i class="ti ti-database-import"></i> Importă 2026</button>')
+    +'<button class="btn-add-service" onclick="openAddContract()"><i class="ti ti-plus"></i> Nou</button>'
+    +'</div></div>';
   var listK=(registreStore.contracte||[]).slice().sort(function(a,b){return b.nr-a.nr;});
   if(!listK.length){html+='<div style="font-style:italic;color:rgba(7,33,68,0.4);font-size:14px;padding:6px 0">Nicio înregistrare</div>';}
   else{
@@ -4290,7 +4336,8 @@ function openAddContract(){
     +'<div class="field"><label>Serie</label><div id="ct-serie-preview" style="font-size:16px;font-weight:700;color:#1a6a40;padding:6px 0">GSNII/C/'+nr+'</div></div>'
     +'<div class="field"><label>Dată</label><input type="text" id="ct-data" value="'+todayRo()+'" placeholder="zz.ll.aaaa"></div>'
     +'<div class="field"><label>Client / Parte</label><select id="ct-client-sel" onchange="var v=this.value;if(v)document.getElementById(\'ct-parte\').value=v;" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:6px">'+opts+'</select><input type="text" id="ct-parte" placeholder="Sau introdu manual..."></div>'
-    +'<div class="field"><label>Obiectul actului</label><input type="text" id="ct-obiect" placeholder="ex: Prestări servicii..."></div>'
+    +'<div class="field"><label>Obiectul actului</label><input type="text" id="ct-obiect" list="ct-obiect-list" placeholder="ex: Prestări servicii... (sau alege din cele deja folosite)"></div>'
+    +'<datalist id="ct-obiect-list">'+obiecteContractSugestii().map(function(o){return '<option value="'+esc(o)+'">';}).join('')+'</datalist>'
     +'<div class="field"><label>Observații</label><input type="text" id="ct-obs" placeholder="Observații..."></div>'
     +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="saveContract('+nr+','+year+')"><i class="ti ti-check"></i> Salvează</button></div>';
   document.getElementById('restanta-picker-body').innerHTML=html;
@@ -4338,7 +4385,8 @@ function editRegistruEntry(tip,nr){
       +'<div class="field"><label>Serie</label><div id="ct-serie-preview" style="font-size:16px;font-weight:700;color:#1a6a40;padding:6px 0">'+esc(r.serie||serieContract(r.tip,r.nr))+'</div></div>'
       +'<div class="field"><label>Dată</label><input type="text" id="ct-data" value="'+esc(r.data||'')+'"></div>'
       +'<div class="field"><label>Client / Parte</label><select id="ct-client-sel" onchange="var v=this.value;if(v)document.getElementById(\'ct-parte\').value=v;" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:6px">'+opts+'</select><input type="text" id="ct-parte" value="'+esc(r.parte||'')+'"></div>'
-      +'<div class="field"><label>Obiectul actului</label><input type="text" id="ct-obiect" value="'+esc(r.obiect||'')+'"></div>'
+      +'<div class="field"><label>Obiectul actului</label><input type="text" id="ct-obiect" list="ct-obiect-list" value="'+esc(r.obiect||'')+'"></div>'
+      +'<datalist id="ct-obiect-list">'+obiecteContractSugestii().map(function(o){return '<option value="'+esc(o)+'">';}).join('')+'</datalist>'
       +'<div class="field"><label>Observații</label><input type="text" id="ct-obs" value="'+esc(r.obs||'')+'"></div>'
       +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="updateContract('+nr+')"><i class="ti ti-check"></i> Salvează</button></div>';
     document.getElementById('restanta-picker-body').innerHTML=html;
@@ -4538,8 +4586,17 @@ function renderServiciiTab(){
 
 function renderServiciiList(){
   var sorted=clients.slice().sort(function(a,b){
+    var recA=getRecord(a.id,currentServiceMonth),recB=getRecord(b.id,currentServiceMonth);
+    var totA=recA?computeRecordTotal(recA).serviceTotal:0;
+    var totB=recB?computeRecordTotal(recB).serviceTotal:0;
+    var hasA=totA>0.004,hasB=totB>0.004;
+    // 1) clienți cu servicii prestate luna asta, descrescător după valoare
+    if(hasA&&hasB)return totB-totA;
+    if(hasA!==hasB)return hasA?-1:1;
+    // 2) restul: activi înaintea inactivilor
     var aA=isActive(a)?0:1,bA=isActive(b)?0:1;
     if(aA!==bA)return aA-bA;
+    // 3) în cadrul fiecărui grup, alfabetic
     return (a.nume||'').toLowerCase().localeCompare((b.nume||'').toLowerCase(),'ro');
   });
   var q=svcSearchQuery.toLowerCase().trim();
@@ -5772,9 +5829,13 @@ function saveClient(){
 
 function deleteClient(){
   var c=clients.find(function(x){return x.id===editId;});
-  if(!confirm('\u0218tergi clientul "'+(c?c.nume:'')+'"?'))return;
+  if(!confirm('\u0218tergi clientul "'+(c?c.nume:'')+'"? Documentele lui din Drive vor fi mutate la Trash (recuperabile ~30 de zile).'))return;
+  var numeClient=c?clientDocFolderName(c.id):null;
   clients=clients.filter(function(x){return x.id!==editId;});
   save();closeModal();render();
+  if(numeClient){
+    gdriveDeleteFolder('Clienți/'+numeClient).catch(function(){});
+  }
 }
 
 function savePDF(){
@@ -6869,15 +6930,15 @@ function semnSearchClients(q){
   var nq=norm(q||'');
   var alreadyAdded={};
   semnareDraft.signers.forEach(function(s){if(s.clientId)alreadyAdded[s.clientId]=true;});
-  var eligibili=(clients||[]).filter(function(c){return clean(c.email)&&!alreadyAdded[c.id];});
+  var eligibili=(clients||[]).filter(function(c){return !alreadyAdded[c.id];});
   var filtered=eligibili.filter(function(c){
     if(!nq)return true;
     return norm(c.nume).includes(nq)||norm(c.email).includes(nq);
   }).slice(0,30);
-  if(!filtered.length){el.innerHTML='<div class="empty">Niciun client găsit cu adresă de email completată.</div>';return;}
+  if(!filtered.length){el.innerHTML='<div class="empty">Niciun client găsit.</div>';return;}
   el.innerHTML=filtered.map(function(c){
     return '<div onclick="selectSemnatarExistent(\''+c.id+'\')" style="padding:10px 12px;border:1px solid rgba(7,33,68,0.1);border-radius:8px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff">'
-      +'<div><div style="font-weight:600;color:var(--navy)">'+esc(c.nume)+'</div><div style="font-size:12px;color:rgba(7,33,68,0.5)">'+esc(c.email)+'</div></div>'
+      +'<div><div style="font-weight:600;color:var(--navy)">'+esc(c.nume)+'</div><div style="font-size:12px;color:rgba(7,33,68,0.5)">'+(clean(c.email)?esc(c.email):'<i>fără email</i>')+'</div></div>'
       +'</div>';
   }).join('');
 }
@@ -6895,7 +6956,7 @@ function openAddSemnatarManual(){
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:12px">Adaugă semnatar manual</div>'
     +'<div class="field"><label>Nume</label><input type="text" id="semn-manual-nume" placeholder="Nume și prenume"></div>'
-    +'<div class="field"><label>Email</label><input type="email" id="semn-manual-email" placeholder="adresa@email.com"></div>'
+    +'<div class="field"><label>Email (opțional)</label><input type="email" id="semn-manual-email" placeholder="adresa@email.com"></div>'
     +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="salveazaSemnatarManual()"><i class="ti ti-plus"></i> Adaugă</button>'
     +'</div>';
   document.getElementById('restanta-picker-body').innerHTML=html;
@@ -6908,7 +6969,7 @@ function salveazaSemnatarManual(){
   var nume=(document.getElementById('semn-manual-nume').value||'').trim();
   var email=(document.getElementById('semn-manual-email').value||'').trim();
   if(!nume){alert('Introdu numele semnatarului.');return;}
-  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('Introdu o adresă de email validă.');return;}
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('Adresa de email nu pare validă. Las-o goală dacă nu o ai.');return;}
   semnareDraft.signers.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,6),tip:'manual',clientId:null,nume:nume,email:email,token:genSemnToken(),status:'pending',semnatAt:null});
   document.getElementById('restanta-picker').style.display='none';
   renderSemnSignersList();
@@ -6935,16 +6996,17 @@ function salveazaSemnareNoua(){
   if(btn){btn.disabled=true;btn.innerHTML='Se salvează...';}
 
   var docId='doc'+Date.now();
+  var numeFisier=titlu.replace(/[\/\\:*?"<>|]/g,'_').trim()||'document';
   var blob=new Blob([semnareDraft.pdfBytes],{type:'application/pdf'});
-  gdriveUploadBlob('Semnări/'+docId,'original.pdf',blob,'application/pdf').then(function(res){
+  gdriveUploadBlob('Semnări/'+docId,numeFisier+'.pdf',blob,'application/pdf').then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
-    return gdriveUploadBlob('Semnări/'+docId,'lucru.pdf',blob,'application/pdf');
+    return gdriveUploadBlob('Semnări/'+docId,numeFisier+'_semnat.pdf',blob,'application/pdf');
   }).then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
     var doc={
       id:docId,titlu:titlu,createdAt:Date.now(),
-      pdfPath:'Semnări/'+docId+'/original.pdf',
-      lucruPdfPath:'Semnări/'+docId+'/lucru.pdf',
+      pdfPath:'Semnări/'+docId+'/'+numeFisier+'.pdf',
+      lucruPdfPath:'Semnări/'+docId+'/'+numeFisier+'_semnat.pdf',
       semnatPdfPath:null,
       signers:semnareDraft.signers,
       zones:semnareDraft.zones,
@@ -7120,9 +7182,14 @@ function trimiteEmailSemnare(docId,signerId){
 
 function stergeDocumentSemnare(docId){
   if(!confirm('Ștergi acest document și tot procesul de semnare? Această acțiune nu poate fi anulată.'))return;
+  var doc=getSemnari().find(function(d){return d.id===docId;});
   var list=getSemnari().filter(function(d){return d.id!==docId;});
   saveSemnari(list);
   renderSemnariTab();
+  if(doc){
+    if(doc.pdfPath)gdriveDelete(doc.pdfPath).catch(function(){});
+    if(doc.lucruPdfPath&&doc.lucruPdfPath!==doc.pdfPath)gdriveDelete(doc.lucruPdfPath).catch(function(){});
+  }
 }
 
 // ── Listă „Semnate" ────────────────────────────────────────
