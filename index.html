@@ -2231,7 +2231,7 @@ function sbStorageUrl(path){
 var GDRIVE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyUtCAgLBuxSqZcmtC-o_RWz2b6xex_PA7evXsYDbfNblDPqmwpkEzUK2KaZZ5GKbujsw/exec';
 
 function gdriveGet(key){
-  return fetch(GDRIVE_SCRIPT_URL+'?action=get&key='+encodeURIComponent(key))
+  return fetch(GDRIVE_SCRIPT_URL+'?action=get&key='+encodeURIComponent(key)+'&t='+Date.now())
     .then(function(r){return r.json();})
     .then(function(res){return (res&&res.value)?res.value:null;})
     .catch(function(){return null;});
