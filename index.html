@@ -2217,6 +2217,48 @@ function sbStorageUrl(path){
   return SUPABASE_URL+'/storage/v1/object/public/'+SB_BUCKET+'/'+path;
 }
 
+// ══ GOOGLE DRIVE (Apps Script) pentru documentele clienților ══
+// Notă: Semnările (contracte de semnat) rămân pe Supabase Storage deocamdată;
+// migrarea lor e o etapă separată.
+var GDRIVE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyUtCAgLBuxSqZcmtC-o_RWz2b6xex_PA7evXsYDbfNblDPqmwpkEzUK2KaZZ5GKbujsw/exec';
+
+function gdriveGet(key){
+  return fetch(GDRIVE_SCRIPT_URL+'?action=get&key='+encodeURIComponent(key))
+    .then(function(r){return r.json();})
+    .then(function(res){return (res&&res.value)?res.value:null;})
+    .catch(function(){return null;});
+}
+
+function gdriveSet(key,value){
+  var body=typeof value==='string'?value:JSON.stringify(value);
+  return fetch(GDRIVE_SCRIPT_URL+'?action=set&key='+encodeURIComponent(key),{method:'POST',body:body})
+    .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
+function gdriveUpload(folderPath,filename,dataURL,mimeType){
+  var base64=dataURL.indexOf(',')>-1?dataURL.split(',')[1]:dataURL;
+  return fetch(GDRIVE_SCRIPT_URL+'?action=upload&folderPath='+encodeURIComponent(folderPath)+'&filename='+encodeURIComponent(filename)+'&mimeType='+encodeURIComponent(mimeType||'application/octet-stream'),{
+    method:'POST',
+    body:base64
+  }).then(function(r){return r.json();});
+}
+
+function gdriveDelete(path){
+  return fetch(GDRIVE_SCRIPT_URL+'?action=delete&path='+encodeURIComponent(path),{method:'POST'})
+    .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
+function gdriveRenameClientFolder(numeVechi,numeNou){
+  if(!numeVechi||!numeNou||numeVechi===numeNou)return Promise.resolve();
+  return fetch(GDRIVE_SCRIPT_URL+'?action=renameClientFolder&numeVechi='+encodeURIComponent(numeVechi)+'&numeNou='+encodeURIComponent(numeNou),{method:'POST'})
+    .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
+function clientDocFolderName(clientId){
+  var c=(clients||[]).find(function(x){return x.id===clientId;});
+  return (c&&clean(c.nume))?c.nume:('Client_'+clientId);
+}
+
 // Conversia data URL → Blob
 function dataURLtoBlob(dataURL){
   var arr=dataURL.split(',');
@@ -2229,63 +2271,40 @@ function dataURLtoBlob(dataURL){
 }
 
 // Salvare document — IndexedDB local + Supabase Storage
-function saveDoc(clientId,name,type,dataURL,category,duYear){
-  // Salvare locală IndexedDB
-  var localPromise=dbTx('readwrite').then(function(store){
-    return new Promise(function(resolve,reject){
-      var req=store.add({clientId:clientId,name:name,type:type,data:dataURL,
-        category:category||'general',duYear:duYear||'',date:todayRo()});
-      req.onsuccess=function(){resolve(req.result);};
-      req.onerror=function(){reject(req.error);};
-    });
-  });
-
-  // Upload Supabase Storage
-  var path=clientId+'/'+(category||'general')+'/'+(duYear?duYear+'/':'')+Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  var blob=dataURLtoBlob(dataURL);
-  var sbPromise=sbStorageUpload(path,blob,type).then(function(res){
-    // Salvăm și metadata în hub_data
-    var metaKey='doc_meta_'+clientId;
-    return sbGet(metaKey).then(function(existing){
+// Salvare document — Google Drive (fișierul real) + metadate (doc_meta_{clientId})
+function saveDocToDrive(clientId,name,type,dataURL,category,folderLabel,duYear){
+  var numeClient=clientDocFolderName(clientId);
+  var folderPath='Clienți/'+numeClient+'/'+(folderLabel||category||'General');
+  var safeName=Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  return gdriveUpload(folderPath,safeName,dataURL,type).then(function(res){
+    if(!res||!res.success)throw new Error('upload_failed');
+    return gdriveGet('doc_meta_'+clientId).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
-      meta.push({path:path,name:name,type:type,category:category||'general',duYear:duYear||'',date:todayRo()});
-      return sbSet(metaKey,meta);
-    });
-  }).catch(function(){/* offline - doar local */});
-
-  return localPromise;
-}
-
-// Listare documente pentru client — combină local + cloud
-function getDocsForClient(clientId){
-  return dbTx('readonly').then(function(store){
-    return new Promise(function(resolve,reject){
-      var idx=store.index('clientId');
-      var req=idx.getAll(clientId);
-      req.onsuccess=function(){resolve(req.result);};
-      req.onerror=function(){reject(req.error);};
+      meta.push({
+        path:folderPath+'/'+safeName,name:name,type:type,
+        category:category||'general',duYear:duYear||'',date:todayRo(),
+        viewUrl:res.viewUrl,downloadUrl:res.downloadUrl
+      });
+      return gdriveSet('doc_meta_'+clientId,meta);
     });
   });
 }
 
-// Ștergere document
-function deleteDoc(id){
-  return dbTx('readwrite').then(function(store){
-    return new Promise(function(resolve,reject){
-      // Mai întâi citim datele ca să știm path-ul Supabase
-      var getReq=store.get(id);
-      getReq.onsuccess=function(){
-        var doc=getReq.result;
-        var delReq=store.delete(id);
-        delReq.onsuccess=function(){
-          resolve();
-          // Ștergem și din Supabase Storage (async)
-          if(doc&&doc.sbPath){
-            sbStorageDelete([doc.sbPath]).catch(function(){});
-          }
-        };
-        delReq.onerror=function(){reject(delReq.error);};
-      };
+// Listare documente pentru client — direct din metadata Drive
+function getDocsForClient(clientId){
+  return gdriveGet('doc_meta_'+clientId).then(function(meta){
+    return meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+  });
+}
+
+// Ștergere document — Drive + metadata
+function deleteDocDrive(clientId,path){
+  return gdriveDelete(path).then(function(){
+    return gdriveGet('doc_meta_'+clientId).then(function(meta){
+      if(!meta)return;
+      var allMeta=typeof meta==='string'?JSON.parse(meta):meta;
+      allMeta=allMeta.filter(function(m){return m.path!==path;});
+      return gdriveSet('doc_meta_'+clientId,allMeta);
     });
   });
 }
@@ -2301,7 +2320,7 @@ function uploadDocsCat(input,clientId,category,categoryLabel){
     return new Promise(function(resolve){
       var reader=new FileReader();
       reader.onload=function(e){
-        saveDoc(clientId,file.name,file.type,e.target.result,category,'').then(resolve);
+        saveDocToDrive(clientId,file.name,file.type,e.target.result,category,categoryLabel,'').then(resolve).catch(function(){resolve();});
       };
       reader.readAsDataURL(file);
     });
@@ -2309,7 +2328,7 @@ function uploadDocsCat(input,clientId,category,categoryLabel){
   Promise.all(promises).then(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
-    loadDocsCat(clientId,category,'docs-cat-'+clientId+'-'+category);
+    loadDocsCatMerged(clientId,category,'docs-cat-'+clientId+'-'+category);
   });
 }
 
@@ -2322,7 +2341,7 @@ function uploadDocsCatDU(input,clientId,year){
     return new Promise(function(resolve){
       var reader=new FileReader();
       reader.onload=function(e){
-        saveDoc(clientId,file.name,file.type,e.target.result,'du',String(year)).then(resolve);
+        saveDocToDrive(clientId,file.name,file.type,e.target.result,'du','Declarație Unică/'+year,String(year)).then(resolve).catch(function(){resolve();});
       };
       reader.readAsDataURL(file);
     });
@@ -2336,96 +2355,6 @@ function uploadDocsCatDU(input,clientId,year){
 
 function uploadDocs(input,clientId){uploadDocsCat(input,clientId,'general','General');}
 
-function buildDocRowHtml(doc,clientId,reloadFn){
-  var isPdf=doc.type==='application/pdf';
-  var iconColor=isPdf?'#b23b3b':'#1f6aa0';
-  var fileIcon=isPdf
-    ?'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="'+iconColor+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="6" y="19" font-size="5" fill="'+iconColor+'" stroke="none" font-family="sans-serif">PDF</text></svg>'
-    :'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="'+iconColor+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
-  var eyeIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-  var dlIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-  var shareIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
-  var trashIcon='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
-  return '<div class="doc-row" id="doc-row-'+doc.id+'">'
-    +fileIcon
-    +'<div class="doc-row-info">'
-    +'<div class="doc-row-name">'+esc(doc.name)+'</div>'
-    +'<div class="doc-row-date">'+esc(doc.date)+'</div>'
-    +'</div>'
-    +'<div class="doc-row-actions">'
-    +'<button type="button" class="doc-btn" onclick="viewDoc('+doc.id+')" title="Vizualizează">'+eyeIcon+'</button>'
-    +'<button type="button" class="doc-btn" onclick="downloadDoc('+doc.id+')" title="Descarcă">'+dlIcon+'</button>'
-    +'<button type="button" class="doc-btn" onclick="shareDoc('+doc.id+')" title="Distribuie">'+shareIcon+'</button>'
-    +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteDocReload('+doc.id+',\''+clientId+'\',\''+reloadFn+'\')" title="Şterge">'+trashIcon+'</button>'
-    +'</div>'
-    +'</div>';
-}
-
-function deleteDocReload(id,clientId,reloadFn){
-  if(!confirm('Ştergi documentul?'))return;
-  deleteDoc(id).then(function(){
-    if(reloadFn==='du') loadDocsDU(clientId);
-    else loadDocsCat(clientId,reloadFn,'docs-cat-'+clientId+'-'+reloadFn);
-  });
-}
-
-function loadDocsCat(clientId,category,containerId){
-  var el=document.getElementById(containerId);
-  if(!el)return;
-  getDocsForClient(clientId).then(function(docs){
-    var filtered=docs.filter(function(d){return d.category===category;});
-    if(!filtered.length){
-      el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';
-    }else if(category==='libre'){
-      // group by duYear (used as label)
-      var groups={};
-      filtered.forEach(function(d){var lbl=d.duYear||'Altele';if(!groups[lbl])groups[lbl]=[];groups[lbl].push(d);});
-      var html='';
-      Object.keys(groups).forEach(function(lbl){
-        html+='<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:rgba(7,33,68,0.6);margin-bottom:3px">'+esc(lbl)+'</div>';
-        html+=groups[lbl].map(function(d){return buildDocRowHtml(d,clientId,category);}).join('');
-        html+='</div>';
-      });
-      el.innerHTML=html;
-    }else{
-      el.innerHTML=filtered.map(function(d){return buildDocRowHtml(d,clientId,category);}).join('');
-    }
-    injectIcons();
-  });
-}
-
-function loadDocsDU(clientId){
-  var container=document.getElementById('docs-du-years-'+clientId);
-  if(!container)return;
-  getDocsForClient(clientId).then(function(docs){
-    var duDocs=docs.filter(function(d){return d.category==='du';});
-    var years={};
-    duDocs.forEach(function(d){var y=d.duYear||'?';if(!years[y])years[y]=[];years[y].push(d);});
-    var sortedYears=Object.keys(years).sort().reverse();
-    if(!sortedYears.length){
-      container.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun document</div>';
-      injectIcons();return;
-    }
-    var html='';
-    sortedYears.forEach(function(year){
-      html+='<div class="du-year-block">'
-        +'<div class="du-year-header">'
-        +'<span class="du-year-label">'+esc(year)+'</span>'
-        +'<label class="doc-cat-add-btn" title="Adaugă fișier pentru '+esc(year)+'">'
-        +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
-        +' onchange="uploadDocsCatDU(this,\''+clientId+'\',\''+year+'\')">'
-        +'<i class="ti ti-plus"></i></label>'
-        +'</div>'
-        +'<div class="docs-list">'
-        +years[year].map(function(d){return buildDocRowHtml(d,clientId,'du');}).join('')
-        +'</div>'
-        +'</div>';
-    });
-    container.innerHTML=html;
-    injectIcons();
-  });
-}
-
 function toggleAddFreeDocCat(clientId){
   var panel=document.getElementById('doc-libre-panel-'+clientId);
   var chev=document.getElementById('doc-libre-chevron-'+clientId);
@@ -2433,7 +2362,7 @@ function toggleAddFreeDocCat(clientId){
   var open=panel.style.display!=='none';
   panel.style.display=open?'none':'block';
   if(chev)chev.style.transform=open?'':'rotate(180deg)';
-  if(!open)loadDocsCat(clientId,'libre','docs-cat-'+clientId+'-libre');
+  if(!open)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
 }
 
 function uploadDocsFree(input,clientId){
@@ -2447,7 +2376,7 @@ function uploadDocsFree(input,clientId){
     return new Promise(function(resolve){
       var reader=new FileReader();
       reader.onload=function(e){
-        saveDoc(clientId,file.name,file.type,e.target.result,'libre',catLabel).then(resolve);
+        saveDocToDrive(clientId,file.name,file.type,e.target.result,'libre',catLabel,'').then(resolve).catch(function(){resolve();});
       };
       reader.readAsDataURL(file);
     });
@@ -2481,12 +2410,57 @@ function loadDocsList(clientId,containerId){
   if(libreEl)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
 }
 
-function deleteDocById(id,clientId,containerId){
-  if(!confirm('Ştergi documentul?'))return;
-  deleteDoc(id).then(function(){loadDocsList(clientId,containerId);});
+// Documente Declarație Unică, grupate pe ani — aceleași metadate/servicii ca restul documentelor
+function loadDocsDU(clientId){
+  var container=document.getElementById('docs-du-years-'+clientId);
+  if(!container)return;
+  container.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Se încarcă...</div>';
+  getDocsForClient(clientId).then(function(docs){
+    var duDocs=docs.filter(function(d){return d.category==='du';});
+    var years={};
+    duDocs.forEach(function(d){var y=d.duYear||'?';if(!years[y])years[y]=[];years[y].push(d);});
+    var sortedYears=Object.keys(years).sort().reverse();
+    if(!sortedYears.length){
+      container.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun document</div>';
+      return;
+    }
+    var eyeSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+    var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+    var html='';
+    sortedYears.forEach(function(year){
+      html+='<div class="du-year-block">'
+        +'<div class="du-year-header">'
+        +'<span class="du-year-label">'+esc(year)+'</span>'
+        +'<label class="doc-cat-add-btn" title="Adaugă fișier pentru '+esc(year)+'">'
+        +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
+        +' onchange="uploadDocsCatDU(this,\''+clientId+'\',\''+year+'\')">'
+        +'<i class="ti ti-plus"></i></label>'
+        +'</div>'
+        +'<div class="docs-list">'
+        +years[year].map(function(m){
+          var urlE=(m.viewUrl||'').replace(/'/g,"\\'");
+          var pathE=(m.path||'').replace(/'/g,"\\'");
+          var nameE=(m.name||'').replace(/'/g,"\\'");
+          return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
+            +'<div class="doc-row-actions">'
+            +'<button type="button" class="doc-btn" onclick="window.open(\''+urlE+'\',\'_blank\')" title="Vizualizează">'+eyeSvg+'</button>'
+            +'<button type="button" class="doc-btn" onclick="shareDocUrl(\''+urlE+'\',\''+nameE+'\')" title="Distribuie">'+shareSvg+'</button>'
+            +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDocDU(\''+clientId+'\',\''+pathE+'\')" title="Șterge">'+trashSvg+'</button>'
+            +'</div></div>';
+        }).join('')
+        +'</div>'
+        +'</div>';
+    });
+    container.innerHTML=html;
+    injectIcons();
+  });
 }
 
-// viewDoc, downloadDoc, shareDoc definite în blocul Supabase Storage de mai sus
+function deleteCloudDocDU(clientId,path){
+  if(!confirm('Ștergi documentul?'))return;
+  deleteDocDrive(clientId,path).then(function(){loadDocsDU(clientId);}).catch(function(){alert('Eroare la ștergere.');});
+}
 
 function closeDocViewer(){
   document.getElementById('doc-viewer').style.display='none';
@@ -2942,8 +2916,10 @@ function uploadDuDoc(input,clientId,year,type){
   if(!file)return;
   var reader=new FileReader();
   reader.onload=function(e){
-    saveDoc(clientId,file.name,file.type,e.target.result,'du',year+'_'+type)
-      .then(function(){loadDuDocs(clientId,year);});
+    var eticheta=type==='recipisa'?'Recipise':'Declarații';
+    saveDocToDrive(clientId,file.name,file.type,e.target.result,'du','Declarație Unică/'+year+'/'+eticheta,year+'_'+type)
+      .then(function(){loadDuDocs(clientId,year);})
+      .catch(function(){alert('Eroare la încărcare. Verifică internetul.');});
   };
   reader.readAsDataURL(file);
   input.value='';
@@ -2958,14 +2934,20 @@ function loadDuDocs(clientId,year){
     if(!duDocs.length){container.innerHTML='';return;}
     container.innerHTML=duDocs.map(function(doc){
       var isRec=doc.duYear.endsWith('_recipisa');
+      var urlE=(doc.viewUrl||'').replace(/'/g,"\\'");
+      var pathE=(doc.path||'').replace(/'/g,"\\'");
       return '<span class="du-doc-chip" title="'+esc(doc.name)+'">'
         +(isRec?'<i class="ti ti-receipt"></i>':'<i class="ti ti-file-type-pdf"></i>')
-        +' <button onclick="viewDoc('+doc.id+')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
-        +' <button onclick="deleteDoc('+doc.id+').then(function(){loadDuDocs(\''+clientId+'\','+year+')})" style="background:none;border:none;cursor:pointer;color:#b23b3b;font-size:11px">✕</button>'
+        +' <button onclick="window.open(\''+urlE+'\',\'_blank\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--navy)">'+esc(doc.name.length>15?doc.name.substring(0,14)+'…':doc.name)+'</button>'
+        +' <button onclick="deleteDuDocDrive(\''+clientId+'\',\''+pathE+'\','+year+')" style="background:none;border:none;cursor:pointer;color:#b23b3b;font-size:11px">✕</button>'
         +'</span>';
     }).join('');
     injectIcons();
   });
+}
+function deleteDuDocDrive(clientId,path,year){
+  if(!confirm('Ștergi documentul?'))return;
+  deleteDocDrive(clientId,path).then(function(){loadDuDocs(clientId,year);}).catch(function(){alert('Eroare la ștergere.');});
 }
 
 // ── DU Adăugare manuală ──────────────────────────────────
@@ -3357,7 +3339,8 @@ function renderExpirariTab(){
 function loadDocsCatMerged(clientId,category,containerId){
   var el=document.getElementById(containerId);
   if(!el)return;
-  sbGet('doc_meta_'+clientId).then(function(meta){
+  el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Se încarcă...</div>';
+  gdriveGet('doc_meta_'+clientId).then(function(meta){
     var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
     var catMeta=allMeta.filter(function(m){return m.category===category;});
     if(!catMeta.length){el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';return;}
@@ -3365,8 +3348,7 @@ function loadDocsCatMerged(clientId,category,containerId){
     var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
     var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
     el.innerHTML=catMeta.map(function(m){
-      var url=sbStorageUrl(m.path);
-      var urlE=url.replace(/'/g,"\\'");
+      var urlE=(m.viewUrl||'').replace(/'/g,"\\'");
       var nameE=(m.name||'').replace(/'/g,"\\'");
       var pathE=(m.path||'').replace(/'/g,"\\'");
       return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
@@ -3386,16 +3368,9 @@ function shareDocUrl(url,name){
 
 function deleteCloudDoc(clientId,path,containerId){
   if(!confirm('Ștergi documentul?'))return;
-  sbStorageDelete([path]).then(function(){
-    sbGet('doc_meta_'+clientId).then(function(meta){
-      if(!meta)return;
-      var allMeta=typeof meta==='string'?JSON.parse(meta):meta;
-      allMeta=allMeta.filter(function(m){return m.path!==path;});
-      sbSet('doc_meta_'+clientId,allMeta).then(function(){
-        var cat=containerId.replace('docs-cat-'+clientId+'-','');
-        loadDocsCatMerged(clientId,cat,containerId);
-      });
-    });
+  deleteDocDrive(clientId,path).then(function(){
+    var cat=containerId.replace('docs-cat-'+clientId+'-','');
+    loadDocsCatMerged(clientId,cat,containerId);
   }).catch(function(){alert('Eroare la ștergere.');});
 }
 
@@ -5435,6 +5410,7 @@ function saveClient(){
   var nume=document.getElementById('f-nume').value.trim();
   if(!nume){alert('Numele este obligatoriu!');return;}
   var existing=editId?clients.find(function(x){return x.id===editId;}):null;
+  var numeVechi=existing?existing.nume:null;
   var data={id:editId||('n'+Date.now())};
   keys.forEach(function(k){var el=document.getElementById('f-'+k);data[k]=el?el.value.trim():(existing?(existing[k]||''):'');});
   var activEl=document.getElementById('f-activ');
@@ -5451,6 +5427,10 @@ function saveClient(){
   if(editId){var idx=clients.findIndex(function(x){return x.id===editId;});if(idx>-1)clients[idx]=data;}
   else{clients.unshift(data);}
   save();closeModal();render();
+  // Dacă numele s-a schimbat, redenumim și folderul din Google Drive (silențios, în fundal)
+  if(numeVechi&&nume&&numeVechi!==nume){
+    gdriveRenameClientFolder(numeVechi,nume).catch(function(){});
+  }
 }
 
 function deleteClient(){
