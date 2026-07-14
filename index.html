@@ -1895,12 +1895,35 @@ var PDF_FONT_ITALIC = "AAEAAAAQAQAABAAAR0RFRgzvDVgAALAUAAAAZEdQT1OCQu54AACweAAAS
   "APEBkwABAAEATwABAAAAAQAIAAEABv/2AAIAAQFJAVIAAAABAAAAAQAIAAEABv/sAAIAAQFTAWYAAAABAAAAAQAIAAEABgAUAAIAAQE/AVIAAAABAAAAAQAIAAEABgAKAAIAAgE/AUgAAAFTAVwACgABAAAAAQAIAAEABv//AAEAAQGhAAQAAAABAAgAAQAmAAIACgAU" +
   "AAEABAE2AAIAygACAAYADAE4AAIA1wE5AAIA2wABAAIAegDDAAQAAAABAAgAAQAaAAEACAACAAYADAE3AAIAzQE6AAIA4QABAAEAwwABAAEACAACAAAAFAACAAAAJAACd2dodAEAAABpdGFsAQMAAQAEABQAAwAAAAIBEwGQAAACvAAAAAEAAQAAAQMAAQAA";
 var pdfFontRegistered=false;
-function outputPdf(doc,filename){
+// Deschide o filă goală IMEDIAT (sincron cu apăsarea), cu un mic mesaj de
+// încărcare — ca browserul să n-o considere pop-up, indiferent cât durează
+// să genereze conținutul (document scanat sau raport PDF).
+function deschideFilaGoala(mesaj){
+  var tab=window.open('','_blank');
+  if(tab){
+    try{
+      tab.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Se încarcă...</title></head>'
+        +'<body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f3ee;color:#072144">'
+        +'<div style="text-align:center"><div style="width:36px;height:36px;border:3px solid rgba(7,33,68,0.2);border-top-color:#072144;border-radius:50%;margin:0 auto 14px;animation:sp 0.8s linear infinite"></div>'
+        +'<div style="font-size:14px">'+(mesaj||'Se încarcă documentul...')+'</div></div>'
+        +'<style>@keyframes sp{to{transform:rotate(360deg)}}</style></body></html>');
+      tab.document.close();
+    }catch(e){}
+  }
+  return tab;
+}
+
+function outputPdf(doc,filename,preOpenedTab){
   try{
     var blobUrl=doc.output('bloburl');
-    var win=window.open(blobUrl,'_blank');
-    if(!win){doc.save(filename);}
+    if(preOpenedTab&&!preOpenedTab.closed){
+      preOpenedTab.location.href=blobUrl;
+    }else{
+      var win=window.open(blobUrl,'_blank');
+      if(!win){doc.save(filename);}
+    }
   }catch(e){
+    if(preOpenedTab&&!preOpenedTab.closed)preOpenedTab.close();
     doc.save(filename);
   }
 }
@@ -2411,20 +2434,7 @@ function gdriveFetchFileBlob(path){
 function viewDocDirect(path,btnEl){
   var originalHtml=btnEl?btnEl.innerHTML:null;
   if(btnEl){btnEl.innerHTML='<div class="doc-btn-spinner"></div>';btnEl.style.pointerEvents='none';}
-  // Deschidem fila GOALĂ, imediat, sincron cu apăsarea — altfel browserul o
-  // consideră "pop-up" (fiindcă altfel s-ar deschide abia după ce vin datele,
-  // chiar dacă durează doar câteva zeci de ms) și cere permisiune de fiecare dată.
-  var newTab=window.open('','_blank');
-  if(newTab){
-    try{
-      newTab.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Se încarcă...</title></head>'
-        +'<body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f3ee;color:#072144">'
-        +'<div style="text-align:center"><div style="width:36px;height:36px;border:3px solid rgba(7,33,68,0.2);border-top-color:#072144;border-radius:50%;margin:0 auto 14px;animation:sp 0.8s linear infinite"></div>'
-        +'<div style="font-size:14px">Se încarcă documentul...</div></div>'
-        +'<style>@keyframes sp{to{transform:rotate(360deg)}}</style></body></html>');
-      newTab.document.close();
-    }catch(e){}
-  }
+  var newTab=deschideFilaGoala('Se încarcă documentul...');
   var t0=performance.now();
   gdriveFetchFileBlob(path).then(function(res){
     var ms=Math.round(performance.now()-t0);
@@ -3501,6 +3511,7 @@ function removeDuClient(clientId){
 
 function generateDuPDF(){
   if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   var margin=18,y=42,pageW=210;
@@ -3564,7 +3575,7 @@ function generateDuPDF(){
   drawSection('Nu este cazul',nuCaz,false);
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,'DU_'+currentDuYear+'.pdf');
+  outputPdf(doc,'DU_'+currentDuYear+'.pdf',__pdfTab);
 }
 
 function allRecordsForClient(clientId){
@@ -5964,6 +5975,7 @@ function drawFooter(doc,margin,pageW){
 
 function generateClientServicePDF(c,rec){
   if(typeof window.jspdf==='undefined'){alert('Libr\u0103ria PDF se \u00eencarc\u0103, \u00eencearc\u0103 din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   registerPdfFont(doc);
@@ -6086,7 +6098,7 @@ function generateClientServicePDF(c,rec){
   }
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_servicii_'+rec.month+'.pdf');
+  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_servicii_'+rec.month+'.pdf',__pdfTab);
 }
 
 function cnpCuiSort(a,b){
@@ -6098,6 +6110,7 @@ function cnpCuiSort(a,b){
 
 function generateSpvRepPDF(){
   if(typeof window.jspdf==='undefined'){alert('Libr\u0103ria PDF se \u00eencarc\u0103, \u00eencearc\u0103 din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   registerPdfFont(doc);
@@ -6143,11 +6156,12 @@ function generateSpvRepPDF(){
   section('Persoane juridice \u2013 Denumire',pjList,'cui');
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,'lista_reprezentanti_spv.pdf');
+  outputPdf(doc,'lista_reprezentanti_spv.pdf',__pdfTab);
 }
 
 function generateMonthlyTotalPDF(){
   if(typeof window.jspdf==='undefined'){alert('Libr\u0103ria PDF se \u00eencarc\u0103, \u00eencearc\u0103 din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   registerPdfFont(doc);
@@ -6210,7 +6224,7 @@ function generateMonthlyTotalPDF(){
   doc.text('TOTAL GENERAL LUNA ACEASTA',margin,y);doc.text(money(pjSub+pfSub),pageW-margin,y,{align:'right'});
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,'raport_total_servicii_'+currentServiceMonth+'.pdf');
+  outputPdf(doc,'raport_total_servicii_'+currentServiceMonth+'.pdf',__pdfTab);
 }
 
 function saveClient(){
@@ -6255,6 +6269,7 @@ function savePDF(){
   var c=clients.find(function(x){return x.id===editId;});
   if(!c)return;
   if(typeof window.jspdf==='undefined'){alert('Libr\u0103ria PDF se \u00eencarc\u0103, \u00eencearc\u0103 din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează documentul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   registerPdfFont(doc);
@@ -6334,7 +6349,7 @@ function savePDF(){
 
   drawFooter(doc,margin,pageW);
 
-  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'.pdf');
+  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'.pdf',__pdfTab);
 }
 
 function openFisaIstoricDialog(){
@@ -6361,6 +6376,7 @@ function generateRaportRestante(clientId){
   var luni=clientRestanteLuni(clientId);
   if(!luni.length){alert('Acest client nu are restanțe.');return;}
 
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({unit:'mm',format:'a4'});
   registerPdfFont(doc);
@@ -6492,13 +6508,14 @@ function generateRaportRestante(clientId){
   doc.text('Document generat: '+todayRo(),margin,y+4);
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_raport_restante.pdf');
+  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_raport_restante.pdf',__pdfTab);
 }
 
 function generateFisaIstoric(){
   var c=clients.find(function(x){return x.id===editId;});
   if(!c){alert('Client negăsit.');return;}
   if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează fișa...');
 
   var fromVal=document.getElementById('fisa-from').value; // yyyy-mm or ''
   var toVal=document.getElementById('fisa-to').value;
@@ -6550,7 +6567,7 @@ function generateFisaIstoric(){
     doc.setFont('CrimsonPro','italic');doc.setFontSize(13);doc.setTextColor(150,150,150);
     doc.text('Nicio înregistrare găsită pentru perioada selectată.',margin,y);
     drawFooter(doc,margin,pageW);
-    outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_istoric.pdf');
+    outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_istoric.pdf',__pdfTab);
     return;
   }
 
@@ -6680,7 +6697,7 @@ function generateFisaIstoric(){
   doc.text('Document generat: '+todayRo(),margin,y+4);
 
   drawFooter(doc,margin,pageW);
-  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_istoric_servicii.pdf');
+  outputPdf(doc,(c.nume||'client').replace(/[^a-zA-Z0-9]/g,'_')+'_istoric_servicii.pdf',__pdfTab);
 }
 
 function buildBackupData(){
