@@ -2411,13 +2411,21 @@ function gdriveFetchFileBlob(path){
 function viewDocDirect(path,btnEl){
   var originalHtml=btnEl?btnEl.innerHTML:null;
   if(btnEl){btnEl.innerHTML='<div class="doc-btn-spinner"></div>';btnEl.style.pointerEvents='none';}
+  // Deschidem fila GOALĂ, imediat, sincron cu apăsarea — altfel browserul o
+  // consideră "pop-up" (fiindcă altfel s-ar deschide abia după ce vin datele,
+  // chiar dacă durează doar câteva zeci de ms) și cere permisiune de fiecare dată.
+  var newTab=window.open('','_blank');
   var t0=performance.now();
   gdriveFetchFileBlob(path).then(function(res){
     var ms=Math.round(performance.now()-t0);
     var url=URL.createObjectURL(res.blob);
-    window.open(url,'_blank');
+    if(newTab&&!newTab.closed){newTab.location.href=url;}
+    else{window.open(url,'_blank');}
     aratToastDiagnostic('Sursă: '+res.sursa+' · '+ms+' ms');
-  }).catch(function(){alert('Nu am putut deschide documentul. Verifică internetul și încearcă din nou.');})
+  }).catch(function(){
+    if(newTab&&!newTab.closed)newTab.close();
+    alert('Nu am putut deschide documentul. Verifică internetul și încearcă din nou.');
+  })
   .finally(function(){if(btnEl){btnEl.innerHTML=originalHtml;btnEl.style.pointerEvents='';}});
 }
 
