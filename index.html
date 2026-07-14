@@ -7102,8 +7102,13 @@ function setupZoneDrawing(pageWrap,pageIdx){
     var hPct=boxRect.height/rect.height;
     tempBox.remove();
     if(wPct<0.03||hPct<0.02)return;
-    semnareDraft.zones.push({id:'z'+Date.now()+Math.random().toString(36).slice(2,6),signerId:semnareDraft.activeSignerId,page:pageIdx,xPct:xPct,yPct:yPct,wPct:wPct,hPct:hPct});
-    redrawZonesForPage(pageIdx);
+    // Plasăm automat câte un chenar, la aceeași poziție relativă, pe FIECARE
+    // pagină a documentului — fiecare rămâne editabil individual (mutare/
+    // redimensionare/ștergere) după aceea, independent de celelalte.
+    semnareDraft.pages.forEach(function(pg,idx){
+      semnareDraft.zones.push({id:'z'+Date.now()+Math.random().toString(36).slice(2,6)+'_'+idx,signerId:semnareDraft.activeSignerId,page:idx,xPct:xPct,yPct:yPct,wPct:wPct,hPct:hPct});
+    });
+    semnareDraft.pages.forEach(function(pg,idx){redrawZonesForPage(idx);});
   }
   pageWrap.addEventListener('mousedown',onDown);
   pageWrap.addEventListener('mousemove',onMove);
@@ -7743,6 +7748,13 @@ function renderSignUI(doc,signer){
   });
 }
 
+// La apăsarea pe un chenar "Semnează aici", derulăm lin până la panoul unde
+// se desenează efectiv semnătura, ca semnatarul să nu mai caute prin document.
+function scrollToSignaturePad(){
+  var pad=document.getElementById('sign-pad-canvas');
+  if(pad)pad.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
 function renderSignPdfPages(doc,signer,arrayBuffer){
   var container=document.getElementById('sign-pdf-pages');
   if(!container)return;
@@ -7774,7 +7786,10 @@ function renderSignPdfPages(doc,signer,arrayBuffer){
               box.style.border='2px dashed #1a6a40';
               box.style.background='rgba(34,120,80,0.12)';
               box.style.display='flex';box.style.alignItems='center';box.style.justifyContent='center';
-              box.innerHTML='<span style="font-size:10px;font-weight:700;color:#1a6a40;background:#fff;padding:1px 5px;border-radius:4px">Semnează aici</span>';
+              box.style.cursor='pointer';
+              box.title='Apasă ca să ajungi direct la semnătură';
+              box.innerHTML='<span style="font-size:10px;font-weight:700;color:#1a6a40;background:#fff;padding:1px 5px;border-radius:4px;pointer-events:none">Semnează aici</span>';
+              box.addEventListener('click',scrollToSignaturePad);
               pageWrap.appendChild(box);
             });
           });
@@ -7895,11 +7910,20 @@ function drawStrokeAsInkRibbon(ctx,stroke){
     var speed=d/dt;
     return Math.max(1.1,Math.min(3.2,2.7-speed*8));
   });
-  // netezire (medie mobilă pe 3 puncte), ca tranziția de grosime să fie lină
+  // netezire mai largă (medie mobilă pe 5 puncte), tranziții și mai line
   var w=widths.map(function(_,i){
-    var a=widths[Math.max(0,i-1)],b=widths[i],c=widths[Math.min(widths.length-1,i+1)];
-    return (a+b+c)/3;
+    var lo=Math.max(0,i-2),hi=Math.min(widths.length-1,i+2);
+    var sum=0,cnt=0;
+    for(var k=lo;k<=hi;k++){sum+=widths[k];cnt++;}
+    return sum/cnt;
   });
+  // subțiere naturală la început și sfârșit (ca la ridicarea/apăsarea pixului)
+  var taperLen=Math.min(5,Math.floor(stroke.length/3));
+  for(var t=0;t<taperLen;t++){
+    var f=(t+1)/(taperLen+1);
+    w[t]*=f;
+    w[w.length-1-t]*=f;
+  }
 
   // 2) construim conturul stânga/dreapta, perpendicular pe direcția traseului
   var left=[],right=[];
@@ -7927,10 +7951,12 @@ function drawStrokeAsInkRibbon(ctx,stroke){
   traseuNeted(right.slice().reverse());
   ctx.closePath();
 
-  // 3) umplem cu o ușoară textură de cerneală (2 straturi suprapuse)
+  // 3) umplem cu textură de cerneală (3 straturi suprapuse, densitate naturală)
   ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.92)';
   ctx.fill();
-  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.18)';
+  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.22)';
+  ctx.fill();
+  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.1)';
   ctx.fill();
 }
 
