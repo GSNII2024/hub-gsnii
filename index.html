@@ -2389,18 +2389,22 @@ function gdriveFetchArrayBuffer(path){
 // Descarcă fișierul (codificat text de către script) și îl reconstituie ca Blob în browser.
 function gdriveFetchFileBlob(path){
   if(docBlobCache[path])return Promise.resolve(docBlobCache[path]);
-  return fetch(GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now())
-    .then(function(r){return r.json();})
-    .then(function(res){
-      if(!res||res.error||!res.base64)throw new Error('not_found');
-      var byteChars=atob(res.base64);
-      var byteNumbers=new Array(byteChars.length);
-      for(var i=0;i<byteChars.length;i++)byteNumbers[i]=byteChars.charCodeAt(i);
-      var byteArray=new Uint8Array(byteNumbers);
-      var blob=new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
-      docBlobCache[path]=blob;
-      return blob;
-    });
+  return getCachedBlobPersistent(path).then(function(cached){
+    if(cached){docBlobCache[path]=cached;return cached;}
+    return fetch(GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(!res||res.error||!res.base64)throw new Error('not_found');
+        var byteChars=atob(res.base64);
+        var byteNumbers=new Array(byteChars.length);
+        for(var i=0;i<byteChars.length;i++)byteNumbers[i]=byteChars.charCodeAt(i);
+        var byteArray=new Uint8Array(byteNumbers);
+        var blob=new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
+        docBlobCache[path]=blob;
+        setCachedBlobPersistent(path,blob);
+        return blob;
+      });
+  });
 }
 
 // Deschide documentul direct (nu pagina de vizualizare Google Drive).
@@ -2696,19 +2700,76 @@ function readFileOptimizat(file){
 // Memorare temporară (doar în sesiunea curentă) — dacă redeschizi același
 // document, a doua oară se afișează instant, fără să-l mai ceară de la Drive.
 var docBlobCache={};
+var DOC_CACHE_NAME='hub-gsnii-docs-v1';
+
+// Cache persistent (supraviețuiește reîncărcării paginii / sesiuni noi), pe lângă
+// cel din memorie — folosim Cache Storage API, disponibil nativ în orice browser modern.
+function getCachedBlobPersistent(path){
+  if(!window.caches)return Promise.resolve(null);
+  return caches.open(DOC_CACHE_NAME).then(function(cache){
+    return cache.match('https://hub-doc-cache.local/'+encodeURIComponent(path));
+  }).then(function(resp){
+    return resp?resp.blob():null;
+  }).catch(function(){return null;});
+}
+function setCachedBlobPersistent(path,blob){
+  if(!window.caches)return;
+  caches.open(DOC_CACHE_NAME).then(function(cache){
+    var resp=new Response(blob,{headers:{'Content-Type':blob.type||'application/octet-stream'}});
+    cache.put('https://hub-doc-cache.local/'+encodeURIComponent(path),resp);
+  }).catch(function(){});
+}
+
+// Descarcă documentele unei categorii în fundal, unul câte unul (cu pauză mică
+// între ele), ca să fie deja în cache până apeși pe „ochi" — fără să afecteze
+// fluiditatea aplicației și fără să consume rețeaua excesiv.
+function prefetchDocsInBackground(items){
+  var i=0;
+  function next(){
+    if(i>=items.length)return;
+    var m=items[i++];
+    if(docBlobCache[m.path]){setTimeout(next,20);return;}
+    gdriveFetchFileBlob(m.path).catch(function(){}).then(function(){
+      setTimeout(next,200);
+    });
+  }
+  next();
+}
+
 
 function uploadDocsCat(input,clientId,category,categoryLabel){
   var files=Array.from(input.files);
   if(!files.length)return;
   var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se optimizează și încarcă...';
-  var promises=files.map(function(file){
+  if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+  var done=0;
+  var numeClient=clientDocFolderName(clientId);
+  var folderPath='Clienți/'+numeClient+'/'+(categoryLabel||category||'General');
+
+  // 1) optimizăm + urcăm fișierele în Drive, în paralel (rapid)
+  var uploadPromises=files.map(function(file){
     return readFileOptimizat(file).then(function(res){
-      if(!res)return;
-      return saveDocToDrive(clientId,file.name,res.type,res.dataURL,category,categoryLabel,'').catch(function(){});
+      if(!res)return null;
+      var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
+        done++;
+        if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
+        if(!uploadRes||!uploadRes.success)return null;
+        return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:category||'general',duYear:'',date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+      }).catch(function(){return null;});
     });
   });
-  Promise.all(promises).then(function(){
+
+  // 2) după ce toate s-au urcat, actualizăm lista de documente o singură dată (fără conflicte)
+  Promise.all(uploadPromises).then(function(results){
+    var reusite=results.filter(function(r){return r;});
+    if(!reusite.length)return null;
+    return gdriveGet('doc_meta_'+clientId).then(function(existing){
+      var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+      reusite.forEach(function(r){meta.push(r);});
+      return gdriveSet('doc_meta_'+clientId,meta);
+    });
+  }).then(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
     loadDocsCatMerged(clientId,category,'docs-cat-'+clientId+'-'+category);
@@ -2719,14 +2780,33 @@ function uploadDocsCatDU(input,clientId,year){
   var files=Array.from(input.files);
   if(!files.length)return;
   var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se optimizează și încarcă...';
-  var promises=files.map(function(file){
+  if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+  var done=0;
+  var numeClient=clientDocFolderName(clientId);
+  var folderPath='Clienți/'+numeClient+'/Declarație Unică/'+year;
+
+  var uploadPromises=files.map(function(file){
     return readFileOptimizat(file).then(function(res){
-      if(!res)return;
-      return saveDocToDrive(clientId,file.name,res.type,res.dataURL,'du','Declarație Unică/'+year,String(year)).catch(function(){});
+      if(!res)return null;
+      var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
+        done++;
+        if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
+        if(!uploadRes||!uploadRes.success)return null;
+        return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:'du',duYear:String(year),date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+      }).catch(function(){return null;});
     });
   });
-  Promise.all(promises).then(function(){
+
+  Promise.all(uploadPromises).then(function(results){
+    var reusite=results.filter(function(r){return r;});
+    if(!reusite.length)return null;
+    return gdriveGet('doc_meta_'+clientId).then(function(existing){
+      var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+      reusite.forEach(function(r){meta.push(r);});
+      return gdriveSet('doc_meta_'+clientId,meta);
+    });
+  }).then(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
     loadDocsDU(clientId);
@@ -2734,37 +2814,6 @@ function uploadDocsCatDU(input,clientId,year){
 }
 
 function uploadDocs(input,clientId){uploadDocsCat(input,clientId,'general','General');}
-
-function toggleAddFreeDocCat(clientId){
-  var panel=document.getElementById('doc-libre-panel-'+clientId);
-  var chev=document.getElementById('doc-libre-chevron-'+clientId);
-  if(!panel)return;
-  var open=panel.style.display!=='none';
-  panel.style.display=open?'none':'block';
-  if(chev)chev.style.transform=open?'':'rotate(180deg)';
-  if(!open)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
-}
-
-function uploadDocsFree(input,clientId){
-  var nameEl=document.getElementById('doc-libre-name-'+clientId);
-  var catLabel=(nameEl&&nameEl.value.trim())||'Altele';
-  var files=Array.from(input.files);
-  if(!files.length)return;
-  var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se optimizează și încarcă...';
-  var promises=files.map(function(file){
-    return readFileOptimizat(file).then(function(res){
-      if(!res)return;
-      return saveDocToDrive(clientId,file.name,res.type,res.dataURL,'libre',catLabel,'').catch(function(){});
-    });
-  });
-  Promise.all(promises).then(function(){
-    if(loadEl)loadEl.textContent='';
-    input.value='';
-    if(nameEl)nameEl.value='';
-    loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
-  });
-}
 
 function addDuYear(clientId){
   var year=prompt('Anul pentru care adaugi documentele DU (ex: 2025):');
@@ -2778,17 +2827,11 @@ function addDuYear(clientId){
 
 function loadDocsList(clientId,containerId){
   if(!clientId||clientId==='__new__')return;
-  var cats=['ci','cert','contract'];
-  cats.forEach(function(cat){
-    loadDocsCatMerged(clientId,cat,'docs-cat-'+clientId+'-'+cat);
-  });
   var c=clients.find(function(x){return x.id===clientId;});
-  (c&&c.foldereCustom||[]).forEach(function(f){
-    loadDocsCatMerged(clientId,f.key,'docs-cat-'+clientId+'-'+f.key);
+  ensureDocCategories(c).forEach(function(cat){
+    loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
   });
   loadDocsDU(clientId);
-  var libreEl=document.getElementById('docs-cat-'+clientId+'-libre');
-  if(libreEl)loadDocsCatMerged(clientId,'libre','docs-cat-'+clientId+'-libre');
 }
 
 // Documente Declarație Unică, grupate pe ani — aceleași metadate/servicii ca restul documentelor
@@ -2835,6 +2878,7 @@ function loadDocsDU(clientId){
     });
     container.innerHTML=html;
     injectIcons();
+    prefetchDocsInBackground(duDocs);
   });
 }
 
@@ -3753,6 +3797,9 @@ function loadDocsCatMerged(clientId,category,containerId){
         +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
         +'</div></div>';
     }).join('');
+    // Pre-încărcăm silențios, în fundal, documentele acestei categorii —
+    // până apeși pe „ochi", sunt deja gata în cache, deschidere aproape instantă.
+    prefetchDocsInBackground(catMeta);
   }).catch(function(){el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';});
 }
 
@@ -4071,6 +4118,17 @@ function getToateIncasarile(){
     if(dataEf&&dataEf.indexOf('.')>0){var p=dataEf.split('.');anInc=parseInt(p[2])||anInc;lunaInc=parseInt(p[1])||lunaInc;}
     result.push({c:{id:'__div__'+d.id,nume:d.nume,firma:'',cui:'',cnp:''},nume:d.nume,suma:parseFloat(d.suma)||0,data:dataEf,obs:d.obs||'',nrFactura:d.nrFactura||'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:d.tip||'virament',isDivers:true,diversId:d.id,raw:d,arr:diverse});
   });
+  // Încasări din servicii fără fișă (Servicii → Persoană fără fișă)
+  var serviciiDiv=getServiciiDiverse();
+  serviciiDiv.forEach(function(sd){
+    var incasat=parseFloat(sd.sumaIncasata)||0;
+    if(incasat<=0)return;
+    var dataEf=sd.dataIncasare||sd.data||'';
+    var anInc=parseInt((sd.month||'').split('-')[0])||new Date().getFullYear();
+    var lunaInc=parseInt((sd.month||'').split('-')[1])||(new Date().getMonth()+1);
+    if(dataEf&&dataEf.indexOf('.')>0){var p2=dataEf.split('.');anInc=parseInt(p2[2])||anInc;lunaInc=parseInt(p2[1])||lunaInc;}
+    result.push({c:{id:'__svcdiv__'+sd.id,nume:sd.nume,firma:'',cui:'',cnp:''},nume:sd.nume,suma:incasat,data:dataEf,obs:sd.denumire||sd.obs||'',nrFactura:'',luna:lunaInc,an:anInc,month:anInc+'-'+(lunaInc<10?'0':'')+lunaInc,tip:sd.tipIncasare||'virament',isDivers:true,diversId:sd.id,raw:sd,arr:serviciiDiv,isServiciuDiverse:true});
+  });
   return result;
 }
 
@@ -4079,21 +4137,26 @@ function openEditIncasareByIndex(idx){
   var entry=incasariEditRefs[idx];
   if(!entry)return;
   incasareEditIdx=idx;
-  incasareEditTip=entry.raw.tip==='numerar'?'numerar':'virament';
   var raw=entry.raw;
+  var sumaVal=entry.isServiciuDiverse?raw.sumaIncasata:raw.suma;
+  var dataVal=entry.isServiciuDiverse?raw.dataIncasare:raw.data;
+  var tipVal=entry.isServiciuDiverse?raw.tipIncasare:raw.tip;
+  var nrFactVal=entry.isServiciuDiverse?'':raw.nrFactura;
+  var obsVal=entry.isServiciuDiverse?(raw.denumire||raw.obs||''):raw.obs;
+  incasareEditTip=tipVal==='numerar'?'numerar':'virament';
   var numeAfis=entry.isDivers?(entry.c&&entry.c.nume)||'':clientTitleLine(entry.c);
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:12px">Editează încasare'+(numeAfis?(' &mdash; '+esc(numeAfis)):'')+'</div>'
     +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Sumă:</label>'
-    +'<input type="number" id="inc-edit-suma" min="0" step="0.01" value="'+(parseFloat(raw.suma)||0)+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<input type="number" id="inc-edit-suma" min="0" step="0.01" value="'+(parseFloat(sumaVal)||0)+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
     +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Data încasării:</label>'
-    +'<input type="text" id="inc-edit-data" value="'+esc(raw.data||'')+'" placeholder="zz.ll.aaaa" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
+    +'<input type="text" id="inc-edit-data" value="'+esc(dataVal||'')+'" placeholder="zz.ll.aaaa" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:8px">'
     +'<div style="display:flex;gap:4px;margin-bottom:8px">'
     +'<button type="button" id="inc-edit-tip-vir" onclick="setIncTipEdit(&quot;virament&quot;)" style="flex:1;font-size:12px;padding:6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(incasareEditTip!=='numerar'?'var(--navy)':'transparent')+';color:'+(incasareEditTip!=='numerar'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">🏦 Virament</button>'
     +'<button type="button" id="inc-edit-tip-num" onclick="setIncTipEdit(&quot;numerar&quot;)" style="flex:1;font-size:12px;padding:6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:'+(incasareEditTip==='numerar'?'var(--navy)':'transparent')+';color:'+(incasareEditTip==='numerar'?'#fff':'rgba(7,33,68,0.5)')+';cursor:pointer;font-family:inherit">💵 Numerar</button>'
     +'</div>'
-    +'<input type="text" id="inc-edit-nrfact" placeholder="Ref. tranzacție / nr. factură (opțional)" value="'+esc(raw.nrFactura||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:8px">'
-    +'<input type="text" id="inc-edit-obs" placeholder="Observație (opțional)" value="'+esc(raw.obs||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:14px">'
+    +(entry.isServiciuDiverse?'':'<input type="text" id="inc-edit-nrfact" placeholder="Ref. tranzacție / nr. factură (opțional)" value="'+esc(nrFactVal||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:8px">')
+    +'<input type="text" id="inc-edit-obs" placeholder="Observație (opțional)" value="'+esc(obsVal||'')+'" style="width:100%;font-size:13px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:7px 10px;font-family:inherit;margin-bottom:14px">'
     +'<div style="display:flex;gap:8px">'
     +'<button type="button" class="btn-danger" style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px" onclick="stergeIncasareEdit()"><i class="ti ti-trash"></i> Șterge</button>'
     +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="salveazaEditIncasare()"><i class="ti ti-check"></i> Salvează</button>'
@@ -4118,6 +4181,8 @@ function persistIncasareEntry(entry){
   if(entry.rec){
     entry.rec.sumaIncasata=totalIncasari(entry.rec.incasari||[])+totalIncasari(entry.rec.incasari_pf||[]);
     saveSvcStore();
+  }else if(entry.isServiciuDiverse){
+    saveServiciiDiverse(entry.arr);
   }else{
     localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(entry.arr));
     sbSet('inc_diverse',entry.arr).catch(function(){setSyncStatus(false,'Eroare sync încasări');});
@@ -4130,11 +4195,17 @@ function salveazaEditIncasare(){
   var suma=parseFloat(document.getElementById('inc-edit-suma').value)||0;
   if(!suma){alert('Introdu suma încasată.');return;}
   try{
-    entry.raw.suma=suma;
-    entry.raw.data=document.getElementById('inc-edit-data').value.trim();
-    entry.raw.tip=incasareEditTip||'virament';
-    entry.raw.nrFactura=document.getElementById('inc-edit-nrfact').value.trim();
-    entry.raw.obs=document.getElementById('inc-edit-obs').value.trim();
+    if(entry.isServiciuDiverse){
+      entry.raw.sumaIncasata=suma;
+      entry.raw.dataIncasare=document.getElementById('inc-edit-data').value.trim();
+      entry.raw.tipIncasare=incasareEditTip||'virament';
+    }else{
+      entry.raw.suma=suma;
+      entry.raw.data=document.getElementById('inc-edit-data').value.trim();
+      entry.raw.tip=incasareEditTip||'virament';
+      entry.raw.nrFactura=document.getElementById('inc-edit-nrfact').value.trim();
+      entry.raw.obs=document.getElementById('inc-edit-obs').value.trim();
+    }
     persistIncasareEntry(entry);
   }catch(e){console.error('salveazaEditIncasare error:',e);}
   finally{
@@ -4147,17 +4218,24 @@ function salveazaEditIncasare(){
 function stergeIncasareEdit(){
   var entry=incasariEditRefs[incasareEditIdx];
   if(!entry)return;
-  if(!confirm('Ștergi această încasare? Această acțiune nu poate fi anulată.'))return;
-  try{
-    var pos=entry.arr.indexOf(entry.raw);
-    if(pos>-1)entry.arr.splice(pos,1);
-    persistIncasareEntry(entry);
-  }catch(e){console.error('stergeIncasareEdit error:',e);}
-  finally{
-    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
-    document.getElementById('restanta-picker').style.display='none';
-    renderIncasariTab();
+  if(entry.isServiciuDiverse){
+    if(!confirm('Ștergi încasarea aferentă acestui serviciu? Serviciul rămâne în continuare la Servicii, doar suma încasată se resetează la 0.'))return;
+    try{
+      entry.raw.sumaIncasata=0;
+      entry.raw.dataIncasare='';
+      persistIncasareEntry(entry);
+    }catch(e){console.error('stergeIncasareEdit error:',e);}
+  }else{
+    if(!confirm('Ștergi această încasare? Această acțiune nu poate fi anulată.'))return;
+    try{
+      var pos=entry.arr.indexOf(entry.raw);
+      if(pos>-1)entry.arr.splice(pos,1);
+      persistIncasareEntry(entry);
+    }catch(e){console.error('stergeIncasareEdit error:',e);}
   }
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  document.getElementById('restanta-picker').style.display='none';
+  renderIncasariTab();
 }
 
 // Ștergere directă a unei încasări, prin butonul de coș de pe rând (fără să
@@ -4787,7 +4865,10 @@ function renderServiciiList(){
       html+='<div class="card-top"><div class="avatar" style="background:rgba(225,195,64,0.2);color:#8a6e00">'+initials(d.nume)+'</div>';
       html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(d.nume)+' <span style="font-size:11px;background:rgba(225,195,64,0.2);color:#8a6e00;padding:1px 6px;border-radius:10px;margin-left:4px">fără fișă</span></div>'
         +'<div class="card-firma">'+esc(d.denumire||'Serviciu')+'</div></div>';
-      html+='<span class="exp-badge '+soldCls+'">'+money(rest)+'</span>';
+      html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
+        +'<span class="exp-badge '+soldCls+'">'+money(rest)+'</span>'
+        +'<span class="exp-badge" style="background:rgba(31,106,160,0.12);color:#1f6aa0">'+money(total)+'</span>'
+        +'</div>';
       html+='</div>';
       html+='<div class="svc-preview-list"><div class="svc-preview-row">'+esc(d.denumire||'Serviciu')+': <b>'+(d.cantitate||0)+'</b> × '+money(d.pret)+' = <b>'+money(total)+'</b></div></div>';
       if(incasat>0){
@@ -4804,10 +4885,15 @@ function renderServiciiList(){
       html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(clientTitleLine(c))+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+'</div>'
         +'<div class="card-firma">'+esc(clientSubLine(c))+(clean(c.cui)?' · '+esc(c.cui):clean(c.cnp)?' · CNP: '+esc(c.cnp):'')
         +((!clean(c.cui)&&clean(c.cnp))?'<span class="tag-inactive" style="background:rgba(7,33,68,0.1);color:var(--navy)"> PF</span>':'')+'</div></div>';
+      html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">';
       if(info&&(info.serviceTotal>0||info.soldPrecedent!==0)){
         var soldCls=info.soldNou>0.01?'exp-red':info.soldNou<-0.01?'exp-green':'exp-orange';
         html+='<span class="exp-badge '+soldCls+'">'+money(info.soldNou)+'</span>';
       }else{html+='<span class="exp-badge" style="background:#EEEEEE;color:rgba(7,33,68,0.45)">fără date</span>';}
+      if(info&&info.serviceTotal>0){
+        html+='<span class="exp-badge" style="background:rgba(31,106,160,0.12);color:#1f6aa0">'+money(info.serviceTotal)+'</span>';
+      }
+      html+='</div>';
       html+='</div>';
       if(rec){
         var lines=[];
@@ -5085,24 +5171,6 @@ function buildForm(c){
       html+='<div class="section-title" style="margin-top:12px"><i class="ti ti-paperclip"></i> Documente scanate</div>';
       html+='<div id="doc-custom-cats-'+cid+'">'+renderDocCategoriesBlock(cid,c)+'</div>';
 
-      // Categoria liberă — denumită de utilizator
-      html+='<div class="doc-cat-block doc-cat-libre">'
-        +'<div class="doc-cat-header" style="cursor:pointer" onclick="toggleAddFreeDocCat(\''+cid+'\')">'
-        +'<i class="ti ti-folder-plus"></i> <span>Alte documente</span>'
-        +'<i class="ti ti-chevron-down" id="doc-libre-chevron-'+cid+'"></i>'
-        +'</div>'
-        +'<div id="doc-libre-panel-'+cid+'" style="display:none;margin-top:8px">'
-        +'<div class="doc-libre-add-row">'
-        +'<input type="text" id="doc-libre-name-'+cid+'" placeholder="Denumire categorie (ex: Procură, Aviz...)" style="width:100%;margin-bottom:6px;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:7px 9px;font-family:inherit">'
-        +'<label class="btn-add-service" style="cursor:pointer;width:100%;justify-content:center">'
-        +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
-        +' onchange="uploadDocsFree(this,\''+cid+'\')">'
-        +'<i class="ti ti-upload"></i> Alege fișier(e)</label>'
-        +'</div>'
-        +'<div id="docs-cat-'+cid+'-libre" class="docs-list"></div>'
-        +'</div>'
-        +'</div>';
-
       // Declarație Unică - gestionată din tabul DU, nu din documente client
       // (eliminat din fișa client)
 
@@ -5117,22 +5185,36 @@ function buildForm(c){
 // Construiește blocul cu categoriile prestabilite (CI, Certificat, Contract) +
 // folderele personalizate ale clientului, plus butonul „Adaugă folder nou".
 // Reutilizabil, ca să poată fi reîmprospătat fără să redeschidem toată fișa.
-function renderDocCategoriesBlock(cid,c){
-  var cats=[
-    {key:'ci',label:'Carte de identitate',icon:'ti-id'},
-    {key:'cert',label:'Certificat de înregistrare',icon:'ti-certificate'},
-    {key:'contract',label:'Contract prestări servicii',icon:'ti-file-text'}
+// Asigură existența listei de categorii pe client, migrând automat categoriile
+// prestabilite + orice foldere personalizate create anterior (compatibilitate).
+function ensureDocCategories(c){
+  if(!c)return [];
+  if(c.docCategories)return c.docCategories;
+  var defaults=[
+    {key:'ci',label:'Carte de identitate'},
+    {key:'cert',label:'Certificat de înregistrare'},
+    {key:'contract',label:'Contract prestări servicii'}
   ];
-  var custom=(c&&c.foldereCustom)||[];
-  var toate=cats.concat(custom.map(function(f){return {key:f.key,label:f.label,icon:'ti-folder',custom:true};}));
+  c.docCategories=defaults.concat(c.foldereCustom||[]);
+  return c.docCategories;
+}
+
+var pencilSvgSmall='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>';
+
+function renderDocCategoriesBlock(cid,c){
+  if(cid==='__new__'){
+    return '<div class="card-firma" style="font-style:italic;color:rgba(7,33,68,0.4);margin-bottom:10px">Salvează mai întâi fișa, ca să poți gestiona categoriile de documente.</div>';
+  }
+  var toate=ensureDocCategories(c);
   var html='';
   toate.forEach(function(cat){
     var labelEsc=(cat.label||'').replace(/'/g,"\\'");
     html+='<div class="doc-cat-block">'
       +'<div class="doc-cat-header">'
-      +'<i class="ti '+cat.icon+'"></i> <span>'+esc(cat.label)+'</span>'
-      +(cat.custom?('<button type="button" onclick="event.stopPropagation();stergeFolderCustom(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:2px 6px" title="Șterge folder din fișă"><i class="ti ti-trash" style="font-size:14px"></i></button>'):'')
-      +'<label class="doc-cat-add-btn">'
+      +'<i class="ti ti-folder"></i> <span>'+esc(cat.label)+'</span>'
+      +'<button type="button" onclick="event.stopPropagation();redenumesteCategorie(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:2px 5px" title="Redenumește categoria">'+pencilSvgSmall+'</button>'
+      +'<button type="button" onclick="event.stopPropagation();stergeCategorie(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:2px 5px" title="Șterge categoria"><i class="ti ti-trash" style="font-size:14px"></i></button>'
+      +'<label class="doc-cat-add-btn" title="Adaugă documente (poți selecta mai multe deodată)">'
       +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
       +' onchange="uploadDocsCat(this,\''+cid+'\',\''+cat.key+'\',\''+labelEsc+'\')">'
       +'<i class="ti ti-plus"></i></label>'
@@ -5140,36 +5222,100 @@ function renderDocCategoriesBlock(cid,c){
       +'<div class="docs-list" id="docs-cat-'+cid+'-'+cat.key+'"></div>'
       +'</div>';
   });
-  if(cid==='__new__'){
-    html+='<div class="card-firma" style="font-style:italic;color:rgba(7,33,68,0.4);margin-bottom:10px">Salvează mai întâi fișa, ca să poți adăuga foldere personalizate.</div>';
-  }else{
-    html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="adaugaFolderCustom(\''+cid+'\')"><i class="ti ti-folder-plus"></i> Adaugă folder nou</button>';
-  }
+  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="adaugaCategorieNoua(\''+cid+'\')"><i class="ti ti-folder-plus"></i> Adaugă categorie nouă</button>';
   return html;
 }
 
-function adaugaFolderCustom(clientId){
-  var nume=prompt('Denumirea noului folder de documente (ex: Diplome, Corespondență):');
+function refreshDocCategoriesUI(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  var wrap=document.getElementById('doc-custom-cats-'+clientId);
+  if(!wrap)return;
+  wrap.innerHTML=renderDocCategoriesBlock(clientId,c);
+  injectIcons();
+  ensureDocCategories(c).forEach(function(cat){
+    loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
+  });
+}
+
+function adaugaCategorieNoua(clientId){
+  var nume=prompt('Denumirea noii categorii de documente (ex: Facturi, Autorizații, Poze, Diverse...):');
   if(!nume||!nume.trim())return;
   nume=nume.trim();
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c){alert('Salvează mai întâi fișa clientului.');return;}
-  if(!c.foldereCustom)c.foldereCustom=[];
-  var key='custom_'+Date.now();
-  c.foldereCustom.push({key:key,label:nume});
+  ensureDocCategories(c);
+  var key='cat_'+Date.now();
+  c.docCategories.push({key:key,label:nume});
   save();
-  var wrap=document.getElementById('doc-custom-cats-'+clientId);
-  if(wrap){wrap.innerHTML=renderDocCategoriesBlock(clientId,c);injectIcons();}
+  refreshDocCategoriesUI(clientId);
 }
 
-function stergeFolderCustom(clientId,key){
-  if(!confirm('Ștergi acest folder din fișă? Documentele deja încărcate în el rămân în siguranță în Drive — doar secțiunea dispare din fișă.'))return;
+function redenumesteCategorie(clientId,key){
   var c=clients.find(function(x){return x.id===clientId;});
-  if(!c||!c.foldereCustom)return;
-  c.foldereCustom=c.foldereCustom.filter(function(f){return f.key!==key;});
+  if(!c)return;
+  var cats=ensureDocCategories(c);
+  var cat=cats.find(function(x){return x.key===key;});
+  if(!cat)return;
+  var nume=prompt('Noua denumire pentru categoria „'+cat.label+'":',cat.label);
+  if(!nume||!nume.trim())return;
+  cat.label=nume.trim();
   save();
-  var wrap=document.getElementById('doc-custom-cats-'+clientId);
-  if(wrap){wrap.innerHTML=renderDocCategoriesBlock(clientId,c);injectIcons();}
+  refreshDocCategoriesUI(clientId);
+}
+
+function stergeCategorie(clientId,key){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  var cats=ensureDocCategories(c);
+  var cat=cats.find(function(x){return x.key===key;});
+  if(!cat)return;
+  var altele=cats.filter(function(x){return x.key!==key;});
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:10px">Ștergi categoria „'+esc(cat.label)+'"</div>'
+    +'<div style="font-size:13px;color:rgba(7,33,68,0.6);margin-bottom:16px">Ce vrei să faci cu documentele deja încărcate în această categorie?</div>'
+    +'<button type="button" class="btn-danger" style="width:100%;justify-content:center;margin-bottom:10px" onclick="confirmaStergereCategorie(\''+clientId+'\',\''+key+'\',\'delete\')"><i class="ti ti-trash"></i> Șterge categoria și documentele din ea</button>';
+  if(altele.length){
+    html+='<div style="font-size:12px;color:rgba(7,33,68,0.5);margin:6px 0">— sau mută documentele într-o altă categorie —</div>';
+    altele.forEach(function(a){
+      var aKeyEsc=a.key.replace(/'/g,"\\'");
+      html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:6px" onclick="confirmaStergereCategorie(\''+clientId+'\',\''+key+'\',\'move\',\''+aKeyEsc+'\')">→ '+esc(a.label)+'</button>';
+    });
+  }
+  html+='<button type="button" onclick="document.getElementById(\'restanta-picker\').style.display=\'none\'" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer">Anulează</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Șterge categorie';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function confirmaStergereCategorie(clientId,key,actiune,targetKey){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  if(actiune==='delete'&&!confirm('Sigur ștergi definitiv documentele din această categorie? Nu se pot recupera.'))return;
+  document.getElementById('restanta-picker').style.display='none';
+
+  function finalizeaza(){
+    c.docCategories=(c.docCategories||[]).filter(function(x){return x.key!==key;});
+    save();
+    refreshDocCategoriesUI(clientId);
+  }
+
+  gdriveGet('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    if(actiune==='delete'){
+      var deCategorie=allMeta.filter(function(m){return m.category===key;});
+      var altele=allMeta.filter(function(m){return m.category!==key;});
+      var chain=Promise.resolve();
+      deCategorie.forEach(function(m){
+        chain=chain.then(function(){return gdriveDelete(m.path).catch(function(){});});
+      });
+      return chain.then(function(){return gdriveSet('doc_meta_'+clientId,altele);});
+    }else{
+      allMeta.forEach(function(m){if(m.category===key)m.category=targetKey;});
+      return gdriveSet('doc_meta_'+clientId,allMeta);
+    }
+  }).then(finalizeaza).catch(function(){alert('A apărut o eroare. Verifică internetul și încearcă din nou.');refreshDocCategoriesUI(clientId);});
 }
 
 
