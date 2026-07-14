@@ -2383,14 +2383,14 @@ function gdriveUploadBlobPath(fullPath,blob,mimeType){
 }
 // Obține bytes-ii unui fișier direct ca ArrayBuffer (pentru pdf-lib).
 function gdriveFetchArrayBuffer(path){
-  return gdriveFetchFileBlob(path).then(function(blob){return blob.arrayBuffer();});
+  return gdriveFetchFileBlob(path).then(function(res){return res.blob.arrayBuffer();});
 }
 
 // Descarcă fișierul (codificat text de către script) și îl reconstituie ca Blob în browser.
 function gdriveFetchFileBlob(path){
-  if(docBlobCache[path])return Promise.resolve(docBlobCache[path]);
+  if(docBlobCache[path])return Promise.resolve({blob:docBlobCache[path],sursa:'memorie'});
   return getCachedBlobPersistent(path).then(function(cached){
-    if(cached){docBlobCache[path]=cached;return cached;}
+    if(cached){docBlobCache[path]=cached;return {blob:cached,sursa:'cache persistent'};}
     return fetch(GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now())
       .then(function(r){return r.json();})
       .then(function(res){
@@ -2402,7 +2402,7 @@ function gdriveFetchFileBlob(path){
         var blob=new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
         docBlobCache[path]=blob;
         setCachedBlobPersistent(path,blob);
-        return blob;
+        return {blob:blob,sursa:'Drive (descărcat acum)'};
       });
   });
 }
@@ -2411,18 +2411,32 @@ function gdriveFetchFileBlob(path){
 function viewDocDirect(path,btnEl){
   var originalHtml=btnEl?btnEl.innerHTML:null;
   if(btnEl){btnEl.innerHTML='<div class="doc-btn-spinner"></div>';btnEl.style.pointerEvents='none';}
-  gdriveFetchFileBlob(path).then(function(blob){
-    var url=URL.createObjectURL(blob);
+  var t0=performance.now();
+  gdriveFetchFileBlob(path).then(function(res){
+    var ms=Math.round(performance.now()-t0);
+    var url=URL.createObjectURL(res.blob);
     window.open(url,'_blank');
+    aratToastDiagnostic('Sursă: '+res.sursa+' · '+ms+' ms');
   }).catch(function(){alert('Nu am putut deschide documentul. Verifică internetul și încearcă din nou.');})
   .finally(function(){if(btnEl){btnEl.innerHTML=originalHtml;btnEl.style.pointerEvents='';}});
+}
+
+// Indicator vizual TEMPORAR, ca să vedem exact de unde vine fiecare document
+// (memorie / cache persistent / Drive) și cât a durat — util pentru diagnostic.
+function aratToastDiagnostic(text){
+  var el=document.createElement('div');
+  el.textContent=text;
+  el.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(7,33,68,0.92);color:#fff;padding:8px 16px;border-radius:20px;font-size:12.5px;z-index:99999;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,0.2)';
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},3500);
 }
 
 // Distribuie fișierul PROPRIU-ZIS (nu doar un link) prin fereastra nativă de distribuire,
 // dacă browserul suportă asta; altfel revine la deschiderea link-ului.
 function shareDocFile(path,name,mimeType){
   if(navigator.canShare){
-    gdriveFetchFileBlob(path).then(function(blob){
+    gdriveFetchFileBlob(path).then(function(res){
+      var blob=res.blob;
       var file=new File([blob],name,{type:mimeType||blob.type||'application/octet-stream'});
       if(navigator.canShare({files:[file]})){
         navigator.share({files:[file],title:name}).catch(function(){});
@@ -2455,8 +2469,9 @@ function dataURLtoBlob(dataURL){
 // Salvare document — Google Drive (fișierul real) + metadate (doc_meta_{clientId})
 function saveDocToDrive(clientId,name,type,dataURL,category,folderLabel,duYear){
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient+'/'+(folderLabel||category||'General');
-  var safeName=Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var folderPath='Clienți/'+numeClient;
+  var prefixCategorie=(folderLabel||category||'General').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var safeName=Date.now()+'_'+prefixCategorie+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
   return gdriveUpload(folderPath,safeName,dataURL,type).then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
@@ -2565,8 +2580,9 @@ function folderLabelForCategory(category,duYear){
 
 function migreazaUnDocumentVechi(clientId,m){
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient+'/'+folderLabelForCategory(m.category,m.duYear);
-  var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+(m.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var folderPath='Clienți/'+numeClient;
+  var prefixCategorie=folderLabelForCategory(m.category,m.duYear).replace(/[^a-zA-Z0-9._-]/g,'_');
+  var safeName=Date.now()+'_'+prefixCategorie+'_'+Math.random().toString(36).slice(2,6)+'_'+(m.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
   var oldUrl=SUPABASE_URL+'/storage/v1/object/public/'+SB_BUCKET+'/'+m.path;
   return fetch(oldUrl).then(function(r){
     if(!r.ok)throw new Error('fetch_failed');
@@ -2744,13 +2760,14 @@ function uploadDocsCat(input,clientId,category,categoryLabel){
   if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
   var done=0;
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient+'/'+(categoryLabel||category||'General');
+  var folderPath='Clienți/'+numeClient;
+  var prefixCategorie=(categoryLabel||category||'General').replace(/[^a-zA-Z0-9._-]/g,'_');
 
   // 1) optimizăm + urcăm fișierele în Drive, în paralel (rapid)
   var uploadPromises=files.map(function(file){
     return readFileOptimizat(file).then(function(res){
       if(!res)return null;
-      var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      var safeName=Date.now()+'_'+prefixCategorie+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
         done++;
         if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
@@ -2783,12 +2800,12 @@ function uploadDocsCatDU(input,clientId,year){
   if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
   var done=0;
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient+'/Declarație Unică/'+year;
+  var folderPath='Clienți/'+numeClient;
 
   var uploadPromises=files.map(function(file){
     return readFileOptimizat(file).then(function(res){
       if(!res)return null;
-      var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      var safeName=Date.now()+'_DU_'+year+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
         done++;
         if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
@@ -2832,6 +2849,7 @@ function loadDocsList(clientId,containerId){
     loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
   });
   loadDocsDU(clientId);
+  reconciliazaCategoriiDinMetadata(clientId,c);
 }
 
 // Documente Declarație Unică, grupate pe ani — aceleași metadate/servicii ca restul documentelor
@@ -5196,7 +5214,33 @@ function ensureDocCategories(c){
     {key:'contract',label:'Contract prestări servicii'}
   ];
   c.docCategories=defaults.concat(c.foldereCustom||[]);
+  save(); // persistăm imediat, altfel migrarea se pierde la reîncărcarea aplicației
   return c.docCategories;
+}
+
+// Recuperare de siguranță: dacă în metadatele documentelor (doc_meta) apar
+// categorii care nu mai există în lista clientului (ex: pierdute înainte de
+// reparația de mai sus), le reconstituim automat, ca documentele să nu rămână
+// „orfane" (salvate, dar fără nicio secțiune care să le afișeze).
+function reconciliazaCategoriiDinMetadata(clientId,c){
+  return gdriveGet('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    if(!allMeta.length)return;
+    var cats=ensureDocCategories(c);
+    var known={};
+    cats.forEach(function(cat){known[cat.key]=true;});
+    var adaugat=false;
+    allMeta.forEach(function(m){
+      var cat=m.category;
+      if(!cat||cat==='du'||cat==='general'||known[cat])return;
+      known[cat]=true;
+      var parts=(m.path||'').split('/');
+      var labelGasit=parts.length>=2?parts[parts.length-2]:'Categorie recuperată';
+      cats.push({key:cat,label:labelGasit});
+      adaugat=true;
+    });
+    if(adaugat){save();refreshDocCategoriesUI(clientId);}
+  }).catch(function(){});
 }
 
 var pencilSvgSmall='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>';
@@ -7375,11 +7419,13 @@ function salveazaSemnareNoua(){
   var docId='doc'+Date.now();
   var numeFisier=titlu.replace(/[\/\\:*?"<>|]/g,'_').trim()||'document';
   var blob=new Blob([semnareDraft.pdfBytes],{type:'application/pdf'});
+  var creatorIPPromise=fetchPublicIP();
   gdriveUploadBlob('Semnări/'+docId,numeFisier+'.pdf',blob,'application/pdf').then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
     return gdriveUploadBlob('Semnări/'+docId,numeFisier+'_semnat.pdf',blob,'application/pdf');
   }).then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
+    return creatorIPPromise.then(function(creatorIP){
     var doc={
       id:docId,titlu:titlu,createdAt:Date.now(),
       pdfPath:'Semnări/'+docId+'/'+numeFisier+'.pdf',
@@ -7387,7 +7433,8 @@ function salveazaSemnareNoua(){
       semnatPdfPath:null,
       signers:semnareDraft.signers,
       zones:semnareDraft.zones,
-      status:'in_progress'
+      status:'in_progress',
+      creatorIP:creatorIP
     };
     var list=getSemnari();
     list.unshift(doc);
@@ -7395,6 +7442,7 @@ function salveazaSemnareNoua(){
     semnareDraft=null;
     semnariSubTab='incurs';
     renderSemnariTab();
+    });
   }).catch(function(e){
     console.error('Eroare salvare document semnare:',e);
     alert('A apărut o eroare la salvarea documentului. Verifică internetul și încearcă din nou.');
@@ -7571,6 +7619,13 @@ function blobToDataURL(blob){
 
 // Raport de semnare — un singur PDF, cu toți semnatarii care au semnat deja
 // (nume, email, dată/oră, loc, IP, semnătura desenată într-un chenar).
+function sha256Hex(buffer){
+  return crypto.subtle.digest('SHA-256',buffer).then(function(hashBuffer){
+    var arr=Array.from(new Uint8Array(hashBuffer));
+    return arr.map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  });
+}
+
 function genereazaRaportSemnare(docId){
   var doc=getSemnari().find(function(d){return d.id===docId;});
   if(!doc){alert('Documentul nu a fost găsit.');return;}
@@ -7586,54 +7641,81 @@ function genereazaRaportSemnare(docId){
   pdfDoc.setFont('CrimsonPro','normal');
   drawLetterhead(pdfDoc,margin,pageW);
 
-  pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(18);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
-  pdfDoc.text('Raport de semnare',margin,y);y+=8;
-  pdfDoc.setFont('CrimsonPro','normal');pdfDoc.setFontSize(12.5);pdfDoc.setTextColor(90,90,90);
-  pdfDoc.text('Document: '+(doc.titlu||'—'),margin,y);y+=6;
-  pdfDoc.setFontSize(10.5);pdfDoc.setTextColor(140,140,140);
-  pdfDoc.text(semnatari.length+' / '+doc.signers.length+' semnatari au semnat',margin,y);y+=10;
+  function checkP(nevoie){if(y+nevoie>272){pdfDoc.addPage();registerPdfFont(pdfDoc);y=20;}}
+  function linie(label,valoare,dim){
+    checkP(6);
+    pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(dim||10.5);pdfDoc.setTextColor(90,90,90);
+    pdfDoc.text(label+':',margin,y);
+    pdfDoc.setFont('CrimsonPro','normal');pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
+    var labelW=pdfDoc.getTextWidth(label+':  ');
+    var maxW=pageW-margin-margin-labelW;
+    var linii=pdfDoc.splitTextToSize(String(valoare||'—'),maxW);
+    pdfDoc.text(linii,margin+labelW,y);
+    y+=5*linii.length+0.5;
+  }
+  function sectiune(titlu){
+    checkP(12);
+    y+=3;
+    pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(12.5);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
+    pdfDoc.text(titlu,margin,y);y+=2.5;
+    pdfDoc.setDrawColor(gold[0],gold[1],gold[2]);pdfDoc.setLineWidth(0.5);
+    pdfDoc.line(margin,y,pageW-margin,y);y+=6.5;
+  }
 
+  pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(19);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
+  pdfDoc.text('Certificat de finalizare',margin,y);y+=6;
+  pdfDoc.setFont('CrimsonPro','italic');pdfDoc.setFontSize(10);pdfDoc.setTextColor(150,150,150);
+  pdfDoc.text('Generat la: '+new Date().toLocaleString('ro-RO'),margin,y);y+=10;
+
+  // pregătim datele care necesită acces la fișierul semnat (hash) + semnăturile desenate
+  var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
+  var pdfPath=doc.semnatPdfPath||doc.lucruPdfPath;
+  var hashPromise=gdriveFetchArrayBuffer(pdfPath).then(sha256Hex).catch(function(){return null;});
   var imgPromises=semnatari.map(function(s){
     if(!s.semnaturaPath)return Promise.resolve(null);
-    return gdriveFetchFileBlob(s.semnaturaPath).then(function(blob){return blobToDataURL(blob);}).catch(function(){return null;});
+    return gdriveFetchFileBlob(s.semnaturaPath).then(function(res){return blobToDataURL(res.blob);}).catch(function(){return null;});
   });
 
-  Promise.all(imgPromises).then(function(imgs){
-    semnatari.forEach(function(s,idx){
-      var boxH=46;
-      if(y+boxH>268){pdfDoc.addPage();registerPdfFont(pdfDoc);y=20;}
-      pdfDoc.setDrawColor(gold[0],gold[1],gold[2]);pdfDoc.setLineWidth(0.5);
-      pdfDoc.roundedRect(margin,y,pageW-2*margin,boxH,2,2);
+  Promise.all([hashPromise,Promise.all(imgPromises)]).then(function(rez){
+    var hash=rez[0],imgs=rez[1];
+    var ultimaSemnatura=Math.max.apply(null,semnatari.map(function(s){return s.semnatAt||0;}));
 
-      var sigBoxW=52,sigBoxH=boxH-10;
-      var sigBoxX=pageW-margin-sigBoxW-5,sigBoxY=y+5;
-      pdfDoc.setDrawColor(210,210,210);pdfDoc.setLineWidth(0.3);
+    sectiune('Rezumat');
+    linie('ID document',docId);
+    linie('Denumire document',doc.titlu);
+    if(hash)linie('Hash document (SHA-256)',hash,8.5);
+    linie('Organizație','Gál S. Norbert – Întreprindere Individuală');
+    linie('Creat la',doc.createdAt?new Date(doc.createdAt).toLocaleString('ro-RO'):'—');
+    linie('Finalizat la',toateSemnate?new Date(ultimaSemnatura).toLocaleString('ro-RO'):'(document încă în curs de semnare)');
+    linie('Semnatari',semnatari.length+' / '+doc.signers.length);
+
+    sectiune('Inițiator document');
+    linie('Nume','GÁL NORBERT');
+    linie('Email','contact@gsnii.ro');
+    linie('Adresă IP',doc.creatorIP||'—');
+
+    semnatari.forEach(function(s,idx){
+      sectiune('Semnatar '+(idx+1));
+      linie('Nume',s.nume);
+      linie('Email',s.email||'—');
+      linie('Vizualizat la',s.deschisAt?new Date(s.deschisAt).toLocaleString('ro-RO'):'—');
+      linie('Semnat la',s.semnatAt?new Date(s.semnatAt).toLocaleString('ro-RO'):'—');
+      linie('Adresă IP',s.semnatIP||'—');
+
+      checkP(26);
+      pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(10.5);pdfDoc.setTextColor(90,90,90);
+      pdfDoc.text('Semnătură:',margin,y);
+      var sigBoxX=margin+32,sigBoxY=y-5,sigBoxW=55,sigBoxH=20;
+      pdfDoc.setDrawColor(navy[0],navy[1],navy[2]);pdfDoc.setLineWidth(0.35);
       pdfDoc.rect(sigBoxX,sigBoxY,sigBoxW,sigBoxH);
       if(imgs[idx]){
         try{pdfDoc.addImage(imgs[idx],'PNG',sigBoxX+1.5,sigBoxY+1.5,sigBoxW-3,sigBoxH-3,undefined,'FAST');}catch(e){}
-      }else{
-        pdfDoc.setFont('CrimsonPro','italic');pdfDoc.setFontSize(9);pdfDoc.setTextColor(180,180,180);
-        pdfDoc.text('fără semnătură salvată',sigBoxX+sigBoxW/2,sigBoxY+sigBoxH/2,{align:'center'});
       }
-
-      var tx=margin+5,ty=y+8;
-      pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(13);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
-      pdfDoc.text(s.nume||'—',tx,ty);ty+=6;
-      pdfDoc.setFont('CrimsonPro','normal');pdfDoc.setFontSize(10);pdfDoc.setTextColor(100,100,100);
-      pdfDoc.text('Email: '+(s.email||'—'),tx,ty);ty+=5;
-      var dataOra=s.semnatAt?new Date(s.semnatAt).toLocaleString('ro-RO'):'—';
-      pdfDoc.text('Data/ora: '+dataOra,tx,ty);ty+=5;
-      pdfDoc.text('Loc: '+(s.semnatLocatie||'necunoscut')+'   ·   IP: '+(s.semnatIP||'—'),tx,ty);
-
-      y+=boxH+6;
+      y+=sigBoxH+4;
     });
 
-    if(y>270){pdfDoc.addPage();registerPdfFont(pdfDoc);y=20;}
-    pdfDoc.setFont('CrimsonPro','italic');pdfDoc.setFontSize(10);pdfDoc.setTextColor(160,160,160);
-    pdfDoc.text('Raport generat: '+todayRo(),margin,y+4);
-
     drawFooter(pdfDoc,margin,pageW);
-    var fileName=(doc.titlu||'document').replace(/[^a-zA-Z0-9._-]/g,'_')+'_raport_semnare.pdf';
+    var fileName='Certificat_semnare_'+(doc.titlu||'document').replace(/[^a-zA-Z0-9._-]/g,'_')+'.pdf';
     pdfDoc.save(fileName);
   }).catch(function(e){
     console.error('Eroare generare raport:',e);
@@ -8018,11 +8100,9 @@ function rotateImageDataUrl(dataUrl,degrees){
 
 // Obține (aproximativ) IP-ul public și locația semnatarului, pentru raportul
 // de semnare. Eșuează silențios dacă nu are net sau serviciul nu răspunde.
-function fetchSemnareLocationInfo(){
-  return fetch('https://ipapi.co/json/').then(function(r){return r.json();}).then(function(data){
-    var locatie=[data.city,data.country_name].filter(Boolean).join(', ');
-    return {ip:data.ip||'',locatie:locatie};
-  }).catch(function(){return {ip:'',locatie:''};});
+// Obține adresa IP publică (folosită la crearea documentului, cât și la semnare).
+function fetchPublicIP(){
+  return fetch('https://api.ipify.org?format=json').then(function(r){return r.json();}).then(function(d){return d.ip||'';}).catch(function(){return '';});
 }
 
 function submitSemnatura(docId,signerId){
@@ -8034,7 +8114,7 @@ function submitSemnatura(docId,signerId){
 
   var canvas=document.getElementById('sign-pad-canvas');
   var signatureDataUrl=canvas.toDataURL('image/png');
-  var locationPromise=fetchSemnareLocationInfo();
+  var ipPromise=fetchPublicIP();
 
   sbGet('semnari').then(function(raw){
     var list=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
@@ -8077,12 +8157,11 @@ function submitSemnatura(docId,signerId){
           var sigBlob=dataURLtoBlob(signatureDataUrl);
           var sigPath='Semnări/'+docId+'/semnaturi/'+signerId+'.png';
           return gdriveUploadBlob('Semnări/'+docId+'/semnaturi',signerId+'.png',sigBlob,'image/png').then(function(){
-            return locationPromise;
-          }).then(function(locInfo){
+            return ipPromise;
+          }).then(function(ip){
             signer.status='semnat';
             signer.semnatAt=Date.now();
-            signer.semnatIP=locInfo.ip;
-            signer.semnatLocatie=locInfo.locatie;
+            signer.semnatIP=ip;
             signer.semnaturaPath=sigPath;
             var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
             if(toateSemnate){doc.status='semnat';doc.semnatPdfPath=doc.lucruPdfPath;}
