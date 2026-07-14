@@ -2415,6 +2415,16 @@ function viewDocDirect(path,btnEl){
   // consideră "pop-up" (fiindcă altfel s-ar deschide abia după ce vin datele,
   // chiar dacă durează doar câteva zeci de ms) și cere permisiune de fiecare dată.
   var newTab=window.open('','_blank');
+  if(newTab){
+    try{
+      newTab.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Se încarcă...</title></head>'
+        +'<body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f3ee;color:#072144">'
+        +'<div style="text-align:center"><div style="width:36px;height:36px;border:3px solid rgba(7,33,68,0.2);border-top-color:#072144;border-radius:50%;margin:0 auto 14px;animation:sp 0.8s linear infinite"></div>'
+        +'<div style="font-size:14px">Se încarcă documentul...</div></div>'
+        +'<style>@keyframes sp{to{transform:rotate(360deg)}}</style></body></html>');
+      newTab.document.close();
+    }catch(e){}
+  }
   var t0=performance.now();
   gdriveFetchFileBlob(path).then(function(res){
     var ms=Math.round(performance.now()-t0);
