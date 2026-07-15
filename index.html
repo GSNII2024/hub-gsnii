@@ -2372,6 +2372,13 @@ function gdriveDelete(path){
     .then(function(r){return r.json();}).catch(function(){return null;});
 }
 
+// Creează (dacă nu există deja) un folder, ÎNAINTE de a începe încărcările în
+// paralel — ca să nu apară foldere duplicate când urci mai multe fișiere deodată.
+function gdriveEnsureFolder(folderPath){
+  return fetch(GDRIVE_SCRIPT_URL+'?action=ensureFolder&path='+encodeURIComponent(folderPath),{method:'POST'})
+    .then(function(r){return r.json();}).catch(function(){return null;});
+}
+
 // Mută la Trash folderul întreg al unui client (cu tot ce e în el), din Drive.
 function gdriveDeleteFolder(path){
   return fetch(GDRIVE_SCRIPT_URL+'?action=deleteFolder&path='+encodeURIComponent(path),{method:'POST'})
@@ -2497,9 +2504,9 @@ function dataURLtoBlob(dataURL){
 // Salvare document — Google Drive (fișierul real) + metadate (doc_meta_{clientId})
 function saveDocToDrive(clientId,name,type,dataURL,category,folderLabel,duYear){
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient;
-  var prefixCategorie=(folderLabel||category||'General').replace(/[^a-zA-Z0-9._-]/g,'_');
-  var safeName=Date.now()+'_'+prefixCategorie+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var subfolder=(folderLabel||category||'General');
+  var folderPath='Clienți/'+numeClient+'/'+subfolder;
+  var safeName=Date.now()+'_'+name.replace(/[^a-zA-Z0-9._-]/g,'_');
   return gdriveUpload(folderPath,safeName,dataURL,type).then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
@@ -2608,9 +2615,9 @@ function folderLabelForCategory(category,duYear){
 
 function migreazaUnDocumentVechi(clientId,m){
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient;
-  var prefixCategorie=folderLabelForCategory(m.category,m.duYear).replace(/[^a-zA-Z0-9._-]/g,'_');
-  var safeName=Date.now()+'_'+prefixCategorie+'_'+Math.random().toString(36).slice(2,6)+'_'+(m.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var subfolder=folderLabelForCategory(m.category,m.duYear);
+  var folderPath='Clienți/'+numeClient+'/'+subfolder;
+  var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+(m.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
   var oldUrl=SUPABASE_URL+'/storage/v1/object/public/'+SB_BUCKET+'/'+m.path;
   return fetch(oldUrl).then(function(r){
     if(!r.ok)throw new Error('fetch_failed');
@@ -2781,33 +2788,38 @@ function prefetchDocsInBackground(items){
 }
 
 
-function uploadDocsCat(input,clientId,category,categoryLabel){
+function uploadDocsCat(input,clientId,category,categoryLabel,folderName){
   var files=Array.from(input.files);
   if(!files.length)return;
   var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+  if(loadEl)loadEl.textContent='Se pregătește...';
   var done=0;
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient;
-  var prefixCategorie=(categoryLabel||category||'General').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var numeFolder=(folderName||categoryLabel||category||'General');
+  var folderPath='Clienți/'+numeClient+'/'+numeFolder;
 
-  // 1) optimizăm + urcăm fișierele în Drive, în paralel (rapid)
-  var uploadPromises=files.map(function(file){
-    return readFileOptimizat(file).then(function(res){
-      if(!res)return null;
-      var safeName=Date.now()+'_'+prefixCategorie+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
-        done++;
-        if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
-        if(!uploadRes||!uploadRes.success)return null;
-        return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:category||'general',duYear:'',date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
-      }).catch(function(){return null;});
+  // 1) ne asigurăm că folderul categoriei există DEJA, o singură dată — altfel,
+  // la încărcare simultană a mai multor fișiere, fiecare ar crea propriul folder.
+  gdriveEnsureFolder(folderPath).then(function(){
+    if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+    // 2) optimizăm + urcăm fișierele în Drive, în paralel (rapid, sigur acum)
+    var uploadPromises=files.map(function(file){
+      return readFileOptimizat(file).then(function(res){
+        if(!res)return null;
+        var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
+          done++;
+          if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
+          if(!uploadRes||!uploadRes.success)return null;
+          return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:category||'general',duYear:'',date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+        }).catch(function(){return null;});
+      });
     });
-  });
 
-  // 2) după ce toate s-au urcat, actualizăm lista de documente o singură dată (fără conflicte)
-  Promise.all(uploadPromises).then(function(results){
-    var reusite=results.filter(function(r){return r;});
+    // 3) după ce toate s-au urcat, actualizăm lista de documente o singură dată (fără conflicte)
+    return Promise.all(uploadPromises);
+  }).then(function(results){
+    var reusite=(results||[]).filter(function(r){return r;});
     if(!reusite.length)return null;
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
@@ -2825,26 +2837,28 @@ function uploadDocsCatDU(input,clientId,year){
   var files=Array.from(input.files);
   if(!files.length)return;
   var loadEl=document.getElementById('docs-loading-'+clientId);
-  if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+  if(loadEl)loadEl.textContent='Se pregătește...';
   var done=0;
   var numeClient=clientDocFolderName(clientId);
-  var folderPath='Clienți/'+numeClient;
+  var folderPath='Clienți/'+numeClient+'/Declarație Unică/'+year;
 
-  var uploadPromises=files.map(function(file){
-    return readFileOptimizat(file).then(function(res){
-      if(!res)return null;
-      var safeName=Date.now()+'_DU_'+year+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
-        done++;
-        if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
-        if(!uploadRes||!uploadRes.success)return null;
-        return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:'du',duYear:String(year),date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
-      }).catch(function(){return null;});
+  gdriveEnsureFolder(folderPath).then(function(){
+    if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
+    var uploadPromises=files.map(function(file){
+      return readFileOptimizat(file).then(function(res){
+        if(!res)return null;
+        var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
+          done++;
+          if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
+          if(!uploadRes||!uploadRes.success)return null;
+          return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:'du',duYear:String(year),date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+        }).catch(function(){return null;});
+      });
     });
-  });
-
-  Promise.all(uploadPromises).then(function(results){
-    var reusite=results.filter(function(r){return r;});
+    return Promise.all(uploadPromises);
+  }).then(function(results){
+    var reusite=(results||[]).filter(function(r){return r;});
     if(!reusite.length)return null;
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
@@ -5236,13 +5250,23 @@ function buildForm(c){
 // prestabilite + orice foldere personalizate create anterior (compatibilitate).
 function ensureDocCategories(c){
   if(!c)return [];
-  if(c.docCategories)return c.docCategories;
+  if(c.docCategories){
+    // completare retroactivă: dacă unele categorii nu au încă folderName
+    // (create înainte de această reparație), le asignăm acum, o singură dată.
+    var completat=false;
+    c.docCategories.forEach(function(cat){
+      if(!cat.folderName){cat.folderName=(cat.label||cat.key).replace(/[\/\\:*?"<>|]/g,'_').trim()||cat.key;completat=true;}
+    });
+    if(completat)save();
+    return c.docCategories;
+  }
   var defaults=[
-    {key:'ci',label:'Carte de identitate'},
-    {key:'cert',label:'Certificat de înregistrare'},
-    {key:'contract',label:'Contract prestări servicii'}
+    {key:'ci',label:'Carte de identitate',folderName:'Carte de identitate'},
+    {key:'cert',label:'Certificat de înregistrare',folderName:'Certificat de înregistrare'},
+    {key:'contract',label:'Contract prestări servicii',folderName:'Contract prestări servicii'}
   ];
-  c.docCategories=defaults.concat(c.foldereCustom||[]);
+  var custom=(c.foldereCustom||[]).map(function(f){return {key:f.key,label:f.label,folderName:(f.label||f.key).replace(/[\/\\:*?"<>|]/g,'_').trim()||f.key};});
+  c.docCategories=defaults.concat(custom);
   save(); // persistăm imediat, altfel migrarea se pierde la reîncărcarea aplicației
   return c.docCategories;
 }
@@ -5265,7 +5289,7 @@ function reconciliazaCategoriiDinMetadata(clientId,c){
       known[cat]=true;
       var parts=(m.path||'').split('/');
       var labelGasit=parts.length>=2?parts[parts.length-2]:'Categorie recuperată';
-      cats.push({key:cat,label:labelGasit});
+      cats.push({key:cat,label:labelGasit,folderName:labelGasit});
       adaugat=true;
     });
     if(adaugat){save();refreshDocCategoriesUI(clientId);}
@@ -5282,6 +5306,7 @@ function renderDocCategoriesBlock(cid,c){
   var html='';
   toate.forEach(function(cat){
     var labelEsc=(cat.label||'').replace(/'/g,"\\'");
+    var folderEsc=(cat.folderName||cat.label||'').replace(/'/g,"\\'");
     html+='<div class="doc-cat-block">'
       +'<div class="doc-cat-header">'
       +'<i class="ti ti-folder"></i> <span>'+esc(cat.label)+'</span>'
@@ -5289,7 +5314,7 @@ function renderDocCategoriesBlock(cid,c){
       +'<button type="button" onclick="event.stopPropagation();stergeCategorie(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:2px 5px" title="Șterge categoria"><i class="ti ti-trash" style="font-size:14px"></i></button>'
       +'<label class="doc-cat-add-btn" title="Adaugă documente (poți selecta mai multe deodată)">'
       +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
-      +' onchange="uploadDocsCat(this,\''+cid+'\',\''+cat.key+'\',\''+labelEsc+'\')">'
+      +' onchange="uploadDocsCat(this,\''+cid+'\',\''+cat.key+'\',\''+labelEsc+'\',\''+folderEsc+'\')">'
       +'<i class="ti ti-plus"></i></label>'
       +'</div>'
       +'<div class="docs-list" id="docs-cat-'+cid+'-'+cat.key+'"></div>'
@@ -5318,7 +5343,8 @@ function adaugaCategorieNoua(clientId){
   if(!c){alert('Salvează mai întâi fișa clientului.');return;}
   ensureDocCategories(c);
   var key='cat_'+Date.now();
-  c.docCategories.push({key:key,label:nume});
+  var folderName=nume.replace(/[\/\\:*?"<>|]/g,'_').trim()||key;
+  c.docCategories.push({key:key,label:nume,folderName:folderName});
   save();
   refreshDocCategoriesUI(clientId);
 }
