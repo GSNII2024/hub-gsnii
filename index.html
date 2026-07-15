@@ -2771,6 +2771,19 @@ function setCachedBlobPersistent(path,blob){
   }).catch(function(){});
 }
 
+// Șterge orice versiune „memorată" a unui fișier — OBLIGATORIU de apelat ori
+// de câte ori un fișier existent e suprascris (ex: documentul de semnat, care
+// se re-încarcă la aceeași adresă după fiecare semnătură). Altfel cache-ul ar
+// livra în continuare varianta veche, dinainte de suprascriere.
+function invalidateDocCache(path){
+  delete docBlobCache[path];
+  if(window.caches){
+    caches.open(DOC_CACHE_NAME).then(function(cache){
+      cache.delete('https://hub-doc-cache.local/'+encodeURIComponent(path));
+    }).catch(function(){});
+  }
+}
+
 // Descarcă documentele unei categorii în fundal, unul câte unul (cu pauză mică
 // între ele), ca să fie deja în cache până apeși pe „ochi" — fără să afecteze
 // fluiditatea aplicației și fără să consume rețeaua excesiv.
@@ -8227,6 +8240,9 @@ function submitSemnatura(docId,signerId){
       }).then(function(newPdfBytes){
         var blob=new Blob([newPdfBytes],{type:'application/pdf'});
         return gdriveUploadBlobPath(doc.lucruPdfPath,blob,'application/pdf').then(function(){
+          // Documentul tocmai s-a suprascris cu varianta semnată — ștergem orice
+          // versiune veche, nesemnată, memorată în cache, altfel s-ar descărca aceea.
+          invalidateDocCache(doc.lucruPdfPath);
           // Salvăm și semnătura brută (imaginea desenată), necesară pentru raportul de semnare.
           var sigBlob=dataURLtoBlob(signatureDataUrl);
           var sigPath='Semnări/'+docId+'/semnaturi/'+signerId+'.png';
