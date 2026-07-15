@@ -7693,6 +7693,7 @@ function genereazaRaportSemnare(docId,docOverride){
   var semnatari=doc.signers.filter(function(s){return s.status==='semnat';});
   if(!semnatari.length){alert('Niciun semnatar nu a semnat încă acest document.');return;}
   if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează certificatul...');
 
   var jsPDF=window.jspdf.jsPDF;
   var pdfDoc=new jsPDF({unit:'mm',format:'a4'});
@@ -7778,9 +7779,10 @@ function genereazaRaportSemnare(docId,docOverride){
 
     drawFooter(pdfDoc,margin,pageW);
     var fileName='Certificat_semnare_'+(doc.titlu||'document').replace(/[^a-zA-Z0-9._-]/g,'_')+'.pdf';
-    pdfDoc.save(fileName);
+    outputPdf(pdfDoc,fileName,__pdfTab);
   }).catch(function(e){
     console.error('Eroare generare raport:',e);
+    if(__pdfTab&&!__pdfTab.closed)__pdfTab.close();
     alert('A apărut o eroare la generarea raportului. Verifică internetul și încearcă din nou.');
   });
 }
@@ -8057,9 +8059,9 @@ function drawStrokeAsInkRibbon(ctx,stroke){
     var d=Math.hypot(next.x-prev.x,next.y-prev.y);
     var dt=Math.max(next.t-prev.t,1);
     var speed=d/dt;
-    return Math.max(1.1,Math.min(3.2,2.7-speed*8));
+    return Math.max(1.0,Math.min(3.4,2.8-speed*7));
   });
-  // netezire mai largă (medie mobilă pe 5 puncte), tranziții și mai line
+  // netezire (medie mobilă pe 5 puncte), tranziții line
   var w=widths.map(function(_,i){
     var lo=Math.max(0,i-2),hi=Math.min(widths.length-1,i+2);
     var sum=0,cnt=0;
@@ -8067,46 +8069,46 @@ function drawStrokeAsInkRibbon(ctx,stroke){
     return sum/cnt;
   });
   // subțiere naturală la început și sfârșit (ca la ridicarea/apăsarea pixului)
-  var taperLen=Math.min(5,Math.floor(stroke.length/3));
+  var taperLen=Math.min(4,Math.floor(stroke.length/3));
   for(var t=0;t<taperLen;t++){
-    var f=(t+1)/(taperLen+1);
+    var f=0.35+0.65*(t+1)/(taperLen+1);
     w[t]*=f;
     w[w.length-1-t]*=f;
   }
 
-  // 2) construim conturul stânga/dreapta, perpendicular pe direcția traseului
-  var left=[],right=[];
-  for(var j=0;j<stroke.length;j++){
-    var p0=stroke[Math.max(0,j-1)],p1=stroke[Math.min(stroke.length-1,j+1)];
-    var dx=p1.x-p0.x,dy=p1.y-p0.y;
-    var len=Math.hypot(dx,dy)||1;
-    var nx=-dy/len,ny=dx/len;
-    var hw=w[j]/2;
-    left.push({x:stroke[j].x+nx*hw,y:stroke[j].y+ny*hw});
-    right.push({x:stroke[j].x-nx*hw,y:stroke[j].y-ny*hw});
-  }
-
-  function traseuNeted(pts){
-    ctx.moveTo(pts[0].x,pts[0].y);
-    for(var k=1;k<pts.length-1;k++){
-      var mx=(pts[k].x+pts[k+1].x)/2,my=(pts[k].y+pts[k+1].y)/2;
-      ctx.quadraticCurveTo(pts[k].x,pts[k].y,mx,my);
+  // 2) desenăm ca segmente scurte, suprapuse, cu capete rotunjite — grosimea
+  // se interpolează lin de-a lungul fiecărui segment, ca traseul să curgă
+  // natural, fără „ciupituri" pe curbe strânse (spre deosebire de o formă
+  // poligonală cu contur stânga/dreapta, care se poate auto-intersecta).
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.9)';
+  for(var i=0;i<stroke.length-1;i++){
+    var p0=stroke[i],p1=stroke[i+1];
+    var w0=w[i],w1=w[i+1];
+    var segLen=Math.hypot(p1.x-p0.x,p1.y-p0.y);
+    var steps=Math.max(1,Math.ceil(segLen/1.4));
+    for(var s=0;s<steps;s++){
+      var t0=s/steps,t1=(s+1)/steps;
+      var x0=p0.x+(p1.x-p0.x)*t0,y0=p0.y+(p1.y-p0.y)*t0;
+      var x1=p0.x+(p1.x-p0.x)*t1,y1=p0.y+(p1.y-p0.y)*t1;
+      ctx.lineWidth=w0+(w1-w0)*((t0+t1)/2);
+      ctx.beginPath();
+      ctx.moveTo(x0,y0);
+      ctx.lineTo(x1,y1);
+      ctx.stroke();
     }
-    ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
   }
 
-  ctx.beginPath();
-  traseuNeted(left);
-  traseuNeted(right.slice().reverse());
-  ctx.closePath();
-
-  // 3) umplem cu textură de cerneală (3 straturi suprapuse, densitate naturală)
-  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.92)';
-  ctx.fill();
-  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.22)';
-  ctx.fill();
-  ctx.fillStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.1)';
-  ctx.fill();
+  // 3) al doilea strat, mai larg și mai transparent, pentru textură ușoară de cerneală
+  ctx.globalAlpha=0.16;
+  for(var i2=0;i2<stroke.length-1;i2++){
+    ctx.lineWidth=(w[i2]+w[i2+1])/2*1.2;
+    ctx.beginPath();
+    ctx.moveTo(stroke[i2].x,stroke[i2].y);
+    ctx.lineTo(stroke[i2+1].x,stroke[i2+1].y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
 }
 
 // Convertește un chenar marcat vizual (procente relative la pagina AȘA CUM
@@ -8182,10 +8184,11 @@ function submitSemnatura(docId,signerId){
   var canvas=document.getElementById('sign-pad-canvas');
   var signatureDataUrl=canvas.toDataURL('image/png');
   var ipPromise=fetchPublicIP();
+  var doc; // declarat aici, ca să rămână accesibil și în callback-ul final (după trimitere)
 
   sbGet('semnari').then(function(raw){
     var list=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
-    var doc=list.find(function(d){return d.id===docId;});
+    doc=list.find(function(d){return d.id===docId;});
     if(!doc)throw new Error('Document negăsit');
     var signer=doc.signers.find(function(s){return s.id===signerId;});
     if(!signer)throw new Error('Semnatar negăsit');
@@ -8247,19 +8250,44 @@ function submitSemnatura(docId,signerId){
       document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ai semnat deja acest document.</div></div>';
       return;
     }
-    var pathSemnat=doc.semnatPdfPath||doc.lucruPdfPath;
-    var titluEsc=(doc.titlu||'').replace(/'/g,"\\'");
-    document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px">'
-      +'<div style="font-size:48px;margin-bottom:14px">✓</div>'
-      +'<div style="font-size:19px;font-weight:700;color:#1a6a40">Mulțumesc! Documentul a fost semnat.</div>'
-      +'<div style="margin-top:8px;margin-bottom:22px;color:rgba(7,33,68,0.5);font-size:14px">Poți descărca o copie mai jos, înainte să închizi pagina.</div>'
-      +'<div style="display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto">'
-      +'<button type="button" onclick="descarcaDocumentSemnatFinal(\''+pathSemnat.replace(/'/g,"\\'")+'\',\''+titluEsc+'\')" style="padding:12px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">⬇️ Descarcă documentul semnat</button>'
-      +'<button type="button" onclick="genereazaRaportSemnare(\''+doc.id+'\',window.__semnDocFinal)" style="padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer">⬇️ Descarcă certificatul de semnare</button>'
-      +'</div>'
-      +'<div style="margin-top:16px;color:rgba(7,33,68,0.35);font-size:12px">Poți închide pagina oricând, după ce ai descărcat ce ai nevoie.</div>'
-      +'</div>';
-    window.__semnDocFinal=doc;
+    try{
+      var pathSemnat=doc.semnatPdfPath||doc.lucruPdfPath;
+      var cont=document.getElementById('sign-page-content');
+      cont.innerHTML='';
+      var wrap=document.createElement('div');
+      wrap.style.cssText='text-align:center;padding:60px 20px';
+      wrap.innerHTML='<div style="font-size:48px;margin-bottom:14px">✓</div>'
+        +'<div style="font-size:19px;font-weight:700;color:#1a6a40">Mulțumesc! Documentul a fost semnat.</div>'
+        +'<div style="margin-top:8px;margin-bottom:22px;color:rgba(7,33,68,0.5);font-size:14px">Poți descărca o copie mai jos, înainte să închizi pagina.</div>';
+      var btnRow=document.createElement('div');
+      btnRow.style.cssText='display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto';
+
+      var btn1=document.createElement('button');
+      btn1.type='button';
+      btn1.textContent='⬇️ Descarcă documentul semnat';
+      btn1.style.cssText='padding:12px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer';
+      btn1.addEventListener('click',function(){descarcaDocumentSemnatFinal(pathSemnat,doc.titlu);});
+
+      var btn2=document.createElement('button');
+      btn2.type='button';
+      btn2.textContent='📄 Deschide certificatul de semnare';
+      btn2.style.cssText='padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer';
+      btn2.addEventListener('click',function(){genereazaRaportSemnare(doc.id,doc);});
+
+      btnRow.appendChild(btn1);
+      btnRow.appendChild(btn2);
+      wrap.appendChild(btnRow);
+
+      var note=document.createElement('div');
+      note.style.cssText='margin-top:16px;color:rgba(7,33,68,0.35);font-size:12px';
+      note.textContent='Poți închide pagina oricând, după ce ai descărcat ce ai nevoie.';
+      wrap.appendChild(note);
+
+      cont.appendChild(wrap);
+    }catch(uiErr){
+      console.error('Eroare la afișarea confirmării:',uiErr);
+      document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:14px">✓</div><div style="font-size:19px;font-weight:700;color:#1a6a40">Mulțumesc! Documentul a fost semnat.</div></div>';
+    }
   }).catch(function(e){
     console.error('Eroare la trimiterea semnăturii:',e);
     alert('A apărut o eroare. Verifică internetul și încearcă din nou.');
