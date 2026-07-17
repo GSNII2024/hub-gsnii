@@ -508,10 +508,8 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
         <label><button onclick="document.getElementById('imp-backup').click()"><i class="ti ti-database-import"></i> Restaurează</button></label>
         <input type="file" id="imp-backup" accept=".json" style="display:none">
         <button onclick="restoreAutoBackup()"><i class="ti ti-history"></i> Backup automat</button>
+        <button onclick="testeazaBackupAutomat()" style="background:#fff;color:var(--navy)">🧪 Testează backup automat</button>
         <button onclick="generateSpvRepPDF()" style="display:none"></button>
-        <button onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
-        <label><button onclick="document.getElementById('imp').click()"><i class="ti ti-upload"></i> Import CSV</button></label>
-        <input type="file" id="imp" accept=".csv" style="display:none">
       </div>
     </div>
   </div>
@@ -7821,14 +7819,28 @@ function salveazaBackupSupabase(manual){
     headers:Object.assign({},SB_BACKUP_HEADERS,{'Prefer':'resolution=merge-duplicates'}),
     body:JSON.stringify(payload)
   }).then(function(res){
-    if(manual){
-      if(res&&res.ok)alert('Backup salvat cu succes în Supabase (doar date, fără documente/poze).');
-      else alert('A apărut o eroare la salvarea backup-ului în Supabase.');
+    if(res&&res.ok){
+      if(manual)alert('Backup salvat cu succes în Supabase (doar date, fără documente/poze).');
+      console.log('Backup Supabase: succes');
+    }else{
+      return res.text().then(function(errText){
+        console.error('Backup Supabase — eroare HTTP '+(res?res.status:'?')+': '+errText);
+        if(manual)alert('Eroare la backup Supabase (cod '+(res?res.status:'?')+'):\n'+errText);
+      });
     }
     return res;
-  }).catch(function(){
-    if(manual)alert('A apărut o eroare la salvarea backup-ului în Supabase. Verifică internetul.');
+  }).catch(function(e){
+    console.error('Backup Supabase — eroare rețea:',e);
+    if(manual)alert('A apărut o eroare de rețea la salvarea backup-ului în Supabase: '+e.message);
   });
+}
+
+// Test manual — declanșează imediat ambele backup-uri (Drive + Supabase) și
+// arată clar rezultatul, ca să depistăm orice problemă fără să mai ghicim.
+function testeazaBackupAutomat(){
+  alert('Se testează backup-ul automat (Drive + Supabase)... urmează 1-2 mesaje cu rezultatul.');
+  autoSaveBackupToDrive(true);
+  salveazaBackupSupabase(true);
 }
 
 function restaureazaBackupSupabase(){
@@ -8002,14 +8014,28 @@ function aplicaActualizareSigura(){
   alert(raport.length?('Actualizate: '+raport.join(', ')+'.'):'Nimic de actualizat — datele locale erau deja la fel de complete sau mai complete.');
 }
 
-function autoSaveBackupToDrive(){
+function autoSaveBackupToDrive(manual){
   try{
     var data=buildBackupData();
     var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     var d=new Date();
     var filename='backup_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.json';
-    gdriveUploadBlob('BackUp',filename,blob,'application/json').catch(function(){});
-  }catch(e){/* nu blocăm aplicația dacă backup-ul eșuează */}
+    gdriveUploadBlob('BackUp',filename,blob,'application/json').then(function(res){
+      if(res&&res.success){
+        console.log('Backup Drive: succes ('+filename+')');
+        if(manual)alert('Backup salvat cu succes în Drive (folderul „BackUp", fișierul „'+filename+'").');
+      }else{
+        console.error('Backup Drive — răspuns neașteptat:',res);
+        if(manual)alert('Backup Drive: răspuns neașteptat de la Google Apps Script. Verifică dacă scriptul e actualizat/publicat corect.');
+      }
+    }).catch(function(e){
+      console.error('Backup Drive — eroare:',e);
+      if(manual)alert('Eroare la backup în Drive: '+(e&&e.message?e.message:'necunoscută')+'. Verifică internetul și dacă scriptul Apps Script e activ.');
+    });
+  }catch(e){
+    console.error('Backup Drive — eroare internă:',e);
+    if(manual)alert('Eroare internă la pregătirea backup-ului: '+e.message);
+  }
 }
 
 function restoreAutoBackup(){
@@ -8146,7 +8172,6 @@ function importCSV(e){
 }
 
 document.getElementById('search').addEventListener('input',render);
-document.getElementById('imp').addEventListener('change',importCSV);
 document.getElementById('imp-backup').addEventListener('change',importFullBackup);
 document.getElementById('btn-del').addEventListener('click',deleteClient);
 document.getElementById('btn-pdf').addEventListener('click',savePDF);
