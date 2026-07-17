@@ -230,12 +230,14 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .lp-stat-lbl{font-size:11px;color:rgba(7,33,68,0.5);margin-top:3px}
 .lp-stat.warn .lp-stat-val{color:#b23b3b}
 .lp-stat.gold .lp-stat-val{color:#9c7a0e}
-.lp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.4rem}
-.lp-card{background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:14px;padding:1.3rem 1rem;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;font-family:inherit;transition:all 0.15s;box-shadow:0 2px 6px rgba(7,33,68,0.06);text-align:center}
+.lp-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:1.4rem}
+.lp-card{background:#fff;border:1px solid rgba(7,33,68,0.1);border-radius:16px;padding:18px 18px;display:flex;align-items:center;gap:16px;cursor:pointer;font-family:inherit;transition:all 0.15s;box-shadow:0 2px 6px rgba(7,33,68,0.06);text-align:left;width:100%}
 .lp-card:hover,.lp-card:active{transform:translateY(-2px);box-shadow:0 6px 18px rgba(7,33,68,0.13);border-color:var(--gold)}
-.lp-card-icon{width:52px;height:52px;border-radius:14px;background:rgba(7,33,68,0.08);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:26px}
-.lp-card-title{font-size:15px;font-weight:700;color:var(--navy);line-height:1.2}
-.lp-card-sub{font-size:12px;color:rgba(7,33,68,0.5);font-style:italic}
+.lp-card-icon{width:62px;height:62px;border-radius:16px;background:rgba(7,33,68,0.08);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0}
+.lp-card-title{font-size:18px;font-weight:700;color:var(--navy);line-height:1.25}
+.lp-card-sub{font-size:14px;color:rgba(7,33,68,0.5);font-style:italic}
+.lp-group-label{font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(7,33,68,0.4);margin:16px 2px 8px}
+.lp-group-label:first-of-type{margin-top:4px}
 .lp-tools{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .lp-tools button{font-size:12.5px;padding:7px 13px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;background:#fff;color:var(--navy);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px}
 .lp-tools button:hover{background:var(--gold-soft)}
@@ -266,9 +268,6 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
   .list{padding-bottom:calc(122px + env(safe-area-inset-bottom))}
   .lp-tools{margin-top:2rem}
 }
-@media (min-width:721px){
-  .lp-grid{grid-template-columns:1fr 1fr 1fr}
-}
 /* iOS specific */
 button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -298,6 +297,12 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
 .todo-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 /* ── Calendar (FullCalendar) — stil mai curat, text mai mic, potrivit pentru telefon ── */
+#fc-calendar-landing .fc{font-size:10.5px}
+#fc-calendar-landing .fc-toolbar-title{font-size:13px}
+#fc-calendar-landing .fc-daygrid-day-number{font-size:10.5px;padding:2px 4px}
+#fc-calendar-landing .fc-col-header-cell-cushion{font-size:9.5px;padding:3px 2px}
+#fc-calendar-landing .fc-event{font-size:9px}
+#fc-calendar-landing .fc-button{padding:3px 7px;font-size:10.5px}
 .fc{font-family:inherit;font-size:12.5px}
 .fc .fc-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
 .fc .fc-toolbar-title{font-size:15px;font-weight:700;color:var(--navy);white-space:nowrap;letter-spacing:0.01em}
@@ -405,88 +410,83 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
     </div>
     <div class="lp-body">
       <div class="lp-stats-row" id="lp-stats"></div>
+      <div class="section-title" style="margin-top:4px"><i class="ti ti-calendar"></i> Calendar</div>
+      <div id="fc-calendar-landing" style="background:#fff;border-radius:10px;padding:6px;margin-bottom:16px"><div style="text-align:center;padding:30px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>
+      <div class="lp-group-label">Zilnic</div>
       <div class="lp-grid">
-        <!-- Lista de făcut - evidențiată sus -->
-        <button class="lp-card" onclick="openView('todo')" style="border-color:rgba(20,100,180,0.3);grid-column:1/-1">
-          <div style="display:flex;align-items:center;gap:12px;width:100%">
-            <div class="lp-card-icon" style="background:rgba(20,100,180,0.12);color:#1464b4;flex-shrink:0">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1464b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-            </div>
-            <div style="text-align:left">
-              <div class="lp-card-title">Listă de făcut</div>
-              <div class="lp-card-sub">Sarcini &amp; activități</div>
-            </div>
-          </div>
-        </button>
         <button class="lp-card" onclick="openView('clienti')">
           <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-address-book"></i></div>
-          <div class="lp-card-title">Clienți</div>
-          <div class="lp-card-sub">Listă și fișe clienți</div>
+          <div><div class="lp-card-title">Clienți</div><div class="lp-card-sub">Listă și fișe clienți</div></div>
         </button>
         <button class="lp-card" onclick="openView('servicii')">
           <div class="lp-card-icon" style="background:rgba(225,195,64,0.18);color:#8a6e00"><i class="ti ti-receipt"></i></div>
-          <div class="lp-card-title">Servicii</div>
-          <div class="lp-card-sub">Rapoarte lunare</div>
+          <div><div class="lp-card-title">Servicii</div><div class="lp-card-sub">Rapoarte lunare</div></div>
         </button>
         <button class="lp-card" onclick="openView('incasari')">
           <div class="lp-card-icon" style="background:rgba(34,120,80,0.12);color:#1a6a40">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a6a40" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
           </div>
-          <div class="lp-card-title">Încasări</div>
-          <div class="lp-card-sub">Jurnal plăți primite</div>
+          <div><div class="lp-card-title">Încasări</div><div class="lp-card-sub">Jurnal plăți primite</div></div>
         </button>
         <button class="lp-card" onclick="openView('restante')">
           <div class="lp-card-icon" style="background:rgba(180,50,50,0.12);color:#a03030"><i class="ti ti-coin-off"></i></div>
-          <div class="lp-card-title">Restanțe</div>
-          <div class="lp-card-sub">Solduri neachitate</div>
+          <div><div class="lp-card-title">Restanțe</div><div class="lp-card-sub">Solduri neachitate</div></div>
+        </button>
+      </div>
+
+      <div class="lp-group-label">Timp &amp; organizare</div>
+      <div class="lp-grid">
+        <button class="lp-card" onclick="openView('todo')" style="border-color:rgba(20,100,180,0.3)">
+          <div class="lp-card-icon" style="background:rgba(20,100,180,0.12);color:#1464b4;flex-shrink:0">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1464b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          </div>
+          <div><div class="lp-card-title">Listă de făcut</div><div class="lp-card-sub">Sarcini &amp; activități</div></div>
+        </button>
+        <button class="lp-card" onclick="openView('programari')">
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar-event"></i></div>
+          <div><div class="lp-card-title">Programări</div><div class="lp-card-sub">Lista programărilor viitoare</div></div>
+        </button>
+        <button class="lp-card" onclick="openView('calendar')">
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar"></i></div>
+          <div><div class="lp-card-title">Calendar</div><div class="lp-card-sub">Programări &amp; evenimente</div></div>
+        </button>
+      </div>
+
+      <div class="lp-group-label">Documente &amp; conformitate</div>
+      <div class="lp-grid">
+        <button class="lp-card" onclick="openView('semnari')">
+          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4.5-1.5L18 5a2.121 2.121 0 013 3L10.5 18.5 9 19l.5-1.5"/><path d="M3 21h18"/></svg>
+          </div>
+          <div><div class="lp-card-title">Semnări</div><div class="lp-card-sub">Documente de semnat</div></div>
         </button>
         <button class="lp-card" onclick="openView('registre')">
           <div class="lp-card-icon" style="background:rgba(80,40,120,0.12);color:#5a2d8a">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5a2d8a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           </div>
-          <div class="lp-card-title">Registre</div>
-          <div class="lp-card-sub">Corespondență &amp; Contracte</div>
-        </button>
-        <button class="lp-card" onclick="openView('semnari')">
-          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4.5-1.5L18 5a2.121 2.121 0 013 3L10.5 18.5 9 19l.5-1.5"/><path d="M3 21h18"/></svg>
-          </div>
-          <div class="lp-card-title">Semnări</div>
-          <div class="lp-card-sub">DOCUMENTE DE SEMNAT</div>
-        </button>
-        <button class="lp-card" onclick="openView('calendar')">
-          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar"></i></div>
-          <div class="lp-card-title">Calendar</div>
-          <div class="lp-card-sub">Programări &amp; evenimente</div>
-        </button>
-        <button class="lp-card" onclick="openView('programari')">
-          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar-event"></i></div>
-          <div class="lp-card-title">Programări</div>
-          <div class="lp-card-sub">Lista programărilor viitoare</div>
-        </button>
-        <button class="lp-card" onclick="openView('spv')">
-          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-id-badge-2"></i></div>
-          <div class="lp-card-title">Listă SPV</div>
-          <div class="lp-card-sub">Reprezentanți SPV</div>
+          <div><div class="lp-card-title">Registre</div><div class="lp-card-sub">Corespondență &amp; Contracte</div></div>
         </button>
         <button class="lp-card" onclick="openView('du')">
           <div class="lp-card-icon" style="background:rgba(34,120,90,0.12);color:#1a7a45"><i class="ti ti-clipboard-check"></i></div>
-          <div class="lp-card-title">Declarație Unică</div>
-          <div class="lp-card-sub">Status depunere DU</div>
+          <div><div class="lp-card-title">Declarație Unică</div><div class="lp-card-sub">Status depunere DU</div></div>
         </button>
         <button class="lp-card" onclick="openView('expirari')">
           <div class="lp-card-icon" style="background:rgba(180,110,0,0.12);color:#8a5500"><i class="ti ti-calendar-x"></i></div>
-          <div class="lp-card-title">Expirări</div>
-          <div class="lp-card-sub">CI și sediu social</div>
+          <div><div class="lp-card-title">Expirări</div><div class="lp-card-sub">CI și sediu social</div></div>
+        </button>
+        <button class="lp-card" onclick="openView('spv')">
+          <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-id-badge-2"></i></div>
+          <div><div class="lp-card-title">Listă SPV</div><div class="lp-card-sub">Reprezentanți SPV</div></div>
         </button>
         <button class="lp-card" onclick="openView('birthdays')">
           <div class="lp-card-icon" style="background:rgba(220,80,80,0.12);color:#b83030"><i class="ti ti-cake"></i></div>
-          <div class="lp-card-title">Zile de naștere</div>
-          <div class="lp-card-sub">Următoarele aniversări</div>
+          <div><div class="lp-card-title">Zile de naștere</div><div class="lp-card-sub">Următoarele aniversări</div></div>
+        </button>
+        <button class="lp-card" onclick="openView('calctaxe')">
+          <div class="lp-card-icon" style="background:rgba(34,90,150,0.12);color:#1e5296"><i class="ti ti-calculator"></i></div>
+          <div><div class="lp-card-title">Calculator taxe PFA</div><div class="lp-card-sub">CASS, CAS, impozit</div></div>
         </button>
       </div>
-      <div class="section-title" style="margin-top:4px"><i class="ti ti-calendar"></i> Calendar</div>
-      <div id="fc-calendar-landing" style="background:#fff;border-radius:10px;padding:6px;margin-bottom:14px"><div style="text-align:center;padding:30px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>
       <div id="backup-age-banner" style="display:none;width:100%;padding:8px 12px;background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:8px;font-size:12px;color:#a03030;margin-bottom:4px;text-align:center"></div>
       <div style="text-align:center;margin-top:1rem">
         <button onclick="toggleLpTools()" id="lp-tools-toggle" style="background:none;border:none;color:rgba(7,33,68,0.3);font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px">
@@ -2172,6 +2172,246 @@ function getProgramare(id){return programariStore.find(function(p){return p.id==
 function programareDateTime(p,ora){return new Date(p.data+'T'+(ora||p.oraInceput||'00:00')+':00');}
 
 function todayISO(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+
+// ══ Calculator taxe PFA ═══════════════════════════════════════════════
+// Procentele — constante, ușor de modificat dacă se schimbă legislația.
+var TAX_RATE_CASS=0.10;
+var TAX_RATE_CAS=0.25;
+var TAX_RATE_IMPOZIT=0.10;
+
+// Formatare monetară: două zecimale + separator de mii (stil românesc).
+function moneyRO(n){
+  return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' lei';
+}
+
+// Toată logica de calcul, separată de interfață — ușor de testat/modificat independent.
+function TaxCalculatorPFA(params){
+  this.venitBrut=parseFloat(params.venitBrut)||0;
+  this.cheltuieliDeductibile=parseFloat(params.cheltuieliDeductibile)||0;
+  this.salariuMinim=parseFloat(params.salariuMinim)||0;
+  this.alteVenituri6Salarii=!!params.alteVenituri6Salarii;
+
+  this.plafon6=6*this.salariuMinim;
+  this.plafon12=12*this.salariuMinim;
+  this.plafon24=24*this.salariuMinim;
+  this.plafon72=72*this.salariuMinim;
+
+  this.venitNet=Math.max(0,this.venitBrut-this.cheltuieliDeductibile);
+
+  this._calculeazaCASS();
+  this._calculeazaCAS();
+  this._calculeazaImpozit();
+}
+
+TaxCalculatorPFA.prototype._calculeazaCASS=function(){
+  var vn=this.venitNet;
+  if(vn<=0){
+    this.baseCASS=0;this.cass=0;
+    this.formulaCASS='Venit net = 0 → CASS = 0 lei';
+    return;
+  }
+  if(vn<this.plafon6){
+    if(this.alteVenituri6Salarii){
+      this.baseCASS=vn;
+      this.cass=TAX_RATE_CASS*vn;
+      this.formulaCASS='10% din venitul net (are alte venituri ≥ 6 salarii)';
+    }else{
+      this.baseCASS=this.plafon6;
+      this.cass=TAX_RATE_CASS*this.plafon6;
+      this.formulaCASS='10% din 6 salarii minime (nu are alte venituri ≥ 6 salarii)';
+    }
+    return;
+  }
+  if(vn<=this.plafon72){
+    this.baseCASS=vn;
+    this.cass=TAX_RATE_CASS*vn;
+    this.formulaCASS='10% din venitul net';
+    return;
+  }
+  this.baseCASS=this.plafon72;
+  this.cass=TAX_RATE_CASS*this.plafon72;
+  this.formulaCASS='10% din 72 salarii minime (plafonat)';
+};
+
+TaxCalculatorPFA.prototype._calculeazaCAS=function(){
+  var vn=this.venitNet;
+  if(vn<this.plafon12){
+    this.baseCAS=0;this.cas=0;
+    this.formulaCAS='Venit net sub 12 salarii → CAS = 0 lei';
+    return;
+  }
+  if(vn<=this.plafon24){
+    this.baseCAS=this.plafon12;
+    this.cas=TAX_RATE_CAS*this.plafon12;
+    this.formulaCAS='25% din 12 salarii minime';
+    return;
+  }
+  this.baseCAS=this.plafon24;
+  this.cas=TAX_RATE_CAS*this.plafon24;
+  this.formulaCAS='25% din 24 salarii minime (plafonat)';
+};
+
+TaxCalculatorPFA.prototype._calculeazaImpozit=function(){
+  var vn=this.venitNet;
+  // Sub 6 salarii, se deduce doar proporțional cu venitul net real — nu
+  // întreaga valoare a CASS, dacă aceasta a fost calculată la 6 salarii.
+  this.cassDeductibil=(vn<this.plafon6)?(TAX_RATE_CASS*vn):this.cass;
+  this.bazaImpozabila=Math.max(0,vn-this.cassDeductibil-this.cas);
+  this.impozit=TAX_RATE_IMPOZIT*this.bazaImpozabila;
+};
+
+TaxCalculatorPFA.prototype.getTotalTaxe=function(){
+  return this.cass+this.cas+this.impozit;
+};
+
+TaxCalculatorPFA.prototype.getVenitDupaTaxe=function(){
+  return this.venitNet-this.cass-this.cas-this.impozit;
+};
+
+// ── Interfața tab-ului ──────────────────────────────────────────────
+var calcTaxeState={venitBrut:0,cheltuieliDeductibile:0,salariuMinim:4050,alteVenituri6Salarii:false};
+
+function renderCalculatorTaxeTab(){
+  var container=document.getElementById('list');
+  var s=calcTaxeState;
+  var inputStyle='width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:9px 11px;font-family:inherit';
+
+  container.innerHTML=
+    '<div class="section-title"><i class="ti ti-calculator"></i> Calculator taxe PFA</div>'
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin:-6px 0 14px">Se recalculează automat, pe măsură ce completezi.</div>'
+
+    +'<div class="field"><label>Venit brut (lei)</label><input type="number" id="ctx-venit-brut" inputmode="decimal" value="'+(s.venitBrut||'')+'" oninput="calcTaxeState.venitBrut=parseFloat(this.value)||0;actualizeazaRezultateTaxe()" style="'+inputStyle+'"></div>'
+    +'<div class="field"><label>Cheltuieli deductibile (lei)</label><input type="number" id="ctx-cheltuieli" inputmode="decimal" value="'+(s.cheltuieliDeductibile||'')+'" oninput="calcTaxeState.cheltuieliDeductibile=parseFloat(this.value)||0;actualizeazaRezultateTaxe()" style="'+inputStyle+'"></div>'
+    +'<div class="field"><label>Salariu minim brut (lei)</label><input type="number" id="ctx-salariu-minim" inputmode="decimal" value="'+s.salariuMinim+'" oninput="calcTaxeState.salariuMinim=parseFloat(this.value)||0;actualizeazaRezultateTaxe()" style="'+inputStyle+'"></div>'
+    +'<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:rgba(7,33,68,0.75);margin-bottom:16px;cursor:pointer;line-height:1.3">'
+    +'<input type="checkbox" id="ctx-alte-venituri" '+(s.alteVenituri6Salarii?'checked':'')+' onchange="calcTaxeState.alteVenituri6Salarii=this.checked;actualizeazaRezultateTaxe()" style="width:18px;height:18px;flex-shrink:0">'
+    +'Venituri din alte surse de minimum 6 salarii brute</label>'
+
+    +'<div class="doc-cat-header" style="cursor:default"><i class="ti ti-stack-2"></i> <span>Plafoane</span></div>'
+    +'<div id="ctx-plafoane" style="margin-bottom:16px"></div>'
+
+    +'<div id="ctx-rezultate"></div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:16px" onclick="genereazaRaportTaxePFA()"><i class="ti ti-file-type-pdf"></i> Generează raport PDF</button>';
+
+  injectIcons();
+  actualizeazaRezultateTaxe();
+}
+
+function actualizeazaRezultateTaxe(){
+  var s=calcTaxeState;
+  var calc=new TaxCalculatorPFA(s);
+
+  function randSimplu(nume,val){
+    return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(7,33,68,0.06);font-size:13px"><span style="color:rgba(7,33,68,0.6)">'+nume+'</span><span style="font-weight:600;color:var(--navy)">'+moneyRO(val)+'</span></div>';
+  }
+  function randRezultat(nume,val,evidentiat){
+    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(7,33,68,0.08);font-size:14.5px'+(evidentiat?';font-weight:700':'')+'"><span>'+nume+'</span><span style="font-weight:700;color:var(--navy)">'+moneyRO(val)+'</span></div>';
+  }
+  function randFormula(text){
+    return '<div style="font-size:11.5px;color:rgba(7,33,68,0.45);margin:6px 0 2px">'+text+'</div>';
+  }
+
+  var plafoaneEl=document.getElementById('ctx-plafoane');
+  if(plafoaneEl){
+    plafoaneEl.innerHTML=
+      randSimplu('6 salarii',calc.plafon6)
+      +randSimplu('12 salarii',calc.plafon12)
+      +randSimplu('24 salarii',calc.plafon24)
+      +randSimplu('72 salarii',calc.plafon72);
+  }
+
+  var rezEl=document.getElementById('ctx-rezultate');
+  if(rezEl){
+    rezEl.innerHTML=
+      '<div class="doc-cat-header" style="cursor:default"><i class="ti ti-report-money"></i> <span>Rezultate</span></div>'
+      +randRezultat('Venit brut',calc.venitBrut)
+      +randRezultat('Cheltuieli deductibile',calc.cheltuieliDeductibile)
+      +randRezultat('Venit net',calc.venitNet)
+
+      +randFormula('CASS — bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS)
+      +randRezultat('CASS',calc.cass)
+
+      +randFormula('CAS — bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS)
+      +randRezultat('CAS',calc.cas)
+
+      +randFormula('Bază impozabilă = Venit net − CASS deductibil ('+moneyRO(calc.cassDeductibil)+') − CAS')
+      +randRezultat('Bază impozabilă',calc.bazaImpozabila)
+      +randRezultat('Impozit (10%)',calc.impozit)
+      +randRezultat('Total taxe',calc.getTotalTaxe(),true)
+
+      +'<div style="margin-top:16px;padding:18px;background:rgba(34,120,80,0.1);border:1px solid rgba(34,120,80,0.25);border-radius:12px;text-align:center">'
+      +'<div style="font-size:12px;color:rgba(7,33,68,0.5);letter-spacing:0.05em;margin-bottom:4px">VENIT DUPĂ TAXE</div>'
+      +'<div style="font-size:28px;font-weight:700;color:#1a6a40">'+moneyRO(calc.getVenitDupaTaxe())+'</div>'
+      +'</div>';
+  }
+}
+
+function genereazaRaportTaxePFA(){
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
+  var s=calcTaxeState;
+  var calc=new TaxCalculatorPFA(s);
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  registerPdfFont(doc);
+  var margin=18,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64];
+  doc.setFont('CrimsonPro','normal');
+  drawLetterhead(doc,margin,pageW);
+
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Calculator taxe PFA',margin,y);y+=6;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(10.5);doc.setTextColor(140,140,140);
+  doc.text('Generat: '+todayRo()+'  ·  Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=10;
+
+  function linie(nume,val,bold){
+    doc.setFont('CrimsonPro',bold?'bold':'normal');doc.setFontSize(11.5);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(nume,margin,y);
+    doc.text(moneyRO(val),pageW-margin,y,{align:'right'});
+    y+=7;
+  }
+  function nota(text){
+    doc.setFont('CrimsonPro','italic');doc.setFontSize(9.5);doc.setTextColor(130,130,130);
+    var linii=doc.splitTextToSize(text,pageW-2*margin);
+    doc.text(linii,margin,y);
+    y+=linii.length*4.5+3;
+  }
+  function separator(){
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.3);
+    doc.line(margin,y,pageW-margin,y);y+=7;
+  }
+
+  linie('Venit brut',calc.venitBrut);
+  linie('Cheltuieli deductibile',calc.cheltuieliDeductibile);
+  linie('Venit net',calc.venitNet,true);
+  separator();
+
+  nota('CASS — bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS);
+  linie('CASS',calc.cass);
+
+  nota('CAS — bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS);
+  linie('CAS',calc.cas);
+
+  nota('Bază impozabilă = Venit net − CASS deductibil ('+moneyRO(calc.cassDeductibil)+') − CAS');
+  linie('Bază impozabilă',calc.bazaImpozabila);
+  linie('Impozit (10%)',calc.impozit);
+  separator();
+
+  linie('Total taxe',calc.getTotalTaxe(),true);
+  y+=4;
+
+  doc.setFillColor(236,246,240);
+  doc.roundedRect(margin,y,pageW-2*margin,20,3,3,'F');
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(11);doc.setTextColor(90,90,90);
+  doc.text('VENIT DUPĂ TAXE',margin+6,y+8);
+  doc.setFontSize(15);doc.setTextColor(26,106,64);
+  doc.text(moneyRO(calc.getVenitDupaTaxe()),pageW-margin-6,y+13,{align:'right'});
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,'calculator_taxe_pfa_'+todayISO()+'.pdf',__pdfTab);
+}
+
 function formatDataRo(dataISO){if(!dataISO)return '';var p=dataISO.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
 
 // ── Calendar (FullCalendar) ──────────────────────────────
@@ -2213,7 +2453,7 @@ function initFullCalendarRetry(containerId,incercare){
 function buildFullCalendarConfig(compact){
   return {
     initialView:'dayGridMonth',
-    height:compact?440:'auto',
+    height:compact?320:'auto',
     firstDay:1,
     locale:'ro',
     buttonText:{today:'Azi'},
@@ -3749,7 +3989,8 @@ var VIEW_META={
   todo:{title:'Listă de făcut',icon:'ti-checklist',filter:'todo',toolbar:false},
   semnari:{title:'Semnări',icon:'ti-pencil',filter:'semnari',toolbar:false},
   calendar:{title:'Calendar',icon:'ti-calendar',filter:'calendar',toolbar:false},
-  programari:{title:'Programări',icon:'ti-calendar-event',filter:'programari',toolbar:false}
+  programari:{title:'Programări',icon:'ti-calendar-event',filter:'programari',toolbar:false},
+  calctaxe:{title:'Calculator taxe PFA',icon:'ti-calculator',filter:'calctaxe',toolbar:false}
 };
 
 function goHome(){
@@ -5738,6 +5979,7 @@ function render(){
   if(currentFilter==='semnari'){renderSemnariTab();return;}
   if(currentFilter==='calendar'){renderCalendarTab();return;}
   if(currentFilter==='programari'){renderProgramariTab();return;}
+  if(currentFilter==='calctaxe'){renderCalculatorTaxeTab();return;}
   var q=document.getElementById('search').value.toLowerCase();
   var filtered=clients.filter(function(c){
     return keys.some(function(k){return norm(c[k]).includes(norm(q));});
@@ -7434,6 +7676,202 @@ function autoSaveBackup(){
   }).catch(function(){/* IndexedDB nedisponibil */});
   // Salvez și în Google Drive (folderul „BackUp"), pentru siguranță pe termen lung
   autoSaveBackupToDrive();
+  // Backup secundar, silențios, în Supabase (doar date, fără documente/poze)
+  salveazaBackupSupabase(false);
+}
+
+// ══ Backup secundar în Supabase — separat de Drive, doar ca plasă de
+// siguranță suplimentară. Include TOATE datele (clienți, servicii, încasări,
+// registre, semnări, calendar etc.), dar NU documentele/pozele încărcate.
+var SB_BACKUP_HEADERS={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+
+function salveazaBackupSupabase(manual){
+  var data=buildBackupData();
+  var payload={key:'backup_secundar_date',value:JSON.stringify(data),updated_at:new Date().toISOString()};
+  return fetch(SUPABASE_URL+'/rest/v1/hub_data',{
+    method:'POST',
+    headers:Object.assign({},SB_BACKUP_HEADERS,{'Prefer':'resolution=merge-duplicates'}),
+    body:JSON.stringify(payload)
+  }).then(function(res){
+    if(manual){
+      if(res&&res.ok)alert('Backup salvat cu succes în Supabase (doar date, fără documente/poze).');
+      else alert('A apărut o eroare la salvarea backup-ului în Supabase.');
+    }
+    return res;
+  }).catch(function(){
+    if(manual)alert('A apărut o eroare la salvarea backup-ului în Supabase. Verifică internetul.');
+  });
+}
+
+function restaureazaBackupSupabase(){
+  fetch(SUPABASE_URL+'/rest/v1/hub_data?key=eq.backup_secundar_date&select=value,updated_at',{headers:SB_BACKUP_HEADERS})
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!rows||!rows[0]){alert('Nu există niciun backup salvat în Supabase.');return;}
+      var data;
+      try{data=JSON.parse(rows[0].value);}catch(e){alert('Backup invalid.');return;}
+      var dataUpdate=rows[0].updated_at?new Date(rows[0].updated_at).toLocaleString('ro-RO'):'necunoscută';
+      arataComparatieBackup(data,'Supabase, salvat la '+dataUpdate);
+    }).catch(function(){alert('A apărut o eroare la citirea backup-ului din Supabase. Verifică internetul.');});
+}
+
+// ══ Comparație inteligentă backup vs. date curente ══════════════════════
+// În loc să suprascrie orbește, comparăm entitate cu entitate: ce e nou (se
+// poate adăuga în siguranță), ce e identic (nimic de făcut) și ce diferă
+// (utilizatorul alege explicit ce păstrează).
+var backupComparatieCurenta=null;
+
+function comparaListaCuId(localArr,backupArr){
+  var localMap={};
+  (localArr||[]).forEach(function(item){localMap[item.id]=item;});
+  var backupMap={};
+  (backupArr||[]).forEach(function(item){backupMap[item.id]=item;});
+  var doarInBackup=[],identice=0,diferite=[];
+  Object.keys(backupMap).forEach(function(id){
+    if(!(id in localMap)){doarInBackup.push(backupMap[id]);}
+    else{
+      var a=JSON.stringify(localMap[id]),b=JSON.stringify(backupMap[id]);
+      if(a===b)identice++;
+      else diferite.push({id:id,local:localMap[id],backup:backupMap[id]});
+    }
+  });
+  return {doarInBackup:doarInBackup,identice:identice,diferite:diferite,localCount:(localArr||[]).length,backupCount:(backupArr||[]).length};
+}
+
+function numarChei(obj){return obj?Object.keys(obj).length:0;}
+
+function comparaBackupData(data){
+  return {
+    clienti:comparaListaCuId(clients,data.clienti),
+    programari:comparaListaCuId(programariStore,data.programari),
+    servicii:{localCount:numarChei(svcStore),backupCount:numarChei(data.servicii)},
+    declaratieUnica:{localCount:numarChei(duStore),backupCount:numarChei(data.declaratieUnica)},
+    registre:{localCount:(registreStore.corespondenta||[]).length+(registreStore.contracte||[]).length,
+      backupCount:data.registre?((data.registre.corespondenta||[]).length+(data.registre.contracte||[]).length):0},
+    todo:{localCount:getTodos().length,backupCount:(data.todo||[]).length},
+    semnari:{localCount:getSemnari().length,backupCount:(data.semnari||[]).length},
+    incasariDiverse:{localCount:JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]').length,backupCount:(data.incasariDiverse||[]).length},
+    serviciiDiverse:{localCount:getServiciiDiverse().length,backupCount:(data.serviciiDiverse||[]).length}
+  };
+}
+
+function arataComparatieBackup(data,sursaLabel){
+  backupComparatieCurenta={data:data,comp:comparaBackupData(data)};
+  var comp=backupComparatieCurenta.comp;
+
+  function linieSimpla(nume,cheie){
+    var c=comp[cheie];
+    var diferă=c.backupCount!==c.localCount;
+    return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(7,33,68,0.08);font-size:13px">'
+      +'<span>'+nume+'</span>'
+      +'<span style="color:'+(diferă?'#8a6e00':'rgba(7,33,68,0.4)')+'">local: '+c.localCount+' · backup: '+c.backupCount+'</span>'
+      +'</div>';
+  }
+
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:6px">Comparație backup</div>'
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.5);margin-bottom:14px">Sursă: '+esc(sursaLabel)+'</div>'
+
+    +'<div style="font-weight:700;font-size:13.5px;margin-bottom:6px">👤 Clienți</div>'
+    +'<div style="font-size:13px;color:rgba(7,33,68,0.7);margin-bottom:6px">'
+    +comp.clienti.doarInBackup.length+' noi în backup · '+comp.clienti.diferite.length+' diferă · '+comp.clienti.identice+' identici</div>'
+    +(comp.clienti.doarInBackup.length?'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:6px" onclick="aplicaAdaugaLipsa(\'clienti\')"><i class="ti ti-plus"></i> Adaugă cei '+comp.clienti.doarInBackup.length+' clienți noi</button>':'')
+    +(comp.clienti.diferite.length?'<button type="button" style="width:100%;padding:9px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer;margin-bottom:10px" onclick="aratadiferente(\'clienti\')">Vezi cei '+comp.clienti.diferite.length+' clienți diferiți</button>':'<div style="margin-bottom:10px"></div>')
+
+    +'<div style="font-weight:700;font-size:13.5px;margin-bottom:6px">📅 Programări</div>'
+    +'<div style="font-size:13px;color:rgba(7,33,68,0.7);margin-bottom:6px">'
+    +comp.programari.doarInBackup.length+' noi în backup · '+comp.programari.diferite.length+' diferă · '+comp.programari.identice+' identice</div>'
+    +(comp.programari.doarInBackup.length?'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:6px" onclick="aplicaAdaugaLipsa(\'programari\')"><i class="ti ti-plus"></i> Adaugă cele '+comp.programari.doarInBackup.length+' programări noi</button>':'')
+    +(comp.programari.diferite.length?'<button type="button" style="width:100%;padding:9px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer;margin-bottom:10px" onclick="aratadiferente(\'programari\')">Vezi cele '+comp.programari.diferite.length+' programări diferite</button>':'<div style="margin-bottom:10px"></div>')
+
+    +'<div style="font-weight:700;font-size:13.5px;margin:10px 0 4px">Restul categoriilor</div>'
+    +'<div style="font-size:11.5px;color:rgba(7,33,68,0.45);margin-bottom:4px">Pentru acestea, comparăm doar numărul de înregistrări (structuri mai complexe) — se actualizează automat doar unde backup-ul are cel puțin la fel de multe, exact ca la sincronizarea normală.</div>'
+    +linieSimpla('Servicii/încasări','servicii')
+    +linieSimpla('Declarație Unică','declaratieUnica')
+    +linieSimpla('Registre','registre')
+    +linieSimpla('To-Do','todo')
+    +linieSimpla('Semnări','semnari')
+    +linieSimpla('Încasări fără fișă','incasariDiverse')
+    +linieSimpla('Servicii fără fișă','serviciiDiverse')
+
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:14px" onclick="aplicaActualizareSigura()"><i class="ti ti-check"></i> Aplică actualizările sigure pentru restul categoriilor</button>'
+    +'<button type="button" onclick="document.getElementById(\'restanta-picker\').style.display=\'none\'" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer">Închide</button>'
+    +'</div>';
+
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Comparație backup';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function aplicaAdaugaLipsa(tip){
+  if(!backupComparatieCurenta)return;
+  var lipsa=backupComparatieCurenta.comp[tip].doarInBackup;
+  if(tip==='clienti'){lipsa.forEach(function(c){clients.push(c);});save();}
+  else if(tip==='programari'){lipsa.forEach(function(p){programariStore.push(p);});saveProgramari();}
+  alert('Adăugat: '+lipsa.length+' înregistrări noi.');
+  render();
+  arataComparatieBackup(backupComparatieCurenta.data,'(actualizat)');
+}
+
+function aratadiferente(tip){
+  if(!backupComparatieCurenta)return;
+  var diferite=backupComparatieCurenta.comp[tip].diferite;
+  var titluCamp=tip==='clienti'?'nume':'titlu';
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Diferențe — '+(tip==='clienti'?'Clienți':'Programări')+'</div>';
+  diferite.forEach(function(d,idx){
+    html+='<div style="border:1px solid rgba(7,33,68,0.15);border-radius:8px;padding:10px;margin-bottom:10px">'
+      +'<div style="font-weight:700;font-size:13.5px;margin-bottom:6px">'+esc(d.local[titluCamp]||d.backup[titluCamp]||'—')+'</div>'
+      +'<div style="display:flex;gap:8px">'
+      +'<button type="button" onclick="alegeVersiune(\''+tip+'\',\''+d.id+'\',\'local\')" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:12px;cursor:pointer">Păstrează local</button>'
+      +'<button type="button" onclick="alegeVersiune(\''+tip+'\',\''+d.id+'\',\'backup\')" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(90,45,138,0.3);background:rgba(90,45,138,0.08);color:#5a2d8a;font-family:inherit;font-size:12px;cursor:pointer">Folosește din backup</button>'
+      +'</div>'
+      +'</div>';
+  });
+  html+='<button type="button" onclick="arataComparatieBackup(backupComparatieCurenta.data,\'(revenire)\')" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer">← Înapoi la comparație</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Diferențe';
+  injectIcons();
+}
+
+function alegeVersiune(tip,id,varianta){
+  if(!backupComparatieCurenta)return;
+  var diferite=backupComparatieCurenta.comp[tip].diferite;
+  var entry=diferite.find(function(d){return d.id===id;});
+  if(!entry)return;
+  if(varianta==='backup'){
+    if(tip==='clienti'){
+      var idx=clients.findIndex(function(c){return c.id===id;});
+      if(idx>-1){clients[idx]=entry.backup;save();}
+    }else if(tip==='programari'){
+      var idx2=programariStore.findIndex(function(p){return p.id===id;});
+      if(idx2>-1){programariStore[idx2]=entry.backup;saveProgramari();}
+    }
+  }
+  backupComparatieCurenta.comp[tip].diferite=diferite.filter(function(d){return d.id!==id;});
+  render();
+  aratadiferente(tip);
+}
+
+function aplicaActualizareSigura(){
+  if(!backupComparatieCurenta)return;
+  var data=backupComparatieCurenta.data;
+  var comp=backupComparatieCurenta.comp;
+  var raport=[];
+
+  if(comp.servicii.backupCount>=comp.servicii.localCount&&data.servicii){svcStore=data.servicii;saveSvcStore();raport.push('Servicii');}
+  if(comp.declaratieUnica.backupCount>=comp.declaratieUnica.localCount&&data.declaratieUnica){duStore=data.declaratieUnica;saveDuStore();raport.push('Declarație Unică');}
+  if(comp.registre.backupCount>=comp.registre.localCount&&data.registre){registreStore=data.registre;saveRegistre();raport.push('Registre');}
+  if(comp.todo.backupCount>=comp.todo.localCount&&data.todo){localStorage.setItem(TODO_KEY,JSON.stringify(data.todo));sbSet('todo',data.todo).catch(function(){});raport.push('To-Do');}
+  if(comp.semnari.backupCount>=comp.semnari.localCount&&data.semnari){saveSemnari(data.semnari);raport.push('Semnări');}
+  if(comp.incasariDiverse.backupCount>=comp.incasariDiverse.localCount&&data.incasariDiverse){localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(data.incasariDiverse));sbSet('inc_diverse',data.incasariDiverse).catch(function(){});raport.push('Încasări fără fișă');}
+  if(comp.serviciiDiverse.backupCount>=comp.serviciiDiverse.localCount&&data.serviciiDiverse){localStorage.setItem('crm_servicii_diverse_v1',JSON.stringify(data.serviciiDiverse));sbSet('servicii_diverse',data.serviciiDiverse).catch(function(){});raport.push('Servicii fără fișă');}
+
+  document.getElementById('restanta-picker').style.display='none';
+  render();
+  alert(raport.length?('Actualizate: '+raport.join(', ')+'.'):'Nimic de actualizat — datele locale erau deja la fel de complete sau mai complete.');
 }
 
 function autoSaveBackupToDrive(){
@@ -8986,6 +9424,17 @@ function descarcaDocumentSemnatFinal(path,titlu){
 
 
 var TABLER_ICONS = {
+  "calculator": `<path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+  <path d="M8 7h8" />
+  <path d="M8 11h0" />
+  <path d="M12 11h0" />
+  <path d="M16 11h0" />
+  <path d="M8 15h0" />
+  <path d="M12 15h0" />
+  <path d="M16 15h0" />
+  <path d="M8 19h0" />
+  <path d="M12 19h0" />
+  <path d="M16 19h0" />`,
   "address-book": `<path d="M20 6v12a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2" />
   <path d="M10 16h6" />
   <path d="M11 11a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
