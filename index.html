@@ -284,6 +284,15 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
 .reg-table th{background:rgba(7,33,68,0.05);color:rgba(7,33,68,0.5);font-size:12px;letter-spacing:1px;padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap}
 .reg-table td{padding:10px;border-bottom:1px solid rgba(7,33,68,0.05);color:var(--navy);vertical-align:middle}
 .reg-table tr:hover td{background:rgba(7,33,68,0.02)}
+.reg-card{background:rgba(7,33,68,0.02);border:1px solid rgba(7,33,68,0.08);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.reg-card-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.reg-card-nr{font-weight:700;color:var(--navy);font-size:14.5px}
+.reg-card-data{font-size:13px;color:rgba(7,33,68,0.5)}
+.reg-card-actions{margin-left:auto;display:flex;gap:4px}
+.reg-card-row{font-size:13.5px;color:var(--navy);margin-bottom:3px;line-height:1.4}
+.reg-card-label{display:inline-block;font-size:11px;color:rgba(7,33,68,0.45);text-transform:uppercase;letter-spacing:0.03em;margin-right:6px}
+.reg-card-obiect{font-size:14.5px;color:var(--navy);line-height:1.45;margin-top:4px}
+.reg-card-obs{font-size:12.5px;color:rgba(7,33,68,0.55);font-style:italic;margin-top:5px;line-height:1.4}
 /* ── To-Do ── */
 .todo-item{background:#fff;border:1px solid rgba(7,33,68,0.08);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;transition:all 0.2s}
 .todo-item.done{opacity:0.55;border-color:rgba(7,33,68,0.05)}
@@ -2365,26 +2374,26 @@ function genereazaRaportTaxePFA(){
   doc.setFont('CrimsonPro','normal');
   drawLetterhead(doc,margin,pageW);
 
-  doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text('Calculator taxe PFA',margin,y);y+=6;
-  doc.setFont('CrimsonPro','normal');doc.setFontSize(10.5);doc.setTextColor(140,140,140);
-  doc.text('Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=10;
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(20);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Calculator taxe PFA',margin,y);y+=7;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(12);doc.setTextColor(140,140,140);
+  doc.text('Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=11;
 
   function linie(nume,val,bold,cuZecimale){
-    doc.setFont('CrimsonPro',bold?'bold':'normal');doc.setFontSize(11.5);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.setFont('CrimsonPro',bold?'bold':'normal');doc.setFontSize(14);doc.setTextColor(navy[0],navy[1],navy[2]);
     doc.text(nume,margin,y);
     doc.text(cuZecimale?moneyRO2(val):moneyRO(val),pageW-margin,y,{align:'right'});
-    y+=7;
+    y+=8.5;
   }
   function nota(text){
-    doc.setFont('CrimsonPro','italic');doc.setFontSize(9.5);doc.setTextColor(130,130,130);
+    doc.setFont('CrimsonPro','italic');doc.setFontSize(11.5);doc.setTextColor(130,130,130);
     var linii=doc.splitTextToSize(text,pageW-2*margin);
     doc.text(linii,margin,y);
-    y+=linii.length*4.5+3;
+    y+=linii.length*5.5+3.5;
   }
   function separator(){
     doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.3);
-    doc.line(margin,y,pageW-margin,y);y+=7;
+    doc.line(margin,y,pageW-margin,y);y+=8;
   }
 
   linie('Venit brut',calc.venitBrut,false,true);
@@ -2404,14 +2413,14 @@ function genereazaRaportTaxePFA(){
   separator();
 
   linie('Total taxe',calc.getTotalTaxe(),true);
-  y+=4;
+  y+=5;
 
   doc.setFillColor(236,246,240);
-  doc.roundedRect(margin,y,pageW-2*margin,20,3,3,'F');
-  doc.setFont('CrimsonPro','bold');doc.setFontSize(11);doc.setTextColor(90,90,90);
-  doc.text('VENIT DUPĂ TAXE',margin+6,y+8);
-  doc.setFontSize(15);doc.setTextColor(26,106,64);
-  doc.text(moneyRO(calc.getVenitDupaTaxe()),pageW-margin-6,y+13,{align:'right'});
+  doc.roundedRect(margin,y,pageW-2*margin,26,3,3,'F');
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(13);doc.setTextColor(90,90,90);
+  doc.text('VENIT DUPĂ TAXE',margin+6,y+10);
+  doc.setFontSize(19);doc.setTextColor(26,106,64);
+  doc.text(moneyRO(calc.getVenitDupaTaxe()),pageW-margin-6,y+17,{align:'right'});
 
   drawFooter(doc,margin,pageW);
   outputPdf(doc,'calculator_taxe_pfa_'+todayISO()+'.pdf',__pdfTab);
@@ -5451,15 +5460,22 @@ function renderRegistreTab(){
   else{
     var aniC={};listC.forEach(function(r){var an=r.data?r.data.split('.')[2]:'?';if(!aniC[an])aniC[an]=[];aniC[an].push(r);});
     Object.keys(aniC).sort().reverse().forEach(function(an){
-      html+='<div class="reg-year-header">'+an+'</div><div class="reg-table-wrap"><table class="reg-table"><thead><tr><th>Nr.</th><th>Dată</th><th>Expeditor</th><th>Destinatar</th><th>Obiect</th><th>Obs.</th><th></th></tr></thead><tbody>';
+      html+='<div class="reg-year-header">'+an+'</div>';
       aniC[an].forEach(function(r){
-        var trSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-        var edSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-        html+='<tr><td><b>'+r.nr+'</b></td><td>'+esc(r.data||'')+'</td><td>'+esc(r.expeditor||'')+'</td><td>'+esc(r.destinatar||'')+'</td><td>'+esc(r.obiect||'')+'</td><td>'+esc(r.obs||'')+'</td>'
-          +'<td style="white-space:nowrap"><button class="doc-btn" onclick="editRegistruEntry(\'corespondenta\','+r.nr+')" title="Editează">'+edSvg+'</button>'
-          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'corespondenta\','+r.nr+')" title="Șterge">'+trSvg+'</button></td></tr>';
+        html+='<div class="reg-card">'
+          +'<div class="reg-card-top">'
+          +'<span class="reg-card-nr">Nr. '+r.nr+'</span>'
+          +'<span class="reg-card-data">'+esc(r.data||'')+'</span>'
+          +'<div class="reg-card-actions">'
+          +'<button class="doc-btn" onclick="editRegistruEntry(\'corespondenta\','+r.nr+')" title="Editează"><i class="ti ti-pencil" style="font-size:14px"></i></button>'
+          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'corespondenta\','+r.nr+')" title="Șterge"><i class="ti ti-trash" style="font-size:14px"></i></button>'
+          +'</div></div>'
+          +(r.expeditor?'<div class="reg-card-row"><span class="reg-card-label">De la</span>'+esc(r.expeditor)+'</div>':'')
+          +(r.destinatar?'<div class="reg-card-row"><span class="reg-card-label">Către</span>'+esc(r.destinatar)+'</div>':'')
+          +'<div class="reg-card-obiect">'+esc(r.obiect||'')+'</div>'
+          +(r.obs?'<div class="reg-card-obs">'+esc(r.obs)+'</div>':'')
+          +'</div>';
       });
-      html+='</tbody></table></div>';
     });
   }
   html+='</div>';
@@ -5476,19 +5492,24 @@ function renderRegistreTab(){
   else{
     var aniK={};listK.forEach(function(r){var an=r.an||'?';if(!aniK[an])aniK[an]=[];aniK[an].push(r);});
     Object.keys(aniK).sort().reverse().forEach(function(an){
-      html+='<div class="reg-year-header">'+an+'</div><div class="reg-table-wrap"><table class="reg-table"><thead><tr><th>Serie</th><th>Dată</th><th>Tip</th><th>Client/Parte</th><th>Obiect</th><th>Obs.</th><th></th></tr></thead><tbody>';
+      html+='<div class="reg-year-header">'+an+'</div>';
       aniK[an].forEach(function(r){
         var tipLabel=r.tip==='contract'?'Contract':r.tip==='aditional'?'Act adițional':'Act reziliere';
         var tipColor=r.tip==='contract'?'#1a6a40':r.tip==='aditional'?'#1f5a9a':'#a03030';
-        var trSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-        var edSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-        html+='<tr><td><b style="color:'+tipColor+'">'+esc(serieContract(r.tip,r.nr))+'</b></td><td>'+esc(r.data||'')+'</td>'
-          +'<td><span style="font-size:11px;padding:2px 6px;border-radius:10px;background:'+tipColor+'22;color:'+tipColor+';font-weight:700">'+tipLabel+'</span></td>'
-          +'<td>'+esc(r.parte||'')+'</td><td>'+esc(r.obiect||'')+'</td><td>'+esc(r.obs||'')+'</td>'
-          +'<td style="white-space:nowrap"><button class="doc-btn" onclick="editRegistruEntry(\'contracte\','+r.nr+')" title="Editează">'+edSvg+'</button>'
-          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'contracte\','+r.nr+')" title="Șterge">'+trSvg+'</button></td></tr>';
+        html+='<div class="reg-card">'
+          +'<div class="reg-card-top">'
+          +'<span class="reg-card-nr" style="color:'+tipColor+'">'+esc(serieContract(r.tip,r.nr))+'</span>'
+          +'<span class="reg-card-data">'+esc(r.data||'')+'</span>'
+          +'<div class="reg-card-actions">'
+          +'<button class="doc-btn" onclick="editRegistruEntry(\'contracte\','+r.nr+')" title="Editează"><i class="ti ti-pencil" style="font-size:14px"></i></button>'
+          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'contracte\','+r.nr+')" title="Șterge"><i class="ti ti-trash" style="font-size:14px"></i></button>'
+          +'</div></div>'
+          +'<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:'+tipColor+'22;color:'+tipColor+';font-weight:700;margin-bottom:6px">'+tipLabel+'</span>'
+          +(r.parte?'<div class="reg-card-row"><span class="reg-card-label">Parte</span>'+esc(r.parte)+'</div>':'')
+          +(r.obiect?'<div class="reg-card-obiect">'+esc(r.obiect)+'</div>':'')
+          +(r.obs?'<div class="reg-card-obs">'+esc(r.obs)+'</div>':'')
+          +'</div>';
       });
-      html+='</tbody></table></div>';
     });
   }
   html+='</div>';
