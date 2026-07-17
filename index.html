@@ -296,6 +296,37 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
 .todo-tabs{display:flex;gap:6px;margin-bottom:14px}
 .todo-tab{flex:1;padding:9px;border:1px solid rgba(7,33,68,0.15);border-radius:8px;background:#fff;color:rgba(7,33,68,0.5);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s;text-align:center}
 .todo-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* ── Calendar (FullCalendar) — stil mai curat, text mai mic, potrivit pentru telefon ── */
+.fc{font-family:inherit;font-size:12.5px}
+.fc .fc-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+.fc .fc-toolbar-title{font-size:15px;font-weight:700;color:var(--navy);white-space:nowrap;letter-spacing:0.01em}
+.fc .fc-toolbar-chunk{display:flex;align-items:center}
+.fc .fc-button{background:#fff;border:1px solid rgba(7,33,68,0.18);color:var(--navy);font-size:12px;padding:5px 10px;box-shadow:none!important;text-transform:none;border-radius:7px;transition:background 0.15s}
+.fc .fc-button:hover{background:rgba(7,33,68,0.06);color:var(--navy)}
+.fc .fc-button:focus{box-shadow:0 0 0 2px rgba(225,195,64,0.4)!important}
+.fc .fc-button-primary:not(:disabled).fc-button-active,.fc .fc-button-primary:not(:disabled):active{background:var(--navy);border-color:var(--navy);color:#fff}
+.fc .fc-today-button{text-transform:none}
+.fc .fc-button-group{gap:2px}
+.fc .fc-col-header{background:rgba(7,33,68,0.02)}
+.fc .fc-col-header-cell-cushion{font-size:11px;color:rgba(7,33,68,0.55);padding:6px 2px;text-decoration:none;font-weight:600;letter-spacing:0.03em}
+.fc .fc-daygrid-day-number{font-size:12px;color:var(--navy);padding:4px 6px;text-decoration:none}
+.fc .fc-daygrid-day.fc-day-today{background:rgba(225,195,64,0.16)}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number{font-weight:700;color:#8a6e00}
+.fc .fc-day-other .fc-daygrid-day-number{opacity:0.35}
+.fc .fc-event{font-size:10.5px;padding:1px 3px;border-radius:5px;border-width:0;box-shadow:0 1px 2px rgba(7,33,68,0.15);transition:transform 0.1s}
+.fc .fc-daygrid-event{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.fc .fc-daygrid-more-link{font-size:10px;color:var(--navy);font-weight:600}
+.fc .fc-timegrid-slot-label-cushion{font-size:10.5px;color:rgba(7,33,68,0.5)}
+.fc .fc-timegrid-axis-cushion{font-size:10px}
+.fc .fc-timegrid-now-indicator-line{border-color:#b23b3b}
+.fc-theme-standard td,.fc-theme-standard th{border-color:rgba(7,33,68,0.08)}
+.fc .fc-scrollgrid{border-color:rgba(7,33,68,0.1);border-radius:8px;overflow:hidden}
+.fc .fc-daygrid-day:hover{background:rgba(7,33,68,0.02);cursor:pointer}
+@media (max-width:400px){
+  .fc .fc-toolbar-title{font-size:13.5px}
+  .fc .fc-button{padding:4px 8px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -2155,7 +2186,12 @@ function renderCalendarTab(){
     +'<span><i class="ti ti-calendar"></i> Calendar</span>'
     +'<button class="btn-add-service" onclick="openAddProgramare()"><i class="ti ti-plus"></i> Programare nouă</button>'
     +'</div>'
-    +'<div id="fc-calendar" style="background:#fff;border-radius:10px;padding:6px;margin-top:10px"><div style="text-align:center;padding:40px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>';
+    +'<div id="fc-view-switch" style="display:flex;gap:6px;margin:10px 0 8px">'
+    +'<button type="button" data-view="dayGridMonth" onclick="schimbaViewCalendar(fullCalendarInstance,\'dayGridMonth\',\'fc-view-switch\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;font-family:inherit;font-size:12.5px;cursor:pointer">Lună</button>'
+    +'<button type="button" data-view="timeGridWeek" onclick="schimbaViewCalendar(fullCalendarInstance,\'timeGridWeek\',\'fc-view-switch\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer">Săptămână</button>'
+    +'<button type="button" data-view="timeGridDay" onclick="schimbaViewCalendar(fullCalendarInstance,\'timeGridDay\',\'fc-view-switch\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer">Zi</button>'
+    +'</div>'
+    +'<div id="fc-calendar" style="background:#fff;border-radius:10px;padding:6px"><div style="text-align:center;padding:40px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>';
   injectIcons();
   initFullCalendarRetry('fc-calendar',0);
 }
@@ -2179,13 +2215,11 @@ function initFullCalendarRetry(containerId,incercare){
 function buildFullCalendarConfig(compact){
   return {
     initialView:'dayGridMonth',
-    height:compact?460:'auto',
+    height:compact?440:'auto',
     firstDay:1,
     locale:'ro',
-    buttonText:{today:'Azi',month:'Lună',week:'Săptămână',day:'Zi'},
-    headerToolbar:compact
-      ?{left:'prev,next today',center:'title',right:''}
-      :{left:'prev,next today',center:'title',right:'dayGridMonth,timeGridWeek,timeGridDay'},
+    buttonText:{today:'Azi'},
+    headerToolbar:{left:'prev,next today',center:'title',right:''},
     selectable:true,
     editable:true,
     dayMaxEvents:true,
@@ -2208,6 +2242,18 @@ function buildFullCalendarConfig(compact){
     eventDrop:function(info){mutaProgramareDropResize(info.event);},
     eventResize:function(info){mutaProgramareDropResize(info.event);}
   };
+}
+
+// Schimbă vizualizarea (Lună/Săptămână/Zi) — butoane proprii, în locul celor
+// din bara implicită a bibliotecii (care se suprapuneau urât pe telefon).
+function schimbaViewCalendar(instanta,view,btnGroupId){
+  if(!instanta)return;
+  instanta.changeView(view);
+  document.querySelectorAll('#'+btnGroupId+' button').forEach(function(b){
+    var activ=b.getAttribute('data-view')===view;
+    b.style.background=activ?'var(--navy)':'#fff';
+    b.style.color=activ?'#fff':'var(--navy)';
+  });
 }
 
 function initFullCalendar(){
@@ -2235,11 +2281,12 @@ function refreshAllCalendarInstances(){
 
 function programareToFcEvent(p){
   var culoare=p.status==='confirmata'?'#1a6a40':p.status==='asteptare'?'#c98a00':'#b23b3b';
+  var endData=p.dataSfarsit||p.data;
   return {
     id:p.id,
-    title:p.titlu,
+    title:(p.recurentaGroupId?'🔁 ':'')+p.titlu,
     start:p.data+'T'+(p.oraInceput||'09:00'),
-    end:p.data+'T'+(p.oraSfarsit||p.oraInceput||'10:00'),
+    end:endData+'T'+(p.oraSfarsit||p.oraInceput||'10:00'),
     backgroundColor:culoare,
     borderColor:culoare
   };
@@ -2304,7 +2351,15 @@ function getCalendarExtraEvents(rangeStart,rangeEnd){
 function mutaProgramareDropResize(ev){
   var p=getProgramare(ev.id);
   if(!p)return;
-  p.data=ev.startStr.slice(0,10);
+  var oldData=p.data;
+  var newDataInceput=ev.startStr.slice(0,10);
+  if(p.dataSfarsit){
+    var deltaZile=Math.round((new Date(newDataInceput+'T00:00:00')-new Date(oldData+'T00:00:00'))/(24*3600*1000));
+    var oldEnd=new Date(p.dataSfarsit+'T00:00:00');
+    var newEnd=new Date(oldEnd.getFullYear(),oldEnd.getMonth(),oldEnd.getDate()+deltaZile);
+    p.dataSfarsit=newEnd.getFullYear()+'-'+pad2(newEnd.getMonth()+1)+'-'+pad2(newEnd.getDate());
+  }
+  p.data=newDataInceput;
   if(ev.startStr.length>10)p.oraInceput=ev.startStr.slice(11,16);
   if(ev.endStr&&ev.endStr.length>10)p.oraSfarsit=ev.endStr.slice(11,16);
   saveProgramari();
@@ -2335,31 +2390,51 @@ function openEditProgramare(id){
 function renderProgramareForm(p,dataPresetata,oraStart,oraEnd){
   var titlu=p?p.titlu:'';
   var data=p?p.data:(dataPresetata||todayISO());
+  var dataSfarsit=p?(p.dataSfarsit||''):'';
   var oi=p?p.oraInceput:(oraStart||'09:00');
   var os=p?p.oraSfarsit:(oraEnd||'10:00');
   var locatie=p?p.locatie:'';
   var descriere=p?p.descriere:'';
   var status=p?p.status:'confirmata';
   var reminder=p?(p.reminder||'30min'):'30min';
+  var inputStyle='width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit';
 
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:12px">'+(p?'Editează programarea':'Programare nouă')+'</div>'
     +'<div class="field"><label>Titlu</label><input type="text" id="prg-titlu" value="'+esc(titlu)+'" placeholder="ex: Întâlnire client"></div>'
-    +'<div class="field"><label>Data</label><input type="date" id="prg-data" value="'+data+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'<div class="field"><label>Data</label><input type="date" id="prg-data" value="'+data+'" style="'+inputStyle+'"></div>'
+    +'<div class="field"><label>Data sfârșit (opțional, dacă durează mai multe zile)</label><input type="date" id="prg-data-sfarsit" value="'+dataSfarsit+'" style="'+inputStyle+'"></div>'
     +'<div style="display:flex;gap:8px">'
-    +'<div class="field" style="flex:1"><label>Ora început</label><input type="time" id="prg-ora-inceput" value="'+oi+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
-    +'<div class="field" style="flex:1"><label>Ora sfârșit</label><input type="time" id="prg-ora-sfarsit" value="'+os+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'<div class="field" style="flex:1"><label>Ora început</label><input type="time" id="prg-ora-inceput" value="'+oi+'" style="'+inputStyle+'"></div>'
+    +'<div class="field" style="flex:1"><label>Ora sfârșit</label><input type="time" id="prg-ora-sfarsit" value="'+os+'" style="'+inputStyle+'"></div>'
     +'</div>'
     +'<div class="field"><label>Locație (opțional)</label><input type="text" id="prg-locatie" value="'+esc(locatie)+'" placeholder="ex: Sediu, online..."></div>'
-    +'<div class="field"><label>Descriere / Observații</label><textarea id="prg-descriere" rows="3" placeholder="" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;resize:vertical">'+esc(descriere)+'</textarea></div>'
+    +'<div class="field"><label>Descriere / Observații</label><textarea id="prg-descriere" rows="3" placeholder="" style="'+inputStyle+';resize:vertical">'+esc(descriere)+'</textarea></div>'
     +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Status</label>'
-    +'<select id="prg-status" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:10px">'
+    +'<select id="prg-status" style="'+inputStyle+';margin-bottom:10px">'
     +'<option value="confirmata"'+(status==='confirmata'?' selected':'')+'>✅ Confirmată</option>'
     +'<option value="asteptare"'+(status==='asteptare'?' selected':'')+'>⏳ În așteptare</option>'
     +'<option value="anulata"'+(status==='anulata'?' selected':'')+'>❌ Anulată</option>'
-    +'</select>'
-    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Reminder</label>'
-    +'<select id="prg-reminder" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:6px">'
+    +'</select>';
+
+  if(!p){
+    var rec=' ';
+    html+='<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Repetare</label>'
+      +'<select id="prg-recurenta" onchange="toggleRecurentaFields()" style="'+inputStyle+';margin-bottom:8px">'
+      +'<option value="niciuna">Fără repetare</option>'
+      +'<option value="lunar">Lunar (în aceeași zi a lunii)</option>'
+      +'<option value="saptamanal">Săptămânal</option>'
+      +'</select>'
+      +'<div id="prg-recurenta-extra" style="display:none">'
+      +'<div class="field" id="prg-interval-wrap" style="display:none"><label>La fiecare câte săptămâni?</label><input type="number" id="prg-recurenta-interval" value="1" min="1" max="52" style="'+inputStyle+'"></div>'
+      +'<div class="field"><label>Se repetă până la</label><input type="date" id="prg-recurenta-sfarsit" style="'+inputStyle+'"></div>'
+      +'</div>';
+  }else if(p.recurentaGroupId){
+    html+='<div style="font-size:12px;color:#5a2d8a;background:rgba(90,45,138,0.08);padding:8px 10px;border-radius:6px;margin-bottom:12px">🔁 Parte dintr-o serie repetitivă. Editarea sau ștergerea te va întreba dacă vrei să afecteze doar această apariție sau toată seria.</div>';
+  }
+
+  html+='<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px;margin-top:10px">Reminder</label>'
+    +'<select id="prg-reminder" style="'+inputStyle+';margin-bottom:6px">'
     +'<option value="niciun"'+(reminder==='niciun'?' selected':'')+'>Fără reminder</option>'
     +'<option value="lamoment"'+(reminder==='lamoment'?' selected':'')+'>La ora evenimentului</option>'
     +'<option value="15min"'+(reminder==='15min'?' selected':'')+'>Cu 15 minute înainte</option>'
@@ -2379,9 +2454,51 @@ function renderProgramareForm(p,dataPresetata,oraStart,oraEnd){
   injectIcons();
 }
 
+function toggleRecurentaFields(){
+  var val=document.getElementById('prg-recurenta').value;
+  var extra=document.getElementById('prg-recurenta-extra');
+  var intervalWrap=document.getElementById('prg-interval-wrap');
+  if(extra)extra.style.display=val==='niciuna'?'none':'block';
+  if(intervalWrap)intervalWrap.style.display=val==='saptamanal'?'block':'none';
+}
+
+// Generează toate apariițiile unei programări repetitive (sau doar una, dacă
+// nu se repetă), păstrând aceeași durată (inclusiv multi-zi) la fiecare apariție.
+function genereazaOcurenteRecurente(base){
+  if(!base.recurenta||base.recurenta==='niciuna'||!base.recurentaSfarsit){
+    return [Object.assign({},base,{id:'appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,5)})];
+  }
+  var durataZile=0;
+  if(base.dataSfarsit){
+    durataZile=Math.round((new Date(base.dataSfarsit+'T00:00:00')-new Date(base.data+'T00:00:00'))/(24*3600*1000));
+  }
+  var groupId='rec_'+Date.now();
+  var limitDate=new Date(base.recurentaSfarsit+'T23:59:59');
+  var cursor=new Date(base.data+'T00:00:00');
+  var intervalZile=base.recurenta==='saptamanal'?(7*(parseInt(base.recurentaInterval)||1)):null;
+  var ocurente=[];
+  var iter=0;
+  while(cursor<=limitDate&&iter<200){
+    var dataStr=cursor.getFullYear()+'-'+pad2(cursor.getMonth()+1)+'-'+pad2(cursor.getDate());
+    var entry=Object.assign({},base,{id:'appt_'+Date.now()+'_'+iter+'_'+Math.random().toString(36).slice(2,5),data:dataStr,recurentaGroupId:groupId});
+    if(durataZile>0){
+      var endCursor=new Date(cursor.getFullYear(),cursor.getMonth(),cursor.getDate()+durataZile);
+      entry.dataSfarsit=endCursor.getFullYear()+'-'+pad2(endCursor.getMonth()+1)+'-'+pad2(endCursor.getDate());
+    }
+    ocurente.push(entry);
+    iter++;
+    if(base.recurenta==='lunar')cursor=new Date(cursor.getFullYear(),cursor.getMonth()+1,cursor.getDate());
+    else if(base.recurenta==='saptamanal')cursor=new Date(cursor.getFullYear(),cursor.getMonth(),cursor.getDate()+intervalZile);
+    else break;
+  }
+  return ocurente;
+}
+
 function salveazaProgramare(){
   var titlu=document.getElementById('prg-titlu').value.trim();
   var data=document.getElementById('prg-data').value;
+  var dataSfarsitEl=document.getElementById('prg-data-sfarsit');
+  var dataSfarsit=dataSfarsitEl?dataSfarsitEl.value:'';
   var oi=document.getElementById('prg-ora-inceput').value;
   var os=document.getElementById('prg-ora-sfarsit').value;
   var locatie=document.getElementById('prg-locatie').value.trim();
@@ -2390,17 +2507,29 @@ function salveazaProgramare(){
   var reminder=document.getElementById('prg-reminder').value;
   if(!titlu){alert('Introdu titlul programării.');return;}
   if(!data){alert('Alege o dată.');return;}
+  if(dataSfarsit&&dataSfarsit<data){alert('Data de sfârșit nu poate fi înainte de data de început.');return;}
+
   if(currentProgramareEditId){
     var p=getProgramare(currentProgramareEditId);
     if(p){
       if(p.reminder!==reminder)p.reminderTrimis=false;
-      p.titlu=titlu;p.data=data;p.oraInceput=oi;p.oraSfarsit=os;p.locatie=locatie;p.descriere=descriere;p.status=status;p.reminder=reminder;
+      p.titlu=titlu;p.data=data;p.dataSfarsit=dataSfarsit;p.oraInceput=oi;p.oraSfarsit=os;p.locatie=locatie;p.descriere=descriere;p.status=status;p.reminder=reminder;
     }
   }else{
-    programariStore.push({
-      id:'appt_'+Date.now(),titlu:titlu,data:data,oraInceput:oi,oraSfarsit:os,
-      locatie:locatie,descriere:descriere,status:status,reminder:reminder,reminderTrimis:false,createdAt:Date.now()
-    });
+    var recurentaEl=document.getElementById('prg-recurenta');
+    var recurenta=recurentaEl?recurentaEl.value:'niciuna';
+    var recurentaIntervalEl=document.getElementById('prg-recurenta-interval');
+    var recurentaInterval=recurentaIntervalEl?(parseInt(recurentaIntervalEl.value)||1):1;
+    var recurentaSfarsitEl=document.getElementById('prg-recurenta-sfarsit');
+    var recurentaSfarsit=recurentaSfarsitEl?recurentaSfarsitEl.value:'';
+    if(recurenta!=='niciuna'&&!recurentaSfarsit){alert('Alege data până la care se repetă programarea.');return;}
+
+    var base={
+      titlu:titlu,data:data,dataSfarsit:dataSfarsit,oraInceput:oi,oraSfarsit:os,
+      locatie:locatie,descriere:descriere,status:status,reminder:reminder,reminderTrimis:false,createdAt:Date.now(),
+      recurenta:recurenta,recurentaInterval:recurentaInterval,recurentaSfarsit:recurentaSfarsit
+    };
+    genereazaOcurenteRecurente(base).forEach(function(o){programariStore.push(o);});
     cerePermisiuneNotificari();
   }
   saveProgramari();
@@ -2409,8 +2538,38 @@ function salveazaProgramare(){
 }
 
 function stergeProgramare(id){
+  var p=getProgramare(id);
+  if(!p)return;
+  if(p.recurentaGroupId){
+    var html='<div style="padding:1rem">'
+      +'<div class="section-title" style="margin-bottom:12px">Ștergi programarea</div>'
+      +'<div style="font-size:13px;color:rgba(7,33,68,0.6);margin-bottom:16px">Această programare face parte dintr-o serie repetitivă. Ce vrei să ștergi?</div>'
+      +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:8px" onclick="confirmaStergereProgramare(\''+id+'\',\'doar\')">Doar această apariție</button>'
+      +'<button type="button" class="btn-danger" style="width:100%;justify-content:center;margin-bottom:8px" onclick="confirmaStergereProgramare(\''+id+'\',\'serie\')"><i class="ti ti-trash"></i> Toată seria</button>'
+      +'<button type="button" onclick="document.getElementById(\'restanta-picker\').style.display=\'none\'" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;cursor:pointer">Anulează</button>'
+      +'</div>';
+    document.getElementById('restanta-picker-body').innerHTML=html;
+    document.getElementById('restanta-picker').querySelector('h2').textContent='Șterge programare';
+    document.getElementById('restanta-picker').style.display='flex';
+    injectIcons();
+    return;
+  }
   if(!confirm('Ștergi această programare?'))return;
-  programariStore=programariStore.filter(function(p){return p.id!==id;});
+  programariStore=programariStore.filter(function(x){return x.id!==id;});
+  saveProgramari();
+  document.getElementById('restanta-picker').style.display='none';
+  refreshProgramariViews();
+}
+
+function confirmaStergereProgramare(id,mod){
+  var p=getProgramare(id);
+  if(!p)return;
+  if(mod==='serie'){
+    if(!confirm('Ștergi toate apariițiile acestei serii repetitive?'))return;
+    programariStore=programariStore.filter(function(x){return x.recurentaGroupId!==p.recurentaGroupId;});
+  }else{
+    programariStore=programariStore.filter(function(x){return x.id!==id;});
+  }
   saveProgramari();
   document.getElementById('restanta-picker').style.display='none';
   refreshProgramariViews();
@@ -2453,10 +2612,10 @@ function renderProgramariTab(){
 function renderProgramareCard(p,finalizata){
   var statusColor=p.status==='confirmata'?'#1a6a40':p.status==='asteptare'?'#8a6e00':'#b23b3b';
   var statusLabel=p.status==='confirmata'?'Confirmată':p.status==='asteptare'?'În așteptare':'Anulată';
-  var dataAfis=formatDataRo(p.data);
+  var dataAfis=p.dataSfarsit&&p.dataSfarsit!==p.data?(formatDataRo(p.data)+' – '+formatDataRo(p.dataSfarsit)):formatDataRo(p.data);
   return '<div class="card" style="border-left:3px solid '+statusColor+(finalizata?';opacity:0.6':'')+'" onclick="openEditProgramare(\''+p.id+'\')">'
     +'<div class="card-top"><div class="avatar" style="background:rgba(90,45,138,0.12);color:#5a2d8a"><i class="ti ti-calendar-event"></i></div>'
-    +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(p.titlu)+'</div>'
+    +'<div style="min-width:0;flex:1"><div class="card-name">'+(p.recurentaGroupId?'🔁 ':'')+esc(p.titlu)+'</div>'
     +'<div class="card-firma">'+dataAfis+' · '+(p.oraInceput||'')+(p.oraSfarsit?'–'+p.oraSfarsit:'')+(p.locatie?' · '+esc(p.locatie):'')+'</div></div>'
     +'<span class="exp-badge" style="background:'+statusColor+'22;color:'+statusColor+'">'+statusLabel+'</span>'
     +'</div>'
