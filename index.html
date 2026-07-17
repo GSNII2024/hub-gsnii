@@ -2333,14 +2333,14 @@ function actualizeazaRezultateTaxe(){
       +randRezultat('Cheltuieli deductibile',calc.cheltuieliDeductibile,false,true)
       +randRezultat('Venit net',calc.venitNet,false,true)
 
-      +randFormula('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS)
       +randRezultat('Contribuția de asigurări sociale de sănătate (CASS)',calc.cass)
+      +randFormula('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS)
 
-      +randFormula('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS)
       +randRezultat('Contribuția de asigurări sociale (CAS)',calc.cas)
+      +randFormula('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS)
 
-      +randFormula('Bază impozabilă = Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS')
       +randRezultat('Bază impozabilă',calc.bazaImpozabila)
+      +randFormula('Formulă: Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS')
       +randRezultat('Impozit pe venit (impozit)',calc.impozit)
       +randRezultat('Total taxe',calc.getTotalTaxe(),true)
 
@@ -2392,14 +2392,14 @@ function genereazaRaportTaxePFA(){
   linie('Venit net',calc.venitNet,true,true);
   separator();
 
-  nota('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS);
   linie('Contribuția de asigurări sociale de sănătate (CASS)',calc.cass);
+  nota('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS);
 
-  nota('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS);
   linie('Contribuția de asigurări sociale (CAS)',calc.cas);
+  nota('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS);
 
-  nota('Bază impozabilă = Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS');
   linie('Bază impozabilă',calc.bazaImpozabila);
+  nota('Formulă: Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS');
   linie('Impozit pe venit (impozit)',calc.impozit);
   separator();
 
