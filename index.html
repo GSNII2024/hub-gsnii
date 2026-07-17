@@ -2282,9 +2282,29 @@ function refreshAllCalendarInstances(){
 function programareToFcEvent(p){
   var culoare=p.status==='confirmata'?'#1a6a40':p.status==='asteptare'?'#c98a00':'#b23b3b';
   var endData=p.dataSfarsit||p.data;
+  var esteMultiZi=p.dataSfarsit&&p.dataSfarsit!==p.data;
+  var esteRecurenta=!!p.recurentaGroupId;
+  var titluAfisat=(esteRecurenta?'🔁 ':'')+((esteMultiZi||esteRecurenta)&&p.oraInceput?p.oraInceput+' ':'')+p.titlu;
+
+  if(esteMultiZi||esteRecurenta){
+    // Afișate „toată ziua" — într-un rând separat, sus, ca să nu acopere
+    // programările normale (cu oră fixă) din grila de mai jos.
+    var endExclusiv=new Date(endData+'T00:00:00');
+    endExclusiv.setDate(endExclusiv.getDate()+1); // FullCalendar cere data de sfârșit exclusivă pentru all-day
+    return {
+      id:p.id,
+      title:titluAfisat,
+      start:p.data,
+      end:endExclusiv.getFullYear()+'-'+pad2(endExclusiv.getMonth()+1)+'-'+pad2(endExclusiv.getDate()),
+      allDay:true,
+      backgroundColor:culoare,
+      borderColor:culoare
+    };
+  }
+
   return {
     id:p.id,
-    title:(p.recurentaGroupId?'🔁 ':'')+p.titlu,
+    title:titluAfisat,
     start:p.data+'T'+(p.oraInceput||'09:00'),
     end:endData+'T'+(p.oraSfarsit||p.oraInceput||'10:00'),
     backgroundColor:culoare,
@@ -2351,17 +2371,28 @@ function getCalendarExtraEvents(rangeStart,rangeEnd){
 function mutaProgramareDropResize(ev){
   var p=getProgramare(ev.id);
   if(!p)return;
-  var oldData=p.data;
-  var newDataInceput=ev.startStr.slice(0,10);
-  if(p.dataSfarsit){
-    var deltaZile=Math.round((new Date(newDataInceput+'T00:00:00')-new Date(oldData+'T00:00:00'))/(24*3600*1000));
-    var oldEnd=new Date(p.dataSfarsit+'T00:00:00');
-    var newEnd=new Date(oldEnd.getFullYear(),oldEnd.getMonth(),oldEnd.getDate()+deltaZile);
-    p.dataSfarsit=newEnd.getFullYear()+'-'+pad2(newEnd.getMonth()+1)+'-'+pad2(newEnd.getDate());
+  if(ev.allDay){
+    // eveniment "toată ziua" (multi-zi sau recurent) — datele nu au componentă de oră
+    p.data=ev.startStr.slice(0,10);
+    if(ev.endStr){
+      var endInclusiv=new Date(ev.endStr+'T00:00:00');
+      endInclusiv.setDate(endInclusiv.getDate()-1); // FullCalendar dă data de sfârșit exclusivă
+      var endStr=endInclusiv.getFullYear()+'-'+pad2(endInclusiv.getMonth()+1)+'-'+pad2(endInclusiv.getDate());
+      p.dataSfarsit=(endStr!==p.data)?endStr:'';
+    }
+  }else{
+    var oldData=p.data;
+    var newDataInceput=ev.startStr.slice(0,10);
+    if(p.dataSfarsit){
+      var deltaZile=Math.round((new Date(newDataInceput+'T00:00:00')-new Date(oldData+'T00:00:00'))/(24*3600*1000));
+      var oldEnd=new Date(p.dataSfarsit+'T00:00:00');
+      var newEnd=new Date(oldEnd.getFullYear(),oldEnd.getMonth(),oldEnd.getDate()+deltaZile);
+      p.dataSfarsit=newEnd.getFullYear()+'-'+pad2(newEnd.getMonth()+1)+'-'+pad2(newEnd.getDate());
+    }
+    p.data=newDataInceput;
+    if(ev.startStr.length>10)p.oraInceput=ev.startStr.slice(11,16);
+    if(ev.endStr&&ev.endStr.length>10)p.oraSfarsit=ev.endStr.slice(11,16);
   }
-  p.data=newDataInceput;
-  if(ev.startStr.length>10)p.oraInceput=ev.startStr.slice(11,16);
-  if(ev.endStr&&ev.endStr.length>10)p.oraSfarsit=ev.endStr.slice(11,16);
   saveProgramari();
   refreshProgramariViews();
 }
@@ -2540,6 +2571,15 @@ function salveazaProgramare(){
 function stergeProgramare(id){
   var p=getProgramare(id);
   if(!p)return;
+  var esteTrecuta=programareDateTime(p,p.oraSfarsit||p.oraInceput)<new Date();
+  if(esteTrecuta){
+    if(!confirm('Ștergi această programare din listă?\n\nRămâne vizibilă în calendar, ca istoric — doar dispare din listă.'))return;
+    p.arhivat=true;
+    saveProgramari();
+    document.getElementById('restanta-picker').style.display='none';
+    refreshProgramariViews();
+    return;
+  }
   if(p.recurentaGroupId){
     var html='<div style="padding:1rem">'
       +'<div class="section-title" style="margin-bottom:12px">Ștergi programarea</div>'
@@ -2578,6 +2618,8 @@ function confirmaStergereProgramare(id,mod){
 // ── Listă „Programări" (cronologică) ─────────────────────
 var programariSearchQuery='';
 
+var programariFinalizateDeschis=false;
+
 function renderProgramariTab(){
   var container=document.getElementById('list');
   var now=new Date();
@@ -2585,8 +2627,8 @@ function renderProgramariTab(){
   var q=norm(programariSearchQuery||'');
   var filtered=q?sorted.filter(function(p){return norm(p.titlu).includes(q);}):sorted;
 
-  var viitoare=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)>=now;});
-  var trecute=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)<now;})
+  var viitoare=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)>=now&&!p.arhivat;});
+  var trecute=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)<now&&!p.arhivat;})
     .sort(function(a,b){return programareDateTime(b)-programareDateTime(a);});
 
   var html='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
@@ -2601,12 +2643,36 @@ function renderProgramariTab(){
   }
 
   if(trecute.length){
-    html+='<div class="section-title" style="margin-top:18px;opacity:0.55">Programări finalizate</div>';
-    trecute.slice(0,30).forEach(function(p){html+=renderProgramareCard(p,true);});
+    html+='<div class="doc-cat-header" style="cursor:pointer;margin-top:18px" onclick="toggleProgramariFinalizate()">'
+      +'<i class="ti ti-history"></i> <span>Programări finalizate ('+trecute.length+')</span>'
+      +'<i class="ti ti-chevron-down" id="prg-fin-chevron" style="'+(programariFinalizateDeschis?'transform:rotate(180deg)':'')+'"></i>'
+      +'</div>'
+      +'<div id="prg-fin-panel" style="display:'+(programariFinalizateDeschis?'block':'none')+';margin-top:8px">'
+      +trecute.slice(0,50).map(function(p){return renderProgramareCard(p,true);}).join('')
+      +'</div>';
   }
 
   container.innerHTML=html;
   injectIcons();
+}
+
+function toggleProgramariFinalizate(){
+  programariFinalizateDeschis=!programariFinalizateDeschis;
+  var panel=document.getElementById('prg-fin-panel');
+  var chev=document.getElementById('prg-fin-chevron');
+  if(panel)panel.style.display=programariFinalizateDeschis?'block':'none';
+  if(chev)chev.style.transform=programariFinalizateDeschis?'rotate(180deg)':'';
+}
+
+// Ascunde o programare finalizată din listă — RĂMÂNE vizibilă în calendar,
+// ca istoric; se poate face oricând, doar pentru programări deja trecute.
+function arhiveazaProgramare(id){
+  if(!confirm('Ștergi această programare din listă?\n\nRămâne vizibilă în calendar, ca istoric — doar dispare din listă.'))return;
+  var p=getProgramare(id);
+  if(!p)return;
+  p.arhivat=true;
+  saveProgramari();
+  renderProgramariTab();
 }
 
 function renderProgramareCard(p,finalizata){
@@ -2619,7 +2685,9 @@ function renderProgramareCard(p,finalizata){
     +'<div class="card-firma">'+dataAfis+' · '+(p.oraInceput||'')+(p.oraSfarsit?'–'+p.oraSfarsit:'')+(p.locatie?' · '+esc(p.locatie):'')+'</div></div>'
     +'<span class="exp-badge" style="background:'+statusColor+'22;color:'+statusColor+'">'+statusLabel+'</span>'
     +'</div>'
-    +(finalizata?'':'<div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="button" onclick="event.stopPropagation();navigheazaLaCalendar(\''+p.id+'\')" style="font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer">📅 Vezi în calendar</button></div>')
+    +(finalizata
+      ?'<div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="button" onclick="event.stopPropagation();arhiveazaProgramare(\''+p.id+'\')" style="font-size:11px;color:rgba(178,59,59,0.7);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge din listă</button></div>'
+      :'<div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="button" onclick="event.stopPropagation();navigheazaLaCalendar(\''+p.id+'\')" style="font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer">📅 Vezi în calendar</button></div>')
     +'</div>';
 }
 
