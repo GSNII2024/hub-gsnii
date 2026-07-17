@@ -194,7 +194,7 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .btn-add-service:hover{background:var(--gold-soft)}
 .empty-services{font-size:13px;color:rgba(7,33,68,0.45);font-style:italic;padding:4px 0}
 
-.modal-bg{position:fixed;inset:0;background:rgba(7,33,68,0.45);display:flex;align-items:flex-start;justify-content:center;padding:env(safe-area-inset-top,1.5rem) 1rem 1rem;z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.modal-bg{position:fixed;inset:0;background:rgba(7,33,68,0.45);display:flex;align-items:flex-start;justify-content:center;padding:env(safe-area-inset-top,1.5rem) 1rem calc(1rem + env(safe-area-inset-bottom,0px));z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal{background:var(--cream);border-radius:12px;border:1px solid var(--gold);width:100%;max-width:600px;max-height:calc(100dvh - 3rem);overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 8px 30px rgba(7,33,68,0.25)}
 .modal-header{padding:1rem 1.25rem;border-bottom:2px solid var(--gold);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--navy);z-index:1;border-radius:12px 12px 0 0}
 .modal-header h2{font-size:18px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;color:var(--gold)}
@@ -207,7 +207,7 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .field input,.field select,.field textarea{width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;background:#fff;color:var(--navy);font-family:inherit}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-soft)}
 .field textarea{resize:vertical;min-height:60px;font-size:14.5px}
-.modal-footer{padding:1rem 1.25rem;border-top:1px solid rgba(7,33,68,0.12);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--cream);flex-wrap:wrap;border-radius:0 0 12px 12px}
+.modal-footer{padding:1rem 1.25rem calc(1rem + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(7,33,68,0.12);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--cream);flex-wrap:wrap;border-radius:0 0 12px 12px}
 .btn-danger{background:#fff;color:#B23B3B;border:1px solid #B23B3B;border-radius:8px;font-size:13px;padding:8px 14px;margin-right:auto;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:5px}
 .btn-secondary{background:#fff;color:var(--navy);border:1px solid rgba(7,33,68,0.3);border-radius:8px;font-size:14px;padding:8px 16px;font-family:inherit;cursor:pointer}
 .btn-pdf{background:var(--gold);color:var(--navy);border:1px solid var(--gold);border-radius:8px;font-size:13px;padding:8px 14px;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:5px;font-weight:600}
@@ -423,6 +423,16 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-title">Semnări</div>
           <div class="lp-card-sub">DOCUMENTE DE SEMNAT</div>
         </button>
+        <button class="lp-card" onclick="openView('calendar')">
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar"></i></div>
+          <div class="lp-card-title">Calendar</div>
+          <div class="lp-card-sub">Programări &amp; evenimente</div>
+        </button>
+        <button class="lp-card" onclick="openView('programari')">
+          <div class="lp-card-icon" style="background:rgba(80,40,120,0.1);color:#5a2d8a"><i class="ti ti-calendar-event"></i></div>
+          <div class="lp-card-title">Programări</div>
+          <div class="lp-card-sub">Lista programărilor viitoare</div>
+        </button>
         <button class="lp-card" onclick="openView('spv')">
           <div class="lp-card-icon" style="background:rgba(7,33,68,0.09);color:var(--navy)"><i class="ti ti-id-badge-2"></i></div>
           <div class="lp-card-title">Listă SPV</div>
@@ -444,6 +454,8 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           <div class="lp-card-sub">Următoarele aniversări</div>
         </button>
       </div>
+      <div class="section-title" style="margin-top:4px"><i class="ti ti-calendar"></i> Calendar</div>
+      <div id="fc-calendar-landing" style="background:#fff;border-radius:10px;padding:6px;margin-bottom:14px"><div style="text-align:center;padding:30px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>
       <div id="backup-age-banner" style="display:none;width:100%;padding:8px 12px;background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:8px;font-size:12px;color:#a03030;margin-bottom:4px;text-align:center"></div>
       <div style="text-align:center;margin-top:1rem">
         <button onclick="toggleLpTools()" id="lp-tools-toggle" style="background:none;border:none;color:rgba(7,33,68,0.3);font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px">
@@ -581,6 +593,7 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
 </nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
@@ -2118,6 +2131,384 @@ function obiecteContractSugestii(){
   return out;
 }
 var GSNII_FIRMA='GÁL S. NORBERT Î.I.';
+
+// ══ CALENDAR / PROGRAMĂRI ══════════════════════════════════
+var programariStore=JSON.parse(localStorage.getItem('crm_programari_v1')||'[]');
+function saveProgramari(){
+  localStorage.setItem('crm_programari_v1',JSON.stringify(programariStore));
+  sbSet('programari',programariStore).then(function(){setSyncStatus(true,'Programări sincronizate');}).catch(function(){setSyncStatus(false,'Eroare sync programări — verifică internetul');});
+}
+function getProgramare(id){return programariStore.find(function(p){return p.id===id;});}
+// Combină data + ora într-un moment real, pentru sortare/comparații/reminder
+function programareDateTime(p,ora){return new Date(p.data+'T'+(ora||p.oraInceput||'00:00')+':00');}
+
+function todayISO(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+function formatDataRo(dataISO){if(!dataISO)return '';var p=dataISO.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
+
+// ── Calendar (FullCalendar) ──────────────────────────────
+var fullCalendarInstance=null;
+var landingCalendarInstance=null;
+
+function renderCalendarTab(){
+  var container=document.getElementById('list');
+  container.innerHTML='<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+    +'<span><i class="ti ti-calendar"></i> Calendar</span>'
+    +'<button class="btn-add-service" onclick="openAddProgramare()"><i class="ti ti-plus"></i> Programare nouă</button>'
+    +'</div>'
+    +'<div id="fc-calendar" style="background:#fff;border-radius:10px;padding:6px;margin-top:10px"><div style="text-align:center;padding:40px;color:rgba(7,33,68,0.4);font-size:13px">Se încarcă calendarul...</div></div>';
+  injectIcons();
+  initFullCalendarRetry('fc-calendar',0);
+}
+
+function initFullCalendarRetry(containerId,incercare){
+  if(typeof FullCalendar==='undefined'){
+    if(incercare>20){
+      var el=document.getElementById(containerId);
+      if(el)el.innerHTML='<div style="text-align:center;padding:40px;color:rgba(178,59,59,0.7);font-size:13px">Nu am putut încărca biblioteca de calendar. Verifică internetul și reîncarcă pagina.</div>';
+      return;
+    }
+    setTimeout(function(){initFullCalendarRetry(containerId,incercare+1);},250);
+    return;
+  }
+  if(containerId==='fc-calendar')initFullCalendar();
+  else initLandingCalendar();
+}
+
+// Configurație comună — folosită atât în tab-ul Calendar, cât și în micul
+// calendar de pe pagina principală, ca ambele să se comporte identic.
+function buildFullCalendarConfig(compact){
+  return {
+    initialView:'dayGridMonth',
+    height:compact?460:'auto',
+    firstDay:1,
+    locale:'ro',
+    buttonText:{today:'Azi',month:'Lună',week:'Săptămână',day:'Zi'},
+    headerToolbar:compact
+      ?{left:'prev,next today',center:'title',right:''}
+      :{left:'prev,next today',center:'title',right:'dayGridMonth,timeGridWeek,timeGridDay'},
+    selectable:true,
+    editable:true,
+    dayMaxEvents:true,
+    events:function(info,success){success(programariStore.map(programareToFcEvent).concat(getCalendarExtraEvents(info.start,info.end)));},
+    dateClick:function(info){openAddProgramare(info.dateStr.slice(0,10));},
+    select:function(info){
+      var oi=info.startStr.length>10?info.startStr.slice(11,16):'09:00';
+      var os=info.endStr&&info.endStr.length>10?info.endStr.slice(11,16):'';
+      openAddProgramare(info.startStr.slice(0,10),oi,os);
+    },
+    eventClick:function(info){
+      var tip=info.event.extendedProps.tip;
+      if(tip==='bday'){alert(info.event.title);return;}
+      if(tip==='expirare'){
+        if(confirm(info.event.title+'\n\nDeschizi fișa acestui client?'))openEdit(info.event.extendedProps.clientId);
+        return;
+      }
+      openEditProgramare(info.event.id);
+    },
+    eventDrop:function(info){mutaProgramareDropResize(info.event);},
+    eventResize:function(info){mutaProgramareDropResize(info.event);}
+  };
+}
+
+function initFullCalendar(){
+  var el=document.getElementById('fc-calendar');
+  if(!el||typeof FullCalendar==='undefined')return;
+  if(fullCalendarInstance){try{fullCalendarInstance.destroy();}catch(e){}}
+  fullCalendarInstance=new FullCalendar.Calendar(el,buildFullCalendarConfig(false));
+  fullCalendarInstance.render();
+}
+
+function initLandingCalendar(){
+  var el=document.getElementById('fc-calendar-landing');
+  if(!el||typeof FullCalendar==='undefined')return;
+  if(landingCalendarInstance){try{landingCalendarInstance.destroy();}catch(e){}}
+  landingCalendarInstance=new FullCalendar.Calendar(el,buildFullCalendarConfig(true));
+  landingCalendarInstance.render();
+}
+
+// Reîmprospătează ambele instanțe de calendar (folosit după orice
+// adăugare/editare/ștergere/mutare a unei programări).
+function refreshAllCalendarInstances(){
+  if(fullCalendarInstance)fullCalendarInstance.refetchEvents();
+  if(landingCalendarInstance)landingCalendarInstance.refetchEvents();
+}
+
+function programareToFcEvent(p){
+  var culoare=p.status==='confirmata'?'#1a6a40':p.status==='asteptare'?'#c98a00':'#b23b3b';
+  return {
+    id:p.id,
+    title:p.titlu,
+    start:p.data+'T'+(p.oraInceput||'09:00'),
+    end:p.data+'T'+(p.oraSfarsit||p.oraInceput||'10:00'),
+    backgroundColor:culoare,
+    borderColor:culoare
+  };
+}
+
+// Zile de naștere (din CNP + adăugate manual) + expirări CI/sediu — afișate
+// direct în calendar, alături de programări, ca tot ce contează să fie într-un loc.
+function getCalendarExtraEvents(rangeStart,rangeEnd){
+  var events=[];
+  var yStart=rangeStart.getFullYear(),yEnd=rangeEnd.getFullYear();
+
+  var bdays=[];
+  clients.forEach(function(c){
+    var b=cnpToBirthdate(c.cnp);
+    if(b)bdays.push({nume:c.nume,day:b.day,month:b.month});
+  });
+  try{
+    JSON.parse(localStorage.getItem('crm_bday_manual_v1')||'[]').forEach(function(m){
+      bdays.push({nume:m.nume,day:m.day,month:m.month});
+    });
+  }catch(e){}
+
+  for(var y=yStart;y<=yEnd;y++){
+    bdays.forEach(function(b){
+      var d=new Date(y,b.month-1,b.day);
+      if(d>=rangeStart&&d<=rangeEnd){
+        events.push({
+          id:'bday_'+encodeURIComponent(b.nume)+'_'+y+'_'+b.month+'_'+b.day,
+          title:'🎂 '+b.nume,
+          start:y+'-'+pad2(b.month)+'-'+pad2(b.day),
+          allDay:true,
+          backgroundColor:'#e1c340',borderColor:'#e1c340',textColor:'#072144',
+          editable:false,
+          extendedProps:{tip:'bday'}
+        });
+      }
+    });
+  }
+
+  clients.forEach(function(c){
+    [['exp_ci','📇 Expiră CI'],['exp_sediu','🏢 Expiră sediul']].forEach(function(pair){
+      var val=c[pair[0]];
+      if(!val)return;
+      var d=parseDateRo(val);
+      if(d&&d>=rangeStart&&d<=rangeEnd){
+        events.push({
+          id:'exp_'+pair[0]+'_'+c.id,
+          title:pair[1]+' — '+(c.nume||c.firma||''),
+          start:d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()),
+          allDay:true,
+          backgroundColor:'#b23b3b',borderColor:'#b23b3b',
+          editable:false,
+          extendedProps:{tip:'expirare',clientId:c.id}
+        });
+      }
+    });
+  });
+
+  return events;
+}
+
+function mutaProgramareDropResize(ev){
+  var p=getProgramare(ev.id);
+  if(!p)return;
+  p.data=ev.startStr.slice(0,10);
+  if(ev.startStr.length>10)p.oraInceput=ev.startStr.slice(11,16);
+  if(ev.endStr&&ev.endStr.length>10)p.oraSfarsit=ev.endStr.slice(11,16);
+  saveProgramari();
+  refreshProgramariViews();
+}
+
+function refreshProgramariViews(){
+  refreshAllCalendarInstances();
+  if(currentFilter==='programari'){renderProgramariTab();}
+  updateLpStats();
+}
+
+// ── Formular creare/editare programare ───────────────────
+var currentProgramareEditId=null;
+
+function openAddProgramare(dataPresetata,oraStart,oraEnd){
+  currentProgramareEditId=null;
+  renderProgramareForm(null,dataPresetata,oraStart,oraEnd);
+}
+
+function openEditProgramare(id){
+  var p=getProgramare(id);
+  if(!p)return;
+  currentProgramareEditId=id;
+  renderProgramareForm(p);
+}
+
+function renderProgramareForm(p,dataPresetata,oraStart,oraEnd){
+  var titlu=p?p.titlu:'';
+  var data=p?p.data:(dataPresetata||todayISO());
+  var oi=p?p.oraInceput:(oraStart||'09:00');
+  var os=p?p.oraSfarsit:(oraEnd||'10:00');
+  var locatie=p?p.locatie:'';
+  var descriere=p?p.descriere:'';
+  var status=p?p.status:'confirmata';
+  var reminder=p?(p.reminder||'30min'):'30min';
+
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">'+(p?'Editează programarea':'Programare nouă')+'</div>'
+    +'<div class="field"><label>Titlu</label><input type="text" id="prg-titlu" value="'+esc(titlu)+'" placeholder="ex: Întâlnire client"></div>'
+    +'<div class="field"><label>Data</label><input type="date" id="prg-data" value="'+data+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<div class="field" style="flex:1"><label>Ora început</label><input type="time" id="prg-ora-inceput" value="'+oi+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'<div class="field" style="flex:1"><label>Ora sfârșit</label><input type="time" id="prg-ora-sfarsit" value="'+os+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'</div>'
+    +'<div class="field"><label>Locație (opțional)</label><input type="text" id="prg-locatie" value="'+esc(locatie)+'" placeholder="ex: Sediu, online..."></div>'
+    +'<div class="field"><label>Descriere / Observații</label><textarea id="prg-descriere" rows="3" placeholder="" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;resize:vertical">'+esc(descriere)+'</textarea></div>'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Status</label>'
+    +'<select id="prg-status" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:10px">'
+    +'<option value="confirmata"'+(status==='confirmata'?' selected':'')+'>✅ Confirmată</option>'
+    +'<option value="asteptare"'+(status==='asteptare'?' selected':'')+'>⏳ În așteptare</option>'
+    +'<option value="anulata"'+(status==='anulata'?' selected':'')+'>❌ Anulată</option>'
+    +'</select>'
+    +'<label style="font-size:12px;color:rgba(7,33,68,0.5);display:block;margin-bottom:4px">Reminder</label>'
+    +'<select id="prg-reminder" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:6px;padding:8px 10px;font-family:inherit;margin-bottom:6px">'
+    +'<option value="niciun"'+(reminder==='niciun'?' selected':'')+'>Fără reminder</option>'
+    +'<option value="lamoment"'+(reminder==='lamoment'?' selected':'')+'>La ora evenimentului</option>'
+    +'<option value="15min"'+(reminder==='15min'?' selected':'')+'>Cu 15 minute înainte</option>'
+    +'<option value="30min"'+(reminder==='30min'?' selected':'')+'>Cu 30 de minute înainte</option>'
+    +'<option value="1ora"'+(reminder==='1ora'?' selected':'')+'>Cu 1 oră înainte</option>'
+    +'<option value="1zi"'+(reminder==='1zi'?' selected':'')+'>Cu 1 zi înainte</option>'
+    +'</select>'
+    +'<div style="font-size:11px;color:rgba(7,33,68,0.4);margin-bottom:14px">Notificarea apare doar cât timp ții hub-ul deschis într-o filă a browserului.</div>'
+    +'<div style="display:flex;gap:8px">'
+    +(p?'<button type="button" class="btn-danger" style="flex:1;justify-content:center" onclick="stergeProgramare(\''+p.id+'\')"><i class="ti ti-trash"></i> Șterge</button>':'')
+    +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="salveazaProgramare()"><i class="ti ti-check"></i> Salvează</button>'
+    +'</div>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent=p?'Editează programare':'Programare nouă';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function salveazaProgramare(){
+  var titlu=document.getElementById('prg-titlu').value.trim();
+  var data=document.getElementById('prg-data').value;
+  var oi=document.getElementById('prg-ora-inceput').value;
+  var os=document.getElementById('prg-ora-sfarsit').value;
+  var locatie=document.getElementById('prg-locatie').value.trim();
+  var descriere=document.getElementById('prg-descriere').value.trim();
+  var status=document.getElementById('prg-status').value;
+  var reminder=document.getElementById('prg-reminder').value;
+  if(!titlu){alert('Introdu titlul programării.');return;}
+  if(!data){alert('Alege o dată.');return;}
+  if(currentProgramareEditId){
+    var p=getProgramare(currentProgramareEditId);
+    if(p){
+      if(p.reminder!==reminder)p.reminderTrimis=false;
+      p.titlu=titlu;p.data=data;p.oraInceput=oi;p.oraSfarsit=os;p.locatie=locatie;p.descriere=descriere;p.status=status;p.reminder=reminder;
+    }
+  }else{
+    programariStore.push({
+      id:'appt_'+Date.now(),titlu:titlu,data:data,oraInceput:oi,oraSfarsit:os,
+      locatie:locatie,descriere:descriere,status:status,reminder:reminder,reminderTrimis:false,createdAt:Date.now()
+    });
+    cerePermisiuneNotificari();
+  }
+  saveProgramari();
+  document.getElementById('restanta-picker').style.display='none';
+  refreshProgramariViews();
+}
+
+function stergeProgramare(id){
+  if(!confirm('Ștergi această programare?'))return;
+  programariStore=programariStore.filter(function(p){return p.id!==id;});
+  saveProgramari();
+  document.getElementById('restanta-picker').style.display='none';
+  refreshProgramariViews();
+}
+
+// ── Listă „Programări" (cronologică) ─────────────────────
+var programariSearchQuery='';
+
+function renderProgramariTab(){
+  var container=document.getElementById('list');
+  var now=new Date();
+  var sorted=programariStore.slice().sort(function(a,b){return programareDateTime(a)-programareDateTime(b);});
+  var q=norm(programariSearchQuery||'');
+  var filtered=q?sorted.filter(function(p){return norm(p.titlu).includes(q);}):sorted;
+
+  var viitoare=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)>=now;});
+  var trecute=filtered.filter(function(p){return programareDateTime(p,p.oraSfarsit||p.oraInceput)<now;})
+    .sort(function(a,b){return programareDateTime(b)-programareDateTime(a);});
+
+  var html='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
+    +'<input type="text" id="prg-search" placeholder="Caută după titlu..." value="'+esc(programariSearchQuery)+'" oninput="programariSearchQuery=this.value;renderProgramariTab()" style="font-size:15px">'
+    +'</div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:14px" onclick="openAddProgramare()"><i class="ti ti-plus"></i> Programare nouă</button>';
+
+  if(!viitoare.length){
+    html+='<div class="empty"><i class="ti ti-calendar-event"></i>Nicio programare viitoare</div>';
+  }else{
+    viitoare.forEach(function(p){html+=renderProgramareCard(p,false);});
+  }
+
+  if(trecute.length){
+    html+='<div class="section-title" style="margin-top:18px;opacity:0.55">Programări finalizate</div>';
+    trecute.slice(0,30).forEach(function(p){html+=renderProgramareCard(p,true);});
+  }
+
+  container.innerHTML=html;
+  injectIcons();
+}
+
+function renderProgramareCard(p,finalizata){
+  var statusColor=p.status==='confirmata'?'#1a6a40':p.status==='asteptare'?'#8a6e00':'#b23b3b';
+  var statusLabel=p.status==='confirmata'?'Confirmată':p.status==='asteptare'?'În așteptare':'Anulată';
+  var dataAfis=formatDataRo(p.data);
+  return '<div class="card" style="border-left:3px solid '+statusColor+(finalizata?';opacity:0.6':'')+'" onclick="openEditProgramare(\''+p.id+'\')">'
+    +'<div class="card-top"><div class="avatar" style="background:rgba(90,45,138,0.12);color:#5a2d8a"><i class="ti ti-calendar-event"></i></div>'
+    +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(p.titlu)+'</div>'
+    +'<div class="card-firma">'+dataAfis+' · '+(p.oraInceput||'')+(p.oraSfarsit?'–'+p.oraSfarsit:'')+(p.locatie?' · '+esc(p.locatie):'')+'</div></div>'
+    +'<span class="exp-badge" style="background:'+statusColor+'22;color:'+statusColor+'">'+statusLabel+'</span>'
+    +'</div>'
+    +(finalizata?'':'<div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="button" onclick="event.stopPropagation();navigheazaLaCalendar(\''+p.id+'\')" style="font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer">📅 Vezi în calendar</button></div>')
+    +'</div>';
+}
+
+function navigheazaLaCalendar(id){
+  var p=getProgramare(id);
+  if(!p)return;
+  openView('calendar');
+  setTimeout(function(){
+    if(fullCalendarInstance){
+      fullCalendarInstance.changeView('timeGridDay',p.data);
+    }
+  },150);
+}
+
+// ── Notificări locale (reminder) ──────────────────────────
+function cerePermisiuneNotificari(){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='default')Notification.requestPermission();
+}
+
+function reminderTriggerTime(p){
+  var ms=programareDateTime(p,p.oraInceput).getTime();
+  if(p.reminder==='15min')ms-=15*60000;
+  else if(p.reminder==='30min')ms-=30*60000;
+  else if(p.reminder==='1ora')ms-=60*60000;
+  else if(p.reminder==='1zi')ms-=24*60*60000;
+  return ms;
+}
+
+function verificaReminderProgramari(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  var now=Date.now();
+  var schimbat=false;
+  programariStore.forEach(function(p){
+    if(!p.reminder||p.reminder==='niciun'||p.reminderTrimis||p.status==='anulata')return;
+    var triggerMs=reminderTriggerTime(p);
+    if(triggerMs<=now&&triggerMs>now-5*60000){
+      try{
+        new Notification('📅 '+p.titlu,{body:(p.oraInceput||'')+(p.locatie?' · '+p.locatie:'')});
+      }catch(e){}
+      p.reminderTrimis=true;
+      schimbat=true;
+    }
+  });
+  if(schimbat)saveProgramari();
+}
+setInterval(verificaReminderProgramari,30000);
+
 var customServices=JSON.parse(localStorage.getItem('crm_custom_services_v1')||'[]');
 
 function save(){
@@ -2152,7 +2543,8 @@ function syncFromCloud(){
     sbGet('bday_manual'),
     sbGet('semnari'),
     sbGet('servicii_diverse'),
-    sbGet('registre')
+    sbGet('registre'),
+    sbGet('programari')
   ]).then(function(results){
     var changed=false;
     var avertismente=[];
@@ -2244,6 +2636,14 @@ function syncFromCloud(){
         if(rgCount<localRgCount){avertismente.push('registre');}
         else{registreStore=rg;localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));changed=true;}
       }
+    }
+    // ── programări (array) ──
+    if(results[11]){
+      try{
+        var prgParsed=typeof results[11]==='string'?JSON.parse(results[11]):results[11];
+        if(prgParsed&&prgParsed.length>=programariStore.length){programariStore=prgParsed;localStorage.setItem('crm_programari_v1',JSON.stringify(programariStore));changed=true;}
+        else if(prgParsed&&prgParsed.length<programariStore.length){avertismente.push('programări');}
+      }catch(e){}
     }
 
     if(avertismente.length){
@@ -3122,7 +3522,9 @@ var VIEW_META={
   registre:{title:'Registre',icon:'ti-books',filter:'registre',toolbar:false},
   incasari:{title:'Încasări',icon:'ti-cash',filter:'incasari',toolbar:false},
   todo:{title:'Listă de făcut',icon:'ti-checklist',filter:'todo',toolbar:false},
-  semnari:{title:'Semnări',icon:'ti-pencil',filter:'semnari',toolbar:false}
+  semnari:{title:'Semnări',icon:'ti-pencil',filter:'semnari',toolbar:false},
+  calendar:{title:'Calendar',icon:'ti-calendar',filter:'calendar',toolbar:false},
+  programari:{title:'Programări',icon:'ti-calendar-event',filter:'programari',toolbar:false}
 };
 
 function goHome(){
@@ -3131,6 +3533,8 @@ function goHome(){
   document.getElementById('view-page').style.display='none';
   updateBnav(null);
   updateLpStats();
+  if(landingCalendarInstance){landingCalendarInstance.refetchEvents();}
+  else{initFullCalendarRetry('fc-calendar-landing',0);}
 }
 
 function openView(view){
@@ -5107,6 +5511,8 @@ function render(){
   if(currentFilter==='incasari'){renderIncasariTab();return;}
   if(currentFilter==='todo'){renderTodoTab();return;}
   if(currentFilter==='semnari'){renderSemnariTab();return;}
+  if(currentFilter==='calendar'){renderCalendarTab();return;}
+  if(currentFilter==='programari'){renderProgramariTab();return;}
   var q=document.getElementById('search').value.toLowerCase();
   var filtered=clients.filter(function(c){
     return keys.some(function(k){return norm(c[k]).includes(norm(q));});
@@ -6754,7 +7160,8 @@ function buildBackupData(){
     semnari:getSemnari(),
     todo:getTodos(),
     incasariDiverse:JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]'),
-    serviciiDiverse:getServiciiDiverse()
+    serviciiDiverse:getServiciiDiverse(),
+    programari:programariStore
   };
 }
 
@@ -6854,6 +7261,7 @@ function restaureazaDinBackup(data){
   if(data.todo){localStorage.setItem(TODO_KEY,JSON.stringify(data.todo));sbSet('todo',data.todo).catch(function(){});}
   if(data.incasariDiverse){localStorage.setItem('crm_inc_diverse_v1',JSON.stringify(data.incasariDiverse));sbSet('inc_diverse',data.incasariDiverse).catch(function(){});}
   if(data.serviciiDiverse){localStorage.setItem('crm_servicii_diverse_v1',JSON.stringify(data.serviciiDiverse));sbSet('servicii_diverse',data.serviciiDiverse).catch(function(){});}
+  if(data.programari){programariStore=data.programari;saveProgramari();}
   render();
 }
 
