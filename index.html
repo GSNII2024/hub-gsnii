@@ -5460,7 +5460,8 @@ function renderRegistreTab(){
   else{
     var aniC={};listC.forEach(function(r){var an=r.data?r.data.split('.')[2]:'?';if(!aniC[an])aniC[an]=[];aniC[an].push(r);});
     Object.keys(aniC).sort().reverse().forEach(function(an){
-      html+='<div class="reg-year-header">'+an+'</div>';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center"><div class="reg-year-header" style="margin-bottom:0">'+an+'</div>'
+        +'<button type="button" onclick="genereazaRaportAnualCorespondenta(\''+an+'\')" style="font-size:11.5px;color:var(--navy);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 0"><i class="ti ti-file-type-pdf" style="font-size:14px"></i> Raport anual '+an+'</button></div>';
       aniC[an].forEach(function(r){
         html+='<div class="reg-card">'
           +'<div class="reg-card-top">'
@@ -5492,7 +5493,8 @@ function renderRegistreTab(){
   else{
     var aniK={};listK.forEach(function(r){var an=r.an||'?';if(!aniK[an])aniK[an]=[];aniK[an].push(r);});
     Object.keys(aniK).sort().reverse().forEach(function(an){
-      html+='<div class="reg-year-header">'+an+'</div>';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center"><div class="reg-year-header" style="margin-bottom:0">'+an+'</div>'
+        +'<button type="button" onclick="genereazaRaportAnualContracte(\''+an+'\')" style="font-size:11.5px;color:var(--navy);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 0"><i class="ti ti-file-type-pdf" style="font-size:14px"></i> Raport anual '+an+'</button></div>';
       aniK[an].forEach(function(r){
         var tipLabel=r.tip==='contract'?'Contract':r.tip==='aditional'?'Act adițional':'Act reziliere';
         var tipColor=r.tip==='contract'?'#1a6a40':r.tip==='aditional'?'#1f5a9a':'#a03030';
@@ -5530,6 +5532,106 @@ function openAddCorespondenta(){
   document.getElementById('restanta-picker').querySelector('h2').textContent='Registru corespondență';
   document.getElementById('restanta-picker').style.display='flex';
   injectIcons();
+}
+
+function genereazaRaportAnualCorespondenta(an){
+  var lista=(registreStore.corespondenta||[]).filter(function(r){return (r.data?r.data.split('.')[2]:'?')===an;}).sort(function(a,b){return a.nr-b.nr;});
+  if(!lista.length){alert('Nicio înregistrare pentru anul '+an+'.');return;}
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  registerPdfFont(doc);
+  var margin=16,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64];
+  doc.setFont('CrimsonPro','normal');
+  drawLetterhead(doc,margin,pageW);
+
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Registru corespondență — '+an,margin,y);y+=6;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(140,140,140);
+  doc.text(lista.length+' înregistrări',margin,y);y+=10;
+
+  function checkP(nevoie){if(y+nevoie>272){doc.addPage();registerPdfFont(doc);y=20;}}
+
+  lista.forEach(function(r){
+    checkP(28);
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.3);
+    doc.line(margin,y,pageW-margin,y);y+=6;
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text('Nr. '+r.nr,margin,y);
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(110,110,110);
+    doc.text(r.data||'',pageW-margin,y,{align:'right'});
+    y+=6.5;
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(10.5);doc.setTextColor(90,90,90);
+    if(r.expeditor){doc.text('De la: '+r.expeditor,margin,y);y+=5.5;}
+    if(r.destinatar){doc.text('Către: '+r.destinatar,margin,y);y+=5.5;}
+    doc.setFontSize(11);doc.setTextColor(navy[0],navy[1],navy[2]);
+    var obiectLinii=doc.splitTextToSize(r.obiect||'',pageW-2*margin);
+    doc.text(obiectLinii,margin,y);y+=obiectLinii.length*5+2;
+    if(r.obs){
+      doc.setFont('CrimsonPro','italic');doc.setFontSize(9.5);doc.setTextColor(130,130,130);
+      var obsLinii=doc.splitTextToSize('Obs: '+r.obs,pageW-2*margin);
+      doc.text(obsLinii,margin,y);y+=obsLinii.length*4.5+2;
+    }
+    y+=3;
+  });
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,'registru_corespondenta_'+an+'.pdf',__pdfTab);
+}
+
+function genereazaRaportAnualContracte(an){
+  var lista=(registreStore.contracte||[]).filter(function(r){return String(r.an)===String(an);}).sort(function(a,b){return a.nr-b.nr;});
+  if(!lista.length){alert('Nicio înregistrare pentru anul '+an+'.');return;}
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  registerPdfFont(doc);
+  var margin=16,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64];
+  doc.setFont('CrimsonPro','normal');
+  drawLetterhead(doc,margin,pageW);
+
+  doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Registru contracte — '+an,margin,y);y+=6;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(140,140,140);
+  doc.text(lista.length+' înregistrări',margin,y);y+=10;
+
+  function checkP(nevoie){if(y+nevoie>272){doc.addPage();registerPdfFont(doc);y=20;}}
+
+  lista.forEach(function(r){
+    checkP(28);
+    var tipLabel=r.tip==='contract'?'Contract':r.tip==='aditional'?'Act adițional':'Act reziliere';
+    var tipColRgb=r.tip==='contract'?[26,106,64]:r.tip==='aditional'?[31,90,154]:[160,48,48];
+    doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.3);
+    doc.line(margin,y,pageW-margin,y);y+=6;
+    doc.setFont('CrimsonPro','bold');doc.setFontSize(12.5);doc.setTextColor(tipColRgb[0],tipColRgb[1],tipColRgb[2]);
+    doc.text(serieContract(r.tip,r.nr),margin,y);
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(110,110,110);
+    doc.text(r.data||'',pageW-margin,y,{align:'right'});
+    y+=6.5;
+    doc.setFont('CrimsonPro','normal');doc.setFontSize(10);doc.setTextColor(120,120,120);
+    doc.text(tipLabel,margin,y);y+=5.5;
+    doc.setFontSize(11);doc.setTextColor(navy[0],navy[1],navy[2]);
+    if(r.parte){doc.text('Parte: '+r.parte,margin,y);y+=5.5;}
+    if(r.obiect){
+      var obiectLinii=doc.splitTextToSize(r.obiect,pageW-2*margin);
+      doc.text(obiectLinii,margin,y);y+=obiectLinii.length*5+2;
+    }
+    if(r.obs){
+      doc.setFont('CrimsonPro','italic');doc.setFontSize(9.5);doc.setTextColor(130,130,130);
+      var obsLinii=doc.splitTextToSize('Obs: '+r.obs,pageW-2*margin);
+      doc.text(obsLinii,margin,y);y+=obsLinii.length*4.5+2;
+    }
+    y+=3;
+  });
+
+  drawFooter(doc,margin,pageW);
+  outputPdf(doc,'registru_contracte_'+an+'.pdf',__pdfTab);
 }
 
 function saveCorespondenta(nr){
