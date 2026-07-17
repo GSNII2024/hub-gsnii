@@ -2181,6 +2181,11 @@ var TAX_RATE_IMPOZIT=0.10;
 
 // Formatare monetară: două zecimale + separator de mii (stil românesc).
 function moneyRO(n){
+  // Rotunjire standard: sub 0,5 în jos, de la 0,5 în sus (Math.round face exact asta)
+  return Math.round(parseFloat(n)||0).toLocaleString('ro-RO')+' lei';
+}
+// Variantă cu 2 zecimale — folosită doar la venit brut, cheltuieli și venit net
+function moneyRO2(n){
   return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' lei';
 }
 
@@ -2304,8 +2309,8 @@ function actualizeazaRezultateTaxe(){
   function randSimplu(nume,val){
     return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(7,33,68,0.06);font-size:13px"><span style="color:rgba(7,33,68,0.6)">'+nume+'</span><span style="font-weight:600;color:var(--navy)">'+moneyRO(val)+'</span></div>';
   }
-  function randRezultat(nume,val,evidentiat){
-    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(7,33,68,0.08);font-size:14.5px'+(evidentiat?';font-weight:700':'')+'"><span>'+nume+'</span><span style="font-weight:700;color:var(--navy)">'+moneyRO(val)+'</span></div>';
+  function randRezultat(nume,val,evidentiat,cuZecimale){
+    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(7,33,68,0.08);font-size:14.5px'+(evidentiat?';font-weight:700':'')+'"><span>'+nume+'</span><span style="font-weight:700;color:var(--navy)">'+(cuZecimale?moneyRO2(val):moneyRO(val))+'</span></div>';
   }
   function randFormula(text){
     return '<div style="font-size:11.5px;color:rgba(7,33,68,0.45);margin:6px 0 2px">'+text+'</div>';
@@ -2324,19 +2329,19 @@ function actualizeazaRezultateTaxe(){
   if(rezEl){
     rezEl.innerHTML=
       '<div class="doc-cat-header" style="cursor:default"><i class="ti ti-report-money"></i> <span>Rezultate</span></div>'
-      +randRezultat('Venit brut',calc.venitBrut)
-      +randRezultat('Cheltuieli deductibile',calc.cheltuieliDeductibile)
-      +randRezultat('Venit net',calc.venitNet)
+      +randRezultat('Venit brut',calc.venitBrut,false,true)
+      +randRezultat('Cheltuieli deductibile',calc.cheltuieliDeductibile,false,true)
+      +randRezultat('Venit net',calc.venitNet,false,true)
 
-      +randFormula('CASS — bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS)
-      +randRezultat('CASS',calc.cass)
+      +randFormula('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS)
+      +randRezultat('Contribuția de asigurări sociale de sănătate (CASS)',calc.cass)
 
-      +randFormula('CAS — bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS)
-      +randRezultat('CAS',calc.cas)
+      +randFormula('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS)
+      +randRezultat('Contribuția de asigurări sociale (CAS)',calc.cas)
 
-      +randFormula('Bază impozabilă = Venit net − CASS deductibil ('+moneyRO(calc.cassDeductibil)+') − CAS')
+      +randFormula('Bază impozabilă = Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS')
       +randRezultat('Bază impozabilă',calc.bazaImpozabila)
-      +randRezultat('Impozit (10%)',calc.impozit)
+      +randRezultat('Impozit pe venit (impozit)',calc.impozit)
       +randRezultat('Total taxe',calc.getTotalTaxe(),true)
 
       +'<div style="margin-top:16px;padding:18px;background:rgba(34,120,80,0.1);border:1px solid rgba(34,120,80,0.25);border-radius:12px;text-align:center">'
@@ -2365,10 +2370,10 @@ function genereazaRaportTaxePFA(){
   doc.setFont('CrimsonPro','normal');doc.setFontSize(10.5);doc.setTextColor(140,140,140);
   doc.text('Generat: '+todayRo()+'  ·  Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=10;
 
-  function linie(nume,val,bold){
+  function linie(nume,val,bold,cuZecimale){
     doc.setFont('CrimsonPro',bold?'bold':'normal');doc.setFontSize(11.5);doc.setTextColor(navy[0],navy[1],navy[2]);
     doc.text(nume,margin,y);
-    doc.text(moneyRO(val),pageW-margin,y,{align:'right'});
+    doc.text(cuZecimale?moneyRO2(val):moneyRO(val),pageW-margin,y,{align:'right'});
     y+=7;
   }
   function nota(text){
@@ -2382,20 +2387,20 @@ function genereazaRaportTaxePFA(){
     doc.line(margin,y,pageW-margin,y);y+=7;
   }
 
-  linie('Venit brut',calc.venitBrut);
-  linie('Cheltuieli deductibile',calc.cheltuieliDeductibile);
-  linie('Venit net',calc.venitNet,true);
+  linie('Venit brut',calc.venitBrut,false,true);
+  linie('Cheltuieli deductibile',calc.cheltuieliDeductibile,false,true);
+  linie('Venit net',calc.venitNet,true,true);
   separator();
 
-  nota('CASS — bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS);
-  linie('CASS',calc.cass);
+  nota('Bază de calcul: '+moneyRO(calc.baseCASS)+' · '+calc.formulaCASS);
+  linie('Contribuția de asigurări sociale de sănătate (CASS)',calc.cass);
 
-  nota('CAS — bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS);
-  linie('CAS',calc.cas);
+  nota('Bază de calcul: '+moneyRO(calc.baseCAS)+' · '+calc.formulaCAS);
+  linie('Contribuția de asigurări sociale (CAS)',calc.cas);
 
-  nota('Bază impozabilă = Venit net − CASS deductibil ('+moneyRO(calc.cassDeductibil)+') − CAS');
+  nota('Bază impozabilă = Venit net - CASS deductibil ('+moneyRO(calc.cassDeductibil)+') - CAS');
   linie('Bază impozabilă',calc.bazaImpozabila);
-  linie('Impozit (10%)',calc.impozit);
+  linie('Impozit pe venit (impozit)',calc.impozit);
   separator();
 
   linie('Total taxe',calc.getTotalTaxe(),true);
