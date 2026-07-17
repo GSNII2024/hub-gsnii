@@ -2219,11 +2219,11 @@ TaxCalculatorPFA.prototype._calculeazaCASS=function(){
     if(this.alteVenituri6Salarii){
       this.baseCASS=vn;
       this.cass=TAX_RATE_CASS*vn;
-      this.formulaCASS='10% din venitul net (are alte venituri ≥ 6 salarii)';
+      this.formulaCASS='10% din venitul net (alte venituri ≥ 6 salarii)';
     }else{
       this.baseCASS=this.plafon6;
       this.cass=TAX_RATE_CASS*this.plafon6;
-      this.formulaCASS='10% din 6 salarii minime (nu are alte venituri ≥ 6 salarii)';
+      this.formulaCASS='10% din 6 salarii minime (nu alte venituri ≥ 6 salarii)';
     }
     return;
   }
@@ -2368,7 +2368,7 @@ function genereazaRaportTaxePFA(){
   doc.setFont('CrimsonPro','bold');doc.setFontSize(18);doc.setTextColor(navy[0],navy[1],navy[2]);
   doc.text('Calculator taxe PFA',margin,y);y+=6;
   doc.setFont('CrimsonPro','normal');doc.setFontSize(10.5);doc.setTextColor(140,140,140);
-  doc.text('Generat: '+todayRo()+'  ·  Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=10;
+  doc.text('Salariu minim brut folosit: '+moneyRO(s.salariuMinim),margin,y);y+=10;
 
   function linie(nume,val,bold,cuZecimale){
     doc.setFont('CrimsonPro',bold?'bold':'normal');doc.setFontSize(11.5);doc.setTextColor(navy[0],navy[1],navy[2]);
