@@ -3949,10 +3949,13 @@ function clientSubLine(c){return clean(c.firma)?(c.nume||'\u2014'):'Persoan\u010
 function duKey(clientId,year){return clientId+'_'+year;}
 function getDuRecord(clientId,year){
   var v=duStore[duKey(clientId,year)];
-  if(!v)return {status:'nedepusa',obs:'',dataDep:''};
-  if(typeof v==='string')return {status:v,obs:'',dataDep:''};
-  return {status:v.status||'nedepusa',obs:v.obs||'',dataDep:v.dataDep||''};
+  if(!v)return {status:'nedepusa',obs:'',dataDep:'',exclus:false};
+  if(typeof v==='string')return {status:v,obs:'',dataDep:'',exclus:false};
+  return {status:v.status||'nedepusa',obs:v.obs||'',dataDep:v.dataDep||'',exclus:!!v.exclus};
 }
+// Excludere DIN LISTA DU, valabilă STRICT pentru anul respectiv — un client
+// scos din DU pe 2024 rămâne, implicit, în lista pe 2025 și anii următori.
+function isDuExcludedYear(clientId,year){return !!getDuRecord(clientId,year).exclus;}
 function getDuStatus(clientId,year){return getDuRecord(clientId,year).status;}
 function setDuRecord(clientId,year,fields){
   var rec=getDuRecord(clientId,year);
@@ -4314,8 +4317,9 @@ function setDuFilter(f){
 }
 
 function renderDuTab(){
-  // Clienți cu bifa DU (din fișa client)
-  var tracked=clients.filter(function(c){return isDuClient(c)&&clean(c.cnp);});
+  // Clienți cu bifa DU (din fișa client), mai puțin cei scoși explicit
+  // din listă STRICT pentru anul afișat momentan (currentDuYear).
+  var tracked=clients.filter(function(c){return isDuClient(c)&&clean(c.cnp)&&!isDuExcludedYear(c.id,currentDuYear);});
   // Intrări manuale DU (stocate separat)
   var manualEntries=JSON.parse(localStorage.getItem('crm_du_manual_v1')||'[]');
   // Combinate
@@ -4421,6 +4425,25 @@ function renderDuTab(){
       html+='</div>';
     });
   }
+
+  // Clienți eliminați din DU STRICT pentru anul afișat — afișați colapsat,
+  // cu opțiune de readăugare, în caz de eliminare din greșeală.
+  var eliminatiAnul=clients.filter(function(c){return isDuClient(c)&&clean(c.cnp)&&isDuExcludedYear(c.id,currentDuYear);});
+  if(eliminatiAnul.length){
+    html+='<button type="button" onclick="toggleDuEliminati()" style="width:100%;text-align:center;font-size:12px;color:rgba(7,33,68,0.5);background:none;border:none;cursor:pointer;padding:10px 0;border-top:1px dashed rgba(7,33,68,0.15);margin-top:10px" id="du-eliminati-toggle" data-expanded="0">'
+      +'Eliminați din DU pe '+currentDuYear+' ('+eliminatiAnul.length+') — arată</button>';
+    html+='<div id="du-eliminati-list" style="display:none">';
+    eliminatiAnul.forEach(function(c){
+      html+='<div class="card" style="cursor:default;opacity:0.7">'
+        +'<div class="card-top"><div class="avatar">'+initials(c.nume)+'</div>'
+        +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+'</div>'
+        +'<div class="du-cnp-line">CNP: '+esc(c.cnp)+'</div></div>'
+        +'<button type="button" class="btn-add-service" style="font-size:12px" onclick="readaugaDuClient(\''+c.id+'\')"><i class="ti ti-plus"></i> Readaugă pe '+currentDuYear+'</button>'
+        +'</div></div>';
+    });
+    html+='</div>';
+  }
+
   document.getElementById('list').innerHTML=html;
   injectIcons();
   // Load DU docs for each visible entry
@@ -4544,10 +4567,28 @@ function deleteDuManual(id){
 }
 
 function removeDuClient(clientId){
-  if(!confirm('Scoți acest client din lista Declarației Unice?'))return;
-  var c=clients.find(function(x){return x.id===clientId;});
-  if(c){c.du_client='nu';save();}
+  if(!confirm('Scoți acest client din lista Declarației Unice pentru anul '+currentDuYear+'?\n\nVa rămâne prezent, ca de obicei, în lista pentru ceilalți ani.'))return;
+  setDuRecord(clientId,currentDuYear,{exclus:true});
   renderDuTab();
+}
+
+// Readaugă un client, în lista DU, STRICT pentru anul afișat momentan —
+// anulează o excludere făcută anterior din greșeală (sau intenționat, dacă
+// se răzgândește cineva).
+function readaugaDuClient(clientId){
+  setDuRecord(clientId,currentDuYear,{exclus:false});
+  renderDuTab();
+}
+
+function toggleDuEliminati(){
+  var btn=document.getElementById('du-eliminati-toggle');
+  var list=document.getElementById('du-eliminati-list');
+  if(!btn||!list)return;
+  var expanded=btn.getAttribute('data-expanded')==='1';
+  list.style.display=expanded?'none':'';
+  btn.setAttribute('data-expanded',expanded?'0':'1');
+  var count=list.querySelectorAll('.card').length;
+  btn.textContent='Eliminați din DU pe '+currentDuYear+' ('+count+') — '+(expanded?'arată':'ascunde');
 }
 
 function generateDuPDF(){
