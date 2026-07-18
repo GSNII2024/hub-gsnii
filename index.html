@@ -7768,11 +7768,12 @@ function exportFullBackup(){
   a.download='backup_hub_gsnii_'+d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  // Salvez și o copie silențioasă (local + Drive)
-  autoSaveBackup();
+  // Salvez și în Drive + Supabase, cu confirmare clară (alertă), ca să fii
+  // sigur, la apăsare, că backup-ul chiar s-a făcut peste tot.
+  autoSaveBackup(true);
 }
 
-function autoSaveBackup(){
+function autoSaveBackup(manual){
   // Salvez în IndexedDB ca backup silențios (local, rapid, offline)
   openDocDB().then(function(db){
     var tx=db.transaction('docs','readwrite');
@@ -7801,9 +7802,9 @@ function autoSaveBackup(){
     };
   }).catch(function(){/* IndexedDB nedisponibil */});
   // Salvez și în Google Drive (folderul „BackUp"), pentru siguranță pe termen lung
-  autoSaveBackupToDrive();
-  // Backup secundar, silențios, în Supabase (doar date, fără documente/poze)
-  salveazaBackupSupabase(false);
+  autoSaveBackupToDrive(manual);
+  // Backup secundar, în Supabase (doar date, fără documente/poze)
+  salveazaBackupSupabase(manual);
 }
 
 // ══ Backup secundar în Supabase — separat de Drive, doar ca plasă de
@@ -7821,17 +7822,20 @@ function salveazaBackupSupabase(manual){
   }).then(function(res){
     if(res&&res.ok){
       if(manual)alert('Backup salvat cu succes în Supabase (doar date, fără documente/poze).');
+      else aratToastDiagnostic('✅ Backup Supabase OK');
       console.log('Backup Supabase: succes');
     }else{
       return res.text().then(function(errText){
         console.error('Backup Supabase — eroare HTTP '+(res?res.status:'?')+': '+errText);
         if(manual)alert('Eroare la backup Supabase (cod '+(res?res.status:'?')+'):\n'+errText);
+        else aratToastDiagnostic('❌ Backup Supabase eșuat (cod '+(res?res.status:'?')+')');
       });
     }
     return res;
   }).catch(function(e){
     console.error('Backup Supabase — eroare rețea:',e);
     if(manual)alert('A apărut o eroare de rețea la salvarea backup-ului în Supabase: '+e.message);
+    else aratToastDiagnostic('❌ Backup Supabase — eroare rețea');
   });
 }
 
@@ -8024,13 +8028,16 @@ function autoSaveBackupToDrive(manual){
       if(res&&res.success){
         console.log('Backup Drive: succes ('+filename+')');
         if(manual)alert('Backup salvat cu succes în Drive (folderul „BackUp", fișierul „'+filename+'").');
+        else aratToastDiagnostic('✅ Backup Drive OK');
       }else{
         console.error('Backup Drive — răspuns neașteptat:',res);
         if(manual)alert('Backup Drive: răspuns neașteptat de la Google Apps Script. Verifică dacă scriptul e actualizat/publicat corect.');
+        else aratToastDiagnostic('❌ Backup Drive eșuat (răspuns neașteptat)');
       }
     }).catch(function(e){
       console.error('Backup Drive — eroare:',e);
       if(manual)alert('Eroare la backup în Drive: '+(e&&e.message?e.message:'necunoscută')+'. Verifică internetul și dacă scriptul Apps Script e activ.');
+      else aratToastDiagnostic('❌ Backup Drive — eroare rețea');
     });
   }catch(e){
     console.error('Backup Drive — eroare internă:',e);
@@ -8236,9 +8243,14 @@ function initApp(){
   document.getElementById('cnt').textContent = clients.length + ' client' + (clients.length === 1 ? '' : 'i');
   // Sync din cloud (Google Drive) la pornire
   syncFromCloud();
-  // Backup automat silențios (local + Google Drive)
+  // Backup automat silențios (local + Google Drive + Supabase)
   if(clients.length > 0){
-    setTimeout(function(){ autoSaveBackup(); }, 5000);
+    setTimeout(function(){
+      aratToastDiagnostic('🔄 Backup automat pornit...');
+      autoSaveBackup();
+    }, 5000);
+  }else{
+    console.warn('Backup automat NU a pornit: clients.length === 0 la acest moment.');
   }
   setTimeout(function(){ checkAutoBackupAge(); }, 2000);
   // iOS install banner
