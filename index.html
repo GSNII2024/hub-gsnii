@@ -3938,7 +3938,9 @@ function suggestedSoldPrecedent(clientId,month){
   });
   return Math.round(total*100)/100;
 }
-function money(n){return (parseFloat(n)||0).toFixed(2)+' lei';}
+function money(n){return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' lei';}
+// Formatare simplă (fără „lei"), pentru subtotaluri afișate direct în formulare
+function fmtNum2(n){return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function isPJ(c){return !!(clean(c.firma)&&clean(c.cui));}
 function clientTitleLine(c){return clean(c.firma)?c.firma:(c.nume||'Client');}
 function clientSubLine(c){return clean(c.firma)?(c.nume||'\u2014'):'Persoan\u0103 fizic\u0103';}
@@ -7070,7 +7072,7 @@ function recalcSvcTotals(){
     var subEl=document.querySelector('#svc-services-list .svc-subtotal[data-k="'+k+'"]');
     var qty=parseFloat(q.value)||0,price=priceEl?(parseFloat(priceEl.value)||0):0;
     var sub=qty*price;
-    if(subEl)subEl.textContent=sub.toFixed(2);
+    if(subEl)subEl.textContent=fmtNum2(sub);
     totalPJ+=sub;
   });
   document.querySelectorAll('#svc-modal-body .svc-diverse-row').forEach(function(row){
@@ -7086,7 +7088,7 @@ function recalcSvcTotals(){
     var subEl=document.querySelector('#svc-services-pf-list .svc-subtotal[data-k="'+k+'"]');
     var qty=parseFloat(q.value)||0,price=priceEl?(parseFloat(priceEl.value)||0):0;
     var sub=qty*price;
-    if(subEl)subEl.textContent=sub.toFixed(2);
+    if(subEl)subEl.textContent=fmtNum2(sub);
     totalPF+=sub;
   });
   // PF diverse manuale
