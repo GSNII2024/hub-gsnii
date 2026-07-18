@@ -109,9 +109,12 @@ body{font-family:'CrimsonPro','EB Garamond',Georgia,serif;color:var(--navy);font
 .status-btn{border:none;border-radius:20px;padding:8px 20px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
 .status-active{background:rgba(34,150,90,0.15);color:#1f8a4d}
 .status-inactive{background:rgba(200,40,40,0.12);color:#c22222}
+.status-radiat{background:rgba(178,30,30,0.18);color:#8f1d1d}
+.status-neutral{background:rgba(7,33,68,0.08);color:var(--navy)}
 .du-checkbox-label{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--navy);cursor:pointer}
 .du-checkbox-label input{width:16px;height:16px}
 .tag-inactive{background:rgba(200,40,40,0.12);color:#c22222;font-size:13px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px}
+.tag-radiat{background:rgba(178,30,30,0.18);color:#8f1d1d;font-size:13px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px}
 .du-status-pill{border:none;border-radius:14px;padding:6px 14px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
 .du-depusa{background:rgba(34,150,90,0.15);color:#1f8a4d}
 .du-nedepusa{background:rgba(200,40,40,0.12);color:#c22222}
@@ -6284,8 +6287,11 @@ function render(){
   var filtered=clients.filter(function(c){
     return keys.some(function(k){return norm(c[k]).includes(norm(q));});
   });
-  // Sort: doar alfabetic, fără să țină cont de activ/inactiv
+  // Sort: alfabetic, dar clienții radiați coboară la finalul listei
+  // (tot alfabetic între ei), sub ultimul client nefadiat.
   filtered.sort(function(a,b){
+    var rA=isRadiat(a)?1:0,rB=isRadiat(b)?1:0;
+    if(rA!==rB)return rA-rB;
     return norm(a.nume||'').localeCompare(norm(b.nume||''));
   });
   if(!filtered.length){
@@ -6309,7 +6315,7 @@ function render(){
     var avClass=worst==='exp-red'?'avatar exp':worst==='exp-orange'?'avatar soon':'avatar';
     html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
     html+='<div class="card-top"><div class="'+avClass+'">'+initials(c.nume)+'</div>';
-    html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+'</div>';
+    html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+(isRadiat(c)?'<span class="tag-radiat">Radiată</span>':'')+'</div>';
     if(firma)html+='<div class="card-firma">'+esc(firma)+'</div>';
     if(firma&&clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
     html+='</div></div>';
@@ -6336,6 +6342,7 @@ function render(){
 }
 
 function isActive(c){return !c||c.activ!=='nu';}
+function isRadiat(c){return !!(c&&c.radiat==='da');}
 function isDuClient(c){return !!(c&&c.du_client==='da');}
 
 function toggleActivStatus(){
@@ -6347,8 +6354,18 @@ function toggleActivStatus(){
   btn.className='status-btn '+(newVal==='nu'?'status-inactive':'status-active');
 }
 
+function toggleRadiatStatus(){
+  var inp=document.getElementById('f-radiat');
+  var btn=document.getElementById('f-radiat-btn');
+  var newVal=inp.value==='da'?'nu':'da';
+  inp.value=newVal;
+  btn.textContent=newVal==='da'?'Radiată':'În funcțiune';
+  btn.className='status-btn '+(newVal==='da'?'status-radiat':'status-neutral');
+}
+
 function buildForm(c){
   var activVal=c&&c.activ==='nu'?'nu':'da';
+  var radiatVal=c&&c.radiat==='da'?'da':'nu';
   var duVal=isDuClient(c);
   var topHtml='<div class="status-toggle-row">'
     +'<button type="button" id="f-activ-btn" class="status-btn '+(activVal==='nu'?'status-inactive':'status-active')+'" onclick="toggleActivStatus()">'+(activVal==='nu'?'Inactiv':'Activ')+'</button>'
@@ -6370,6 +6387,12 @@ function buildForm(c){
   var html=topHtml;
   sections.forEach(function(s){
     html+='<div class="section-title">'+s.title+'</div>';
+    if(s.title==='Firm\u0103'){
+      html+='<div class="status-toggle-row" style="margin-top:-6px;margin-bottom:14px">'
+        +'<button type="button" id="f-radiat-btn" class="status-btn '+(radiatVal==='da'?'status-radiat':'status-neutral')+'" onclick="toggleRadiatStatus()">'+(radiatVal==='da'?'Radiată':'În funcțiune')+'</button>'
+        +'<input type="hidden" id="f-radiat" value="'+radiatVal+'">'
+        +'</div>';
+    }
     var useTwo=s.fields.length===2;
     if(useTwo)html+='<div class="two-col">';
     s.fields.forEach(function(k){
@@ -7448,6 +7471,8 @@ function saveClient(){
   keys.forEach(function(k){var el=document.getElementById('f-'+k);data[k]=el?el.value.trim():(existing?(existing[k]||''):'');});
   var activEl=document.getElementById('f-activ');
   data.activ=activEl?activEl.value:(existing?(existing.activ||'da'):'da');
+  var radiatEl=document.getElementById('f-radiat');
+  data.radiat=radiatEl?radiatEl.value:(existing?(existing.radiat||'nu'):'nu');
   var duEl=document.getElementById('f-du-client');
   data.du_client=duEl?(duEl.checked?'da':'nu'):(existing?(existing.du_client||'nu'):'nu');
   var repPfEl=document.getElementById('f-spv-rep-pf');
