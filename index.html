@@ -436,6 +436,9 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
         <div class="lp-sub">0727.949.763 &nbsp;·&nbsp; contact@gsnii.ro</div>
         <div style="margin-top:4px"><span id="sync-status" style="font-size:11px;color:rgba(225,195,64,0.5);cursor:pointer" onclick="syncFromCloud()" title="Click pentru sincronizare">⚡ Se conectează...</span></div>
       </div>
+      <button onclick="openGlobalSearch()" aria-label="Căutare globală" title="Căutare globală (clienți, programări, corespondență, contracte)" style="margin-left:auto;flex-shrink:0;background:rgba(225,195,64,0.15);border:1px solid rgba(225,195,64,0.4);color:var(--gold);border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <i class="ti ti-search" style="font-size:18px"></i>
+      </button>
     </div>
     <div class="lp-body">
       <div class="lp-stats-row" id="lp-stats"></div>
@@ -630,6 +633,19 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
       <button onclick="document.getElementById('restanta-picker').style.display='none'" aria-label="Închide"><i class="ti ti-x"></i></button>
     </div>
     <div class="modal-body" id="restanta-picker-body"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="global-search-modal" style="display:none" onclick="if(event.target===this)closeGlobalSearch()">
+  <div class="modal" style="max-height:75vh">
+    <div class="modal-header">
+      <h2><i class="ti ti-search" style="margin-right:6px;vertical-align:-2px"></i>Căutare globală</h2>
+      <button onclick="closeGlobalSearch()" aria-label="Închide"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="global-search-input" placeholder="Caută nume, firmă, CUI, CNP, programare, corespondență, contract..." style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.25);border-radius:8px;padding:10px 12px;font-family:inherit;margin-bottom:12px;box-sizing:border-box" oninput="renderGlobalSearchResults(this.value)">
+      <div id="global-search-results"></div>
+    </div>
   </div>
 </div>
 
@@ -4073,13 +4089,102 @@ function updateLpStats(){
     var b=cnpToBirthdate(c.cnp);
     if(b&&nextBirthdayInfo(b).days<=7)bdayCount++;
   });
+  // Total încasat în luna curentă (calendaristică), din toate sursele —
+  // servicii clienți (PJ + PF), încasări diverse și servicii fără fișă.
+  var anCurent=now.getFullYear(),lunaCurenta=now.getMonth()+1;
+  var totalIncasatLuna=0;
+  getToateIncasarile().forEach(function(i){
+    if(i.an===anCurent&&i.luna===lunaCurenta)totalIncasatLuna+=i.suma;
+  });
   var el=document.getElementById('lp-stats');
   if(!el)return;
   el.innerHTML=
     '<div class="lp-stat" onclick="openView(\'clienti\')" style="cursor:pointer"><div class="lp-stat-val">'+clients.filter(function(c){return isActive(c);}).length+'</div><div class="lp-stat-lbl">Clienți activi</div></div>'+
+    '<div class="lp-stat" onclick="openView(\'incasari\')" style="cursor:pointer"><div class="lp-stat-val" style="font-size:15px">'+money(totalIncasatLuna)+'</div><div class="lp-stat-lbl">Încasat luna asta</div></div>'+
     (restanteCount?'<div class="lp-stat warn" onclick="openView(\'restante\')" style="cursor:pointer"><div class="lp-stat-val">'+restanteCount+'</div><div class="lp-stat-lbl">Restanțe</div></div>':'')+
     (expCount?'<div class="lp-stat warn" onclick="openView(\'expirari\')" style="cursor:pointer"><div class="lp-stat-val">'+expCount+'</div><div class="lp-stat-lbl">Expirări</div></div>':'')+
     (bdayCount?'<div class="lp-stat gold" onclick="openView(\'birthdays\')" style="cursor:pointer"><div class="lp-stat-val">'+bdayCount+'</div><div class="lp-stat-lbl">Zile de naștere</div></div>':'');
+}
+
+// ══ Căutare globală — peste Clienți, Programări, Corespondență și Contracte ══
+function openGlobalSearch(){
+  document.getElementById('global-search-modal').style.display='flex';
+  var input=document.getElementById('global-search-input');
+  input.value='';
+  document.getElementById('global-search-results').innerHTML='<div class="empty" style="padding:20px 0">Tastează cel puțin 2 caractere pentru a căuta.</div>';
+  setTimeout(function(){input.focus();},150);
+}
+function closeGlobalSearch(){document.getElementById('global-search-modal').style.display='none';}
+
+function renderGlobalSearchResults(query){
+  var container=document.getElementById('global-search-results');
+  var q=norm(query).trim();
+  if(q.length<2){container.innerHTML='<div class="empty" style="padding:20px 0">Tastează cel puțin 2 caractere pentru a căuta.</div>';return;}
+
+  var html='';
+  var rowStyle='padding:10px 12px;margin-bottom:6px;cursor:pointer';
+  var subStyle='font-size:12px;color:rgba(7,33,68,0.6)';
+
+  // Clienți
+  var matchClienti=clients.filter(function(c){
+    return norm(c.nume).includes(q)||norm(c.firma).includes(q)||norm(c.cui).includes(q)||norm(c.cnp).includes(q)||norm(c.telefon).includes(q)||norm(c.email).includes(q);
+  }).slice(0,20);
+  if(matchClienti.length){
+    html+='<div style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:1px;margin:8px 0 6px">CLIENȚI ('+matchClienti.length+')</div>';
+    matchClienti.forEach(function(c){
+      html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openEdit(\''+c.id+'\')">'
+        +'<div style="font-weight:700;color:var(--navy)">'+esc(c.nume||'—')+'</div>'
+        +(clean(c.firma)?'<div style="'+subStyle+'">'+esc(c.firma)+(clean(c.cui)?' · CUI '+esc(c.cui):'')+'</div>':'')
+        +(clean(c.cnp)?'<div style="font-size:11px;color:rgba(7,33,68,0.4)">CNP: '+esc(c.cnp)+'</div>':'')
+        +'</div>';
+    });
+  }
+
+  // Programări
+  var matchProg=(programariStore||[]).filter(function(p){
+    return norm(p.titlu).includes(q);
+  }).slice(0,10);
+  if(matchProg.length){
+    html+='<div style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:1px;margin:14px 0 6px">PROGRAMĂRI ('+matchProg.length+')</div>';
+    matchProg.forEach(function(p){
+      html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openView(\'programari\')">'
+        +'<div style="font-weight:700;color:var(--navy)">'+esc(p.titlu||'—')+'</div>'
+        +(p.data?'<div style="'+subStyle+'">'+esc(p.data)+'</div>':'')
+        +'</div>';
+    });
+  }
+
+  // Corespondență
+  var matchCor=((registreStore&&registreStore.corespondenta)||[]).filter(function(r){
+    return norm(r.expeditor).includes(q)||norm(r.destinatar).includes(q)||norm(r.obiect).includes(q);
+  }).slice(0,10);
+  if(matchCor.length){
+    html+='<div style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:1px;margin:14px 0 6px">CORESPONDENȚĂ ('+matchCor.length+')</div>';
+    matchCor.forEach(function(r){
+      html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openView(\'registre\')">'
+        +'<div style="font-weight:700;color:var(--navy)">Nr. '+esc(r.nr)+(r.obiect?' — '+esc(r.obiect):'')+'</div>'
+        +'<div style="'+subStyle+'">'+esc(r.expeditor||'')+' → '+esc(r.destinatar||'')+(r.data?' · '+esc(r.data):'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Contracte
+  var matchCt=((registreStore&&registreStore.contracte)||[]).filter(function(r){
+    return norm(r.parte).includes(q)||norm(r.obiect).includes(q)||norm(r.serie).includes(q);
+  }).slice(0,10);
+  if(matchCt.length){
+    html+='<div style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:1px;margin:14px 0 6px">CONTRACTE ('+matchCt.length+')</div>';
+    matchCt.forEach(function(r){
+      html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openView(\'registre\')">'
+        +'<div style="font-weight:700;color:var(--navy)">'+esc(r.serie||('Nr. '+r.nr))+(r.obiect?' — '+esc(r.obiect):'')+'</div>'
+        +'<div style="'+subStyle+'">'+esc(r.parte||'')+(r.data?' · '+esc(r.data):'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  if(!html){html='<div class="empty" style="padding:20px 0">Niciun rezultat pentru „'+esc(query)+'".</div>';}
+  container.innerHTML=html;
+  injectIcons();
 }
 
 function setFilter(f){
@@ -8087,6 +8192,29 @@ function aplicaActualizareSigura(){
   alert(raport.length?('Actualizate: '+raport.join(', ')+'.'):'Nimic de actualizat — datele locale erau deja la fel de complete sau mai complete.');
 }
 
+// Politică de retenție: păstrăm doar ultimele N backup-uri în Drive (folderul
+// „BackUp"), ca să nu se umple necontrolat. Ținem o listă de metadate
+// (nume fișier + dată) în același „magazin cheie-valoare" din Drive folosit
+// și pentru metadatele documentelor clienților (gdriveGet/gdriveSet).
+var MAX_BACKUPURI_DRIVE=30;
+
+function aplicaRetentieBackupDrive(filename){
+  gdriveGet('backup_files_meta').then(function(existing){
+    var lista=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+    lista.push({filename:filename,path:'BackUp/'+filename,data:new Date().toISOString()});
+    // Sortăm cronologic și păstrăm doar ultimele MAX_BACKUPURI_DRIVE
+    lista.sort(function(a,b){return (a.data||'').localeCompare(b.data||'');});
+    var deSters=[];
+    while(lista.length>MAX_BACKUPURI_DRIVE){deSters.push(lista.shift());}
+    gdriveSet('backup_files_meta',lista).catch(function(){});
+    deSters.forEach(function(item){
+      gdriveDelete(item.path).then(function(){
+        console.log('Backup vechi șters din Drive (retenție '+MAX_BACKUPURI_DRIVE+'): '+item.path);
+      }).catch(function(e){console.error('Eroare la ștergerea backup-ului vechi din Drive:',e);});
+    });
+  }).catch(function(){/* dacă metadata nu există încă, nu facem nimic — se creează la următorul backup */});
+}
+
 function autoSaveBackupToDrive(manual){
   try{
     var data=buildBackupData();
@@ -8096,7 +8224,8 @@ function autoSaveBackupToDrive(manual){
     gdriveUploadBlob('BackUp',filename,blob,'application/json').then(function(res){
       if(res&&res.success){
         console.log('Backup Drive: succes ('+filename+')');
-        if(manual)alert('Backup salvat cu succes în Drive (folderul „BackUp", fișierul „'+filename+'").');
+        aplicaRetentieBackupDrive(filename);
+        if(manual)alert('Backup salvat cu succes în Drive (folderul „BackUp", fișierul „'+filename+'"). Se păstrează automat ultimele '+MAX_BACKUPURI_DRIVE+' backup-uri.');
         else aratToastDiagnostic('✅ Backup Drive OK');
       }else{
         console.error('Backup Drive — răspuns neașteptat:',res);
@@ -9781,6 +9910,8 @@ var TABLER_ICONS = {
   "plus": `<path d="M12 5l0 14" />
   <path d="M5 12l14 0" />`,
   "receipt": `<path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2m4 -14h6m-6 4h6m-2 4h2" />`,
+  "search": `<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+  <path d="M21 21l-6 -6" />`,
   "report-money": `<path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
   <path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" />
   <path d="M14 11h-2.5a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-2.5" />
