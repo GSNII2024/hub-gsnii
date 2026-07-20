@@ -5245,8 +5245,8 @@ function renderIncasariTab(){
   var html='<div class="bday-today" style="justify-content:space-between">'
     +'<span>💰 Jurnal încasări</span>'
     +'<div style="display:flex;gap:6px">'
-    +'<button class="btn-add-service" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openAdaugaIncasare()"><i class="ti ti-plus"></i> Încasare nouă</button>'
-    +'<button class="btn-add-service" style="font-size:12px" onclick="generateIncasariPDF()">PDF</button>'
+    +'<button class="btn-add-service" style="background:var(--gold);color:var(--navy);border-color:var(--gold);font-weight:700" onclick="openAdaugaIncasare()"><i class="ti ti-plus"></i> Încasare nouă</button>'
+    +'<button class="btn-add-service" style="background:var(--gold);color:var(--navy);border-color:var(--gold);font-weight:700;font-size:12px" onclick="generateIncasariPDF()">PDF</button>'
     +'</div></div>';
 
   // Comutator mod perioadă: An/Lună (clasic) sau Interval personalizat (zi-zi)
@@ -5397,7 +5397,90 @@ function renderIncasariList(){
   injectIcons();
 }
 
-// ── Colectare toate încasările din svcStore ───────────────
+// ── Raport PDF — Jurnal încasări, pentru perioada selectată în ecran ───────────
+function generateIncasariPDF(){
+  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
+  var __pdfTab=deschideFilaGoala('Se generează raportul...');
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  var margin=18,y=42,pageW=210;
+  var navy=[7,33,68],gold=[225,195,64];
+  doc.setFont('CrimsonPro','normal');
+  registerPdfFont(doc);
+  drawLetterhead(doc,margin,pageW);
+
+  var perioadaLabel;
+  if(incasariModPerioada==='interval'){
+    perioadaLabel=(incasariFilterDataStart&&incasariFilterDataEnd)
+      ?(formatDataScurta(incasariFilterDataStart)+' \u2013 '+formatDataScurta(incasariFilterDataEnd))
+      :'Toate încasările';
+  }else{
+    var luniRoLungi=['','Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+    perioadaLabel=incasariFilterLuna>0?(luniRoLungi[incasariFilterLuna]+' '+incasariFilterAn):('Anul '+incasariFilterAn);
+  }
+
+  doc.setFontSize(20);doc.setTextColor(navy[0],navy[1],navy[2]);doc.setFont('CrimsonPro','bold');
+  doc.text('Jurnal \u00eencas\u0103ri \u2013 '+perioadaLabel,margin,y);y+=8;doc.setFont('CrimsonPro','normal');
+
+  var toate=getToateIncasarile().filter(incasareInPerioada);
+  toate.sort(function(a,b){
+    var da=(a.data||'').split('.').reverse().join('');
+    var db=(b.data||'').split('.').reverse().join('');
+    return da.localeCompare(db);
+  });
+
+  var totalIncasat=0,totalVirament=0,totalNumerar=0;
+  toate.forEach(function(i){
+    totalIncasat+=i.suma;
+    if(i.tip==='virament')totalVirament+=i.suma;
+    if(i.tip==='numerar')totalNumerar+=i.suma;
+  });
+
+  function checkPage(){if(y>272){doc.addPage();y=20;registerPdfFont(doc);}}
+
+  checkPage();
+  doc.setFontSize(11);doc.setTextColor(130,130,130);doc.setFont('CrimsonPro','bold');
+  doc.text('DATA',margin,y);
+  doc.text('CLIENT',margin+22,y);
+  doc.text('TIP',margin+122,y);
+  doc.text('SUM\u0102',pageW-margin,y,{align:'right'});
+  y+=2;doc.setDrawColor(200,200,200);doc.setLineWidth(0.2);doc.line(margin,y,pageW-margin,y);y+=5.5;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(12);
+
+  if(!toate.length){
+    doc.setTextColor(130,130,130);doc.setFont('CrimsonPro','italic');
+    doc.text('Nicio \u00eencasare \u00een aceast\u0103 perioad\u0103.',margin,y);y+=8;
+    doc.setFont('CrimsonPro','normal');
+  }
+
+  toate.forEach(function(i){
+    checkPage();
+    doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(i.data||'\u2014',margin,y);
+    doc.text(clientTitleLine(i.c)||'\u2014',margin+22,y,{maxWidth:95});
+    doc.text(i.tip==='numerar'?'Numerar':'Virament',margin+122,y);
+    doc.text(money(i.suma),pageW-margin,y,{align:'right'});
+    y+=6.5;
+    if(i.obs){
+      doc.setFontSize(10);doc.setTextColor(130,130,130);doc.setFont('CrimsonPro','italic');
+      doc.text('Obs: '+i.obs,margin+22,y,{maxWidth:130});
+      doc.setFont('CrimsonPro','normal');doc.setFontSize(12);
+      y+=5.5;
+    }
+  });
+
+  checkPage();
+  y+=3;doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.6);doc.line(margin,y,pageW-margin,y);y+=7;
+  doc.setFontSize(13);doc.setFont('CrimsonPro','bold');doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Total \u00eencasat:',margin,y);doc.text(money(totalIncasat),pageW-margin,y,{align:'right'});y+=6.5;
+  doc.setFont('CrimsonPro','normal');doc.setFontSize(11);doc.setTextColor(90,90,90);
+  doc.text('din care virament:',margin,y);doc.text(money(totalVirament),pageW-margin,y,{align:'right'});y+=5.5;
+  doc.text('din care numerar:',margin,y);doc.text(money(totalNumerar),pageW-margin,y,{align:'right'});y+=5.5;
+
+  drawFooter(doc,margin,pageW);
+  var numeFisier=incasariModPerioada==='interval'?'Incasari_interval':('Incasari_'+(incasariFilterLuna>0?(incasariFilterAn+'-'+pad2(incasariFilterLuna)):(''+incasariFilterAn)));
+  outputPdf(doc,numeFisier+'.pdf',__pdfTab);
+}
 function getToateIncasarile(){
   var result=[];
   Object.keys(svcStore).forEach(function(key){
