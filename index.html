@@ -9508,7 +9508,14 @@ function genereazaRaportSemnare(docId,docOverride){
       pdfDoc.setDrawColor(navy[0],navy[1],navy[2]);pdfDoc.setLineWidth(0.35);
       pdfDoc.rect(sigBoxX,sigBoxY,sigBoxW,sigBoxH);
       if(imgs[idx]){
-        try{pdfDoc.addImage(imgs[idx],'PNG',sigBoxX+1.5,sigBoxY+1.5,sigBoxW-3,sigBoxH-3,undefined,'FAST');}catch(e){}
+        try{
+          var availW=sigBoxW-3,availH=sigBoxH-3;
+          var propsImg=pdfDoc.getImageProperties(imgs[idx]);
+          var scaleImg=Math.min(availW/propsImg.width,availH/propsImg.height);
+          var drawW=propsImg.width*scaleImg,drawH=propsImg.height*scaleImg;
+          var drawX=sigBoxX+1.5+(availW-drawW)/2,drawY=sigBoxY+1.5+(availH-drawH)/2;
+          pdfDoc.addImage(imgs[idx],'PNG',drawX,drawY,drawW,drawH,undefined,'FAST');
+        }catch(e){}
       }
       y+=sigBoxH+6;
     });
