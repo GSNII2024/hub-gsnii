@@ -4806,6 +4806,13 @@ function updateLpStats(){
   var restanteCount=clients.filter(function(c){
     return clientRestanteLuni(c.id).length>0;
   }).length;
+  var numeDiverseRestante={};
+  getServiciiDiverse().forEach(function(d){
+    var total=(parseFloat(d.cantitate)||0)*(parseFloat(d.pret)||0);
+    var incasat=parseFloat(d.sumaIncasata)||0;
+    if(total-incasat>0.004)numeDiverseRestante[norm(d.nume)]=1;
+  });
+  restanteCount+=Object.keys(numeDiverseRestante).length;
   var expCount=0;
   clients.forEach(function(c){
     var dCI=daysUntil(c.exp_ci), dSediu=daysUntil(c.exp_sediu);
@@ -5416,19 +5423,37 @@ function clientTotalRestante(clientId){
 var restanteSearchQuery='';
 
 function renderRestanteTab(){
-  // Build list: only clients with at least one month with soldNou > 0
+  // Clienți cu fișă — la fel ca înainte
   var items=[];
   clients.forEach(function(c){
     var luni=clientRestanteLuni(c.id);
     if(!luni.length)return;
     var totalRestant=luni.reduce(function(s,r){return s+computeRecordTotal(r).soldNou;},0);
-    items.push({c:c,luni:luni,totalRestant:totalRestant});
+    items.push({isDivers:false,c:c,luni:luni,totalRestant:totalRestant});
   });
+  // Persoane fără fișă (Servicii → Persoană fără fișă) cu sumă neîncasată —
+  // grupate după nume, ca să apară centralizat lângă restanțele clienților.
+  var grupeDiverse={};
+  getServiciiDiverse().forEach(function(d){
+    var total=(parseFloat(d.cantitate)||0)*(parseFloat(d.pret)||0);
+    var incasat=parseFloat(d.sumaIncasata)||0;
+    var rest=total-incasat;
+    if(rest<=0.004)return;
+    var cheie=norm(d.nume);
+    if(!grupeDiverse[cheie])grupeDiverse[cheie]={nume:d.nume,entries:[]};
+    grupeDiverse[cheie].entries.push({d:d,total:total,incasat:incasat,rest:rest});
+  });
+  Object.keys(grupeDiverse).forEach(function(k){
+    var g=grupeDiverse[k];
+    var totalRestant=g.entries.reduce(function(s,e){return s+e.rest;},0);
+    items.push({isDivers:true,nume:g.nume,entries:g.entries,totalRestant:totalRestant});
+  });
+
   items.sort(function(a,b){return b.totalRestant-a.totalRestant;});
-  var sumaTotalaGenerala=items.reduce(function(s,it){return s+it.totalRestant;},0);
 
   var q=norm(restanteSearchQuery||'');
   var filteredItems=q?items.filter(function(it){
+    if(it.isDivers)return norm(it.nume).includes(q);
     return norm(it.c.nume).includes(q)||norm(it.c.firma).includes(q)||norm(it.c.cui).includes(q)||norm(it.c.cnp).includes(q);
   }):items;
   var sumaTotala=filteredItems.reduce(function(s,it){return s+it.totalRestant;},0);
@@ -5438,14 +5463,49 @@ function renderRestanteTab(){
     +'</div>';
 
   html+='<div class="bday-today" style="justify-content:space-between">'
-    +'<span><i class="ti ti-alert-triangle"></i> '+filteredItems.length+' client'+(filteredItems.length===1?'':'i')+' cu restan&#539;e</span>'
+    +'<span><i class="ti ti-alert-triangle"></i> '+filteredItems.length+' cu restan&#539;e</span>'
     +'<span style="font-weight:700">'+money(sumaTotala)+'</span></div>';
 
   items=filteredItems;
   if(!items.length){
-    html+='<div class="empty"><i class="ti ti-mood-smile"></i>'+(q?'Niciun client găsit.':'Niciun client cu sold restant.')+'</div>';
+    html+='<div class="empty"><i class="ti ti-mood-smile"></i>'+(q?'Niciun rezultat găsit.':'Niciun sold restant.')+'</div>';
   }else{
     items.forEach(function(it){
+      if(it.isDivers){
+        var gid='fd_'+norm(it.nume).replace(/[^a-z0-9]/g,'_');
+        html+='<div class="card restanta-card">';
+        html+='<div class="card-top" onclick="toggleRestantaDetail(\''+gid+'\')" style="cursor:pointer">'
+          +'<div class="avatar exp" style="background:rgba(225,195,64,0.25);color:#8a6e00">'+initials(it.nume)+'</div>'
+          +'<div style="min-width:0;flex:1">'
+          +'<div class="card-name">'+esc(it.nume)+' <span style="font-size:11px;background:rgba(225,195,64,0.2);color:#8a6e00;padding:1px 6px;border-radius:10px;margin-left:4px">fără fișă</span></div>'
+          +'<div class="card-firma">'+it.entries.length+' serviciu'+(it.entries.length===1?'':'ri')+' neîncasat'+(it.entries.length===1?'':'e')+'</div>'
+          +'</div>'
+          +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">'
+          +'<span class="exp-badge exp-red">'+money(it.totalRestant)+'</span>'
+          +'</div>'
+          +'</div>';
+        html+='<div class="restanta-detail" id="rdet-'+gid+'" style="display:none">';
+        it.entries.forEach(function(e){
+          html+='<div class="restanta-luna-row">'
+            +'<div class="restanta-luna-header">'
+            +'<span class="restanta-luna-label">'+esc(e.d.denumire||'Serviciu')+' · '+monthLabel(e.d.month)+'</span>'
+            +'<span class="exp-badge exp-red" style="font-size:11px">'+money(e.rest)+' restant</span>'
+            +'</div>'
+            +'<div class="restanta-luna-detaliu">'
+            +'<span>Total: '+money(e.total)+'</span>'
+            +'<span>Încasat: '+money(e.incasat)+'</span>'
+            +'</div>'
+            +'<div style="display:flex;gap:6px;margin-top:6px">'
+            +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:12px;background:rgba(34,120,80,0.1);color:#1a6a40;border-color:rgba(34,120,80,0.3)" '
+            +'onclick="event.stopPropagation();marcheazaServiciuFaraFisaIncasat(\''+e.d.id+'\')"><i class="ti ti-check"></i> Marchează încasat</button>'
+            +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:12px" '
+            +'onclick="event.stopPropagation();openEditServiciuFaraFisa(\''+e.d.id+'\')"><i class="ti ti-pencil"></i> Editează</button>'
+            +'</div>'
+            +'</div>';
+        });
+        html+='</div></div>';
+        return;
+      }
       html+='<div class="card restanta-card">';
       // Header client
       html+='<div class="card-top" onclick="toggleRestantaDetail(\''+it.c.id+'\')" style="cursor:pointer">'
@@ -5485,6 +5545,18 @@ function renderRestanteTab(){
   }
   document.getElementById('list').innerHTML=html;
   injectIcons();
+}
+
+// Marchează integral încasat un serviciu "fără fișă", direct din Restanțe (fără
+// să mai deschidă modalul de editare) — util pentru bifat rapid când clientul plătește.
+function marcheazaServiciuFaraFisaIncasat(id){
+  var list=getServiciiDiverse();
+  var d=list.find(function(x){return x.id===id;});
+  if(!d)return;
+  d.sumaIncasata=(parseFloat(d.cantitate)||0)*(parseFloat(d.pret)||0);
+  d.dataIncasare=d.dataIncasare||todayRo();
+  saveServiciiDiverse(list);
+  renderRestanteTab();
 }
 
 // Deschide direct formularul de încasare (același din tab-ul Încasări), cu
@@ -7433,15 +7505,17 @@ function renderServiciiList(){
 
 function openAddServiciuFaraFisa(){
   svcDiverseTipIncasare='virament';
+  svcDiverseAchitatIntegral=true;
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:12px">Persoană fără fișă — '+monthLabel(currentServiceMonth)+'</div>'
     +'<div class="field"><label>Nume</label><input type="text" id="svc-diverse-nume" placeholder="Nume și prenume"></div>'
     +'<div class="field"><label>Denumire serviciu</label><input type="text" id="svc-diverse-denumire" placeholder="ex: Consultanță"></div>'
     +'<div style="display:flex;gap:8px">'
-    +'<div class="field" style="flex:1"><label>Cantitate</label><input type="number" id="svc-diverse-cant" value="1" min="0" step="1"></div>'
-    +'<div class="field" style="flex:1"><label>Preț unitar</label><input type="number" id="svc-diverse-pret" value="0" min="0" step="0.01"></div>'
+    +'<div class="field" style="flex:1"><label>Cantitate</label><input type="number" id="svc-diverse-cant" value="1" min="0" step="1" oninput="svcDiverseRecalcIncasat()"></div>'
+    +'<div class="field" style="flex:1"><label>Preț unitar</label><input type="number" id="svc-diverse-pret" value="0" min="0" step="0.01" oninput="svcDiverseRecalcIncasat()"></div>'
     +'</div>'
-    +'<div class="field"><label>Sumă încasată (opțional)</label><input type="number" id="svc-diverse-incasat" value="0" min="0" step="0.01"></div>'
+    +'<button type="button" id="svc-diverse-achitat-btn" class="status-btn" style="width:100%;margin-bottom:10px;background:rgba(34,120,80,0.15);color:#1a6a40" onclick="toggleSvcDiverseAchitat()">✔ Încasat integral pe loc</button>'
+    +'<div class="field" id="svc-diverse-incasat-wrap" style="display:none"><label>Sumă încasată (parțial)</label><input type="number" id="svc-diverse-incasat" value="0" min="0" step="0.01"></div>'
     +'<div class="field"><label>Data încasării</label><input type="text" id="svc-diverse-data" value="'+todayRo()+'" placeholder="zz.ll.aaaa"></div>'
     +'<div style="display:flex;gap:4px;margin-bottom:12px">'
     +'<button type="button" id="svc-diverse-tip-vir" onclick="setSvcDiverseTip(&quot;virament&quot;)" style="flex:1;font-size:12px;padding:6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit">🏦 Virament</button>'
@@ -7457,6 +7531,26 @@ function openAddServiciuFaraFisa(){
 }
 
 var svcDiverseTipIncasare='virament';
+// Implicit, un "serviciu fără fișă" e o prestație ocazională plătită pe loc —
+// de-asta suma încasată e sincronizată automat cu cantitate×preț, ca să nu mai
+// rămână la 0 (nenumărată în totaluri/Încasări) doar pentru că nu s-a completat
+// separat un al doilea câmp cu aceeași valoare.
+var svcDiverseAchitatIntegral=true;
+function toggleSvcDiverseAchitat(){
+  svcDiverseAchitatIntegral=!svcDiverseAchitatIntegral;
+  var btn=document.getElementById('svc-diverse-achitat-btn');
+  var wrap=document.getElementById('svc-diverse-incasat-wrap');
+  if(btn){
+    btn.textContent=svcDiverseAchitatIntegral?'✔ Încasat integral pe loc':'Încasat parțial / neîncasat';
+    btn.style.background=svcDiverseAchitatIntegral?'rgba(34,120,80,0.15)':'rgba(7,33,68,0.08)';
+    btn.style.color=svcDiverseAchitatIntegral?'#1a6a40':'var(--navy)';
+  }
+  if(wrap)wrap.style.display=svcDiverseAchitatIntegral?'none':'block';
+}
+function svcDiverseRecalcIncasat(){
+  // Doar afișaj — suma reală se calculează la salvare; aici nu e nimic de făcut
+  // vizual când e "încasat integral" (nu există câmp separat de sincronizat).
+}
 function setSvcDiverseTip(tip){
   svcDiverseTipIncasare=tip;
   var vir=document.getElementById('svc-diverse-tip-vir'),card=document.getElementById('svc-diverse-tip-num');
@@ -7471,7 +7565,7 @@ function salveazaServiciuFaraFisa(){
   var denumire=(document.getElementById('svc-diverse-denumire').value||'').trim();
   var cant=parseFloat(document.getElementById('svc-diverse-cant').value)||0;
   var pret=parseFloat(document.getElementById('svc-diverse-pret').value)||0;
-  var incasat=parseFloat(document.getElementById('svc-diverse-incasat').value)||0;
+  var incasat=svcDiverseAchitatIntegral?(cant*pret):(parseFloat(document.getElementById('svc-diverse-incasat').value)||0);
   var dataIncasare=(document.getElementById('svc-diverse-data').value||'').trim()||todayRo();
   var obs=(document.getElementById('svc-diverse-obs').value||'').trim();
   if(!nume){alert('Introdu numele persoanei.');return;}
