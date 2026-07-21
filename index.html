@@ -3525,13 +3525,15 @@ function preproceseazaImaginePentruOcr(dataUrl){
   });
 }
 // Rulează Tesseract cu setări potrivite pentru documente cu text dispersat/dens
-// (act de identitate, certificat) — modul implicit e gândit pentru pagini de
-// carte, nu pentru câmpuri scurte împrăștiate pe card.
+// (act de identitate, certificat) — PSM 6 ("bloc uniform de text") s-a dovedit,
+// pe teste cu CI-uri reale, mult mai bun decât modul 11 ("sparse text"): acesta
+// din urmă fragmentează liniile card-etichetă/valoare și distruge structura de
+// care depinde extragerea pe regex de mai jos.
 function ocrRecognizeCuSetari(dataUrl,onProgress){
   var worker;
   return Tesseract.createWorker('ron',1,{logger:onProgress}).then(function(w){
     worker=w;
-    return worker.setParameters({tessedit_pageseg_mode:'11'});
+    return worker.setParameters({tessedit_pageseg_mode:'6'});
   }).then(function(){
     return worker.recognize(dataUrl);
   }).then(function(result){
@@ -3618,6 +3620,10 @@ function ocrValoareDupaEticheta(linii,regexEticheta){
     var m=normLinie.match(regexEticheta);
     if(m){
       var valoare=linii[i].slice(m.index+m[0].length).replace(/^[\s:\/\-]+/,'').trim();
+      // Cartea de identitate are etichete trilingve (ex. "Emisă de/Delivree par/Issued
+      // by"); dacă ce rămâne pe rând e tot eticheta (în franceză/engleză), nu e valoarea
+      // reală — sărim pe rândul următor, unde e datele efective.
+      if(valoare&&/delivree|issued|validit|naissan|nationalit|adress|\bnom\b|prenom/i.test(valoare))valoare='';
       if(valoare)return valoare;
       if(linii[i+1]&&linii[i+1].trim())return linii[i+1].trim();
     }
@@ -3646,13 +3652,23 @@ function extrageCampuriCI(text){
 
   var nume=ocrValoareDupaEticheta(linii,/\bnume\b[^a-z]*(nom)?[^a-z]*(last\s*name)?/);
   var prenume=ocrValoareDupaEticheta(linii,/\bprenume\b[^a-z]*(prenom)?[^a-z]*(first\s*name)?/);
-  var domiciliu=ocrValoareDupaEticheta(linii,/domiciliu[a-z]*[^a-z]*(adresse)?[^a-z]*(address)?/);
+  var domiciliu=ocrValoareDupaEticheta(linii,/domic[il]{2,4}u[a-z]*[^a-z]*(adresse)?[^a-z]*(address)?/);
   var locNasterii=ocrValoareDupaEticheta(linii,/locul\s*nasteri[a-z]*|loc\s*nastere/);
   var eliberatDeRaw=ocrValoareDupaEticheta(linii,/eliberat[a]?\s*de|emis[a]?\s*de/);
-  var eliberatDe=eliberatDeRaw.replace(/\s*la\s*data\s*de\s*:?\s*\d{2}[.\-\/]\d{2}[.\-\/]\d{4}.*$/i,'').trim();
+  // "SPCLEP <oraș>" e un ancoră mult mai sigură decât eticheta trilingvă de mai sus
+  // (care pe multe scanări rămâne lipită de "Delivree par/Issued by" pe același rând
+  // sau de data emiterii) — o folosim ca prioritate dacă apare oriunde în text.
+  var spclepMatch=t.match(/SPCLEP[^\n\d]*/i);
+  if(spclepMatch)eliberatDeRaw=spclepMatch[0];
+  var eliberatDe=eliberatDeRaw
+    .replace(/\s*la\s*data\s*de\s*:?\s*\d{2}[.\-\/]\d{2}[.\-\/]\d{4}.*$/i,'')
+    .replace(/\s*\d{2}[.\-\/]\d{2}[.\-\/]\d{4}.*$/,'') // taie o dată rămasă lipită (ex. "SPCLEP Zalău 08.09.21-...")
+    .trim();
 
   // Pot exista 2 date pe card: data eliberării și data expirării/valabilității.
-  var toateDatele=t.match(/\d{2}[.\-\/]\d{2}[.\-\/]\d{4}/g)||[];
+  // Cartea de identitate scrie de regulă data eliberării cu an pe 2 cifre și
+  // valabilitatea cu an pe 4 cifre (ex. 08.09.21-17.10.2028) — acceptăm ambele.
+  var toateDatele=t.match(/\d{2}[.\-\/]\d{2}[.\-\/]\d{2,4}/g)||[];
   var dataEliberarii=toateDatele[0]||'';
   var dataValabilitate=toateDatele[1]||'';
 
