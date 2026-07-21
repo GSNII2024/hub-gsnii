@@ -501,6 +501,12 @@ input,textarea,select{touch-action:manipulation;-webkit-tap-highlight-color:tran
           </div>
           <div><div class="lp-card-title">Registre</div><div class="lp-card-sub">Corespondență &amp; Contracte</div></div>
         </button>
+        <button class="lp-card" onclick="openView('dosare_onrc')">
+          <div class="lp-card-icon" style="background:rgba(225,195,64,0.18);color:var(--navy)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l18 0"/><path d="M9 8l1 0"/><path d="M9 12l1 0"/><path d="M9 16l1 0"/><path d="M14 8l1 0"/><path d="M14 12l1 0"/><path d="M14 16l1 0"/><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16"/></svg>
+          </div>
+          <div><div class="lp-card-title">Dosare ONRC</div><div class="lp-card-sub">Urmărire dosare Registrul Comerțului</div></div>
+        </button>
         <button class="lp-card" onclick="openView('du')">
           <div class="lp-card-icon" style="background:rgba(34,120,90,0.12);color:#1a7a45"><i class="ti ti-clipboard-check"></i></div>
           <div><div class="lp-card-title">Declarație Unică</div><div class="lp-card-sub">Status depunere DU</div></div>
@@ -2183,7 +2189,7 @@ if(!clients){
 
 var svcStore=JSON.parse(localStorage.getItem('crm_servicii_v1')||'{}');
 var duStore=JSON.parse(localStorage.getItem('crm_du_v1')||'{}');
-var registreStore=JSON.parse(localStorage.getItem('crm_registre_v1')||'{"corespondenta":[],"contracte":[]}');
+var registreStore=JSON.parse(localStorage.getItem('crm_registre_v1')||'{"corespondenta":[],"contracte":[],"dosare_onrc":[]}');
 function saveRegistre(){
   localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));
   sbSet('registre',registreStore).then(function(){setSyncStatus(true,'Registre sincronizate');}).catch(function(){setSyncStatus(false,'Eroare sync registre — verifică internetul');});
@@ -2193,6 +2199,16 @@ function getNextNrCorespondenta(){
   if(!list.length)return 1;
   return Math.max.apply(null,list.map(function(r){return r.nr||0;}))+1;
 }
+function getNextNrDosarOnrc(){
+  var list=registreStore.dosare_onrc||[];
+  if(!list.length)return 1;
+  return Math.max.apply(null,list.map(function(r){return r.nr||0;}))+1;
+}
+var ORC_JUDETE=['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brașov','Brăila','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
+function orcJudetOptions(){
+  return ORC_JUDETE.map(function(j){return '<option value="ORC '+j+'">';}).join('');
+}
+
 function importaContracte2026(){
   if(!confirm('Importă cele 23 de contracte din 2026 (GSNII/C/26001-26023)?'))return;
   var noi=[{"nr": 26001, "an": 2026, "tip": "contract", "serie": "GSNII/C/26001", "data": "09.01.2026", "parte": "MIHALY BARBARA ERIKA PERSOANĂ FIZICĂ AUTORIZATĂ (BODA BARBARA-ERIKA PERSOANĂ FIZICĂ AUTORIZATĂ)", "obiect": "Actualizare CAEN, Schimbare Denumire, etc", "obs": ""}, {"nr": 26002, "an": 2026, "tip": "contract", "serie": "GSNII/C/26002", "data": "17.01.2026", "parte": "SZABÓ RENÁTA-TÜNDE", "obiect": "Înființare PFA + D.U.", "obs": ""}, {"nr": 26003, "an": 2026, "tip": "contract", "serie": "GSNII/C/26003", "data": "24.01.2026", "parte": "DEAY COM SRL", "obiect": "Actualizare CAEN, Schimbare sediu, majorare capital social", "obs": ""}, {"nr": 26004, "an": 2026, "tip": "contract", "serie": "GSNII/C/26004", "data": "31.01.2026", "parte": "TOLNAI LUKÁCS PFA", "obiect": "Înscriere mențiuni", "obs": ""}, {"nr": 26005, "an": 2026, "tip": "contract", "serie": "GSNII/C/26005", "data": "07.02.2026", "parte": "BARTA NIKOLETTA-JUSZTINA", "obiect": "Înființare PFA + D.U.", "obs": ""}, {"nr": 26006, "an": 2026, "tip": "contract", "serie": "GSNII/C/26006", "data": "16.02.2026", "parte": "KINETOMED FACILITY SRL", "obiect": "Schimbare sediu, Cesiune părți sociale, etc", "obs": ""}, {"nr": 26007, "an": 2026, "tip": "contract", "serie": "GSNII/C/26007", "data": "21.02.2026", "parte": "BODA MÁTÉ-TIBOR", "obiect": "Înființare Î.I. + D.U.", "obs": ""}, {"nr": 26008, "an": 2026, "tip": "contract", "serie": "GSNII/C/26008", "data": "21.02.2026", "parte": "BARTA NIKOLETTA-JUSZTINA PFA", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26009, "an": 2026, "tip": "contract", "serie": "GSNII/C/26009", "data": "04.03.2026", "parte": "NAGY BRIGITTA-KRISZTA PFA", "obiect": "Consultanță, Secretariat etc", "obs": ""}, {"nr": 26010, "an": 2026, "tip": "contract", "serie": "GSNII/C/26010", "data": "07.03.2026", "parte": "BODA MÁTÉ-TIBOR Î.I.", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26011, "an": 2026, "tip": "contract", "serie": "GSNII/C/26011", "data": "14.03.2026", "parte": "SÓLYOM FERENC", "obiect": "Înmatriculare SRL", "obs": ""}, {"nr": 26012, "an": 2026, "tip": "contract", "serie": "GSNII/C/26012", "data": "15.03.2026", "parte": "GOMBOS ERZSÉBET", "obiect": "Înscriere mențiuni ONRC", "obs": ""}, {"nr": 26013, "an": 2026, "tip": "contract", "serie": "GSNII/C/26013", "data": "31.03.2026", "parte": "TĂMĂȘAN TUDOR-ANDREI", "obiect": "Înmatriculare SRL", "obs": ""}, {"nr": 26014, "an": 2026, "tip": "contract", "serie": "GSNII/C/26014", "data": "27.04.2026", "parte": "BONE-SZILÁGYI ANETT-ANNA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26015, "an": 2026, "tip": "contract", "serie": "GSNII/C/26015", "data": "13.05.2026", "parte": "GÁL HENRIETTA-ERIKA", "obiect": "Înființare P.F.A.+ D.U.", "obs": ""}, {"nr": 26016, "an": 2026, "tip": "contract", "serie": "GSNII/C/26016", "data": "13.05.2026", "parte": "BONE-SZILÁGYI ANETT-ANNA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26017, "an": 2026, "tip": "contract", "serie": "GSNII/C/26017", "data": "23.05.2026", "parte": "SZEGEDI KALUDIA-ERIKA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26018, "an": 2026, "tip": "contract", "serie": "GSNII/C/26018", "data": "07.06.2026", "parte": "GÁL HENRIETTA-ERIKA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26019, "an": 2026, "tip": "contract", "serie": "GSNII/C/26019", "data": "13.06.2026", "parte": "SZEGEDI KALUDIA-ERIKA PFA", "obiect": "Consultanță, Secretariat,  mențiuni ONRC etc", "obs": ""}, {"nr": 26020, "an": 2026, "tip": "contract", "serie": "GSNII/C/26020", "data": "13.06.2026", "parte": "BUŞECAN IONUŢ-LUCIAN", "obiect": "Înființare P.F.A.", "obs": ""}, {"nr": 26021, "an": 2026, "tip": "contract", "serie": "GSNII/C/26021", "data": "13.06.2026", "parte": "INCZE BRIGHITA", "obiect": "Consultanță, Secretariat, mențiuni ONRC, etc", "obs": ""}, {"nr": 26022, "an": 2026, "tip": "contract", "serie": "GSNII/C/26022", "data": "20.06.2026", "parte": "GAL TAMARA", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}, {"nr": 26023, "an": 2026, "tip": "contract", "serie": "GSNII/C/26023", "data": "27.06.2026", "parte": "TOLNAI KETRIN", "obiect": "Înființare P.F.A. + D.U.", "obs": ""}];
@@ -3169,8 +3185,8 @@ function syncFromCloud(){
     // ── registre (obiect cu 2 liste) ──
     if(results[10]){
       var rg=typeof results[10]==='string'?JSON.parse(results[10]):results[10];
-      var rgCount=rg?((rg.corespondenta||[]).length+(rg.contracte||[]).length):0;
-      var localRgCount=(registreStore.corespondenta||[]).length+(registreStore.contracte||[]).length;
+      var rgCount=rg?((rg.corespondenta||[]).length+(rg.contracte||[]).length+(rg.dosare_onrc||[]).length):0;
+      var localRgCount=(registreStore.corespondenta||[]).length+(registreStore.contracte||[]).length+(registreStore.dosare_onrc||[]).length;
       if(rgCount>0){
         if(rgCount<localRgCount){avertismente.push('registre');}
         else{registreStore=rg;localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));changed=true;}
@@ -3239,12 +3255,14 @@ var ocrTip='pf'; // 'pf' (persoană fizică) | 'pj' (firmă) | 'combinat' (firm�
 var ocrTipFirma='ii'; // 'ii' (Î.I./PFA) | 'srl'
 var ocrFiles={ci:null,cert:null,ciRep:null}; // {dataUrl,name} per slot
 var ocrExtracted={}; // câmpurile extrase (editabile de utilizator)
+var ocrRawTexts={}; // textul brut citit de Tesseract, per slot — afișat pentru verificare/depanare
 var ocrWorking=false;
 
 function setOcrTip(tip){
   ocrTip=tip;
   ocrFiles={ci:null,cert:null,ciRep:null};
   ocrExtracted={};
+  ocrRawTexts={};
   renderOcrTab();
 }
 function setOcrTipFirma(tip){
@@ -3293,6 +3311,18 @@ function renderOcrTab(){
     +'<div id="ocr-progress-label" style="font-size:12px;color:rgba(7,33,68,0.5);margin-top:4px;text-align:center">Se preg\u0103te\u0219te\u2026</div>'
     +'</div>';
 
+  var sloturiCuText=Object.keys(ocrRawTexts);
+  if(sloturiCuText.length){
+    var etichetaSlot={ci:'Carte de identitate',cert:'Certificat'};
+    html+='<details style="margin-bottom:14px;border:1px dashed rgba(7,33,68,0.25);border-radius:8px;padding:8px 12px">'
+      +'<summary style="cursor:pointer;font-size:12.5px;color:rgba(7,33,68,0.6);font-weight:600">\ud83d\udd0d Vezi textul brut citit de OCR (util dac\u0103 lipsesc c\u00e2mpuri)</summary>';
+    sloturiCuText.forEach(function(slot){
+      html+='<div style="margin-top:8px"><div style="font-size:11.5px;font-weight:700;color:rgba(7,33,68,0.5);margin-bottom:3px">'+(etichetaSlot[slot]||slot)+'</div>'
+        +'<textarea readonly style="width:100%;box-sizing:border-box;min-height:110px;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.15);font-family:monospace;font-size:11.5px;color:rgba(7,33,68,0.75);background:rgba(7,33,68,0.02)">'+esc(ocrRawTexts[slot])+'</textarea></div>';
+    });
+    html+='</details>';
+  }
+
   html+='<div id="ocr-fields-form"></div>';
   html+='<div id="ocr-result"></div>';
 
@@ -3328,6 +3358,7 @@ function ocrUploadSlotHtml(key,label,fileInfo){
 function ocrStergeFisier(key){
   ocrFiles[key]=null;
   ocrExtracted={};
+  ocrRawTexts={};
   renderOcrTab();
 }
 
@@ -3458,6 +3489,59 @@ function selecteazaDocPicker(pathEnc,name,mimeType){
   });
 }
 
+// Îmbunătățește acuratețea OCR: transformă poza în alb-negru cu contrast
+// crescut (util mai ales pentru poze făcute cu telefonul, cu lumină inegală).
+function preproceseazaImaginePentruOcr(dataUrl){
+  return new Promise(function(resolve){
+    var gata=false;
+    function finalizeaza(rez){if(gata)return;gata=true;resolve(rez);}
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var canvas=document.createElement('canvas');
+        var maxW=1800;
+        var scale=Math.min(1,maxW/img.width);
+        canvas.width=Math.round(img.width*scale);
+        canvas.height=Math.round(img.height*scale);
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        var imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+        var d=imgData.data;
+        for(var i=0;i<d.length;i+=4){
+          var gray=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+          gray=(gray-128)*1.35+128; // contrast usor crescut
+          gray=gray<0?0:(gray>255?255:gray);
+          d[i]=d[i+1]=d[i+2]=gray;
+        }
+        ctx.putImageData(imgData,0,0);
+        finalizeaza(canvas.toDataURL('image/png'));
+      }catch(e){finalizeaza(dataUrl);}
+    };
+    img.onerror=function(){finalizeaza(dataUrl);};
+    img.src=dataUrl;
+    // Plasă de siguranță: dacă imaginea nu se încarcă din vreun motiv (fișier
+    // corupt, browser neobișnuit), nu blocăm la nesfârșit — continuăm cu originalul.
+    setTimeout(function(){finalizeaza(dataUrl);},6000);
+  });
+}
+// Rulează Tesseract cu setări potrivite pentru documente cu text dispersat/dens
+// (act de identitate, certificat) — modul implicit e gândit pentru pagini de
+// carte, nu pentru câmpuri scurte împrăștiate pe card.
+function ocrRecognizeCuSetari(dataUrl,onProgress){
+  var worker;
+  return Tesseract.createWorker('ron',1,{logger:onProgress}).then(function(w){
+    worker=w;
+    return worker.setParameters({tessedit_pageseg_mode:'11'});
+  }).then(function(){
+    return worker.recognize(dataUrl);
+  }).then(function(result){
+    return worker.terminate().then(function(){return result;});
+  }).catch(function(err){
+    if(worker)worker.terminate();
+    throw err;
+  });
+}
+
 function ruleazaOcr(){
   if(typeof Tesseract==='undefined'){alert('Librăria OCR nu s-a încărcat încă. Verifică internetul și încearcă din nou.');return;}
   ocrWorking=true;
@@ -3494,16 +3578,18 @@ function ruleazaOcr(){
     var slot=sloturi[idx][0], eticheta=sloturi[idx][1];
     var bar=document.getElementById('ocr-progress-bar');
     var label=document.getElementById('ocr-progress-label');
-    Tesseract.recognize(ocrFiles[slot].dataUrl,'ron',{
-      logger:function(m){
+    if(label)label.textContent='Preg\u0103tesc imaginea („'+eticheta+'")\u2026';
+    preproceseazaImaginePentruOcr(ocrFiles[slot].dataUrl).then(function(dataUrlPregatit){
+      return ocrRecognizeCuSetari(dataUrlPregatit,function(m){
         if(!bar||!label)return;
         var pctSlot = m.status==='recognizing text' ? (m.progress*100) : 0;
         var pctTotal = Math.round(((idx + pctSlot/100) / sloturi.length) * 100);
         bar.style.width=pctTotal+'%';
         label.textContent='Citesc '+eticheta+'\u2026 ('+Math.round(pctSlot)+'%)';
-      }
+      });
     }).then(function(result){
       texts[slot]=result.data.text;
+      ocrRawTexts[slot]=result.data.text;
       idx++;
       urmatorul();
     }).catch(function(err){
@@ -3549,10 +3635,13 @@ function extrageCampuriCI(text){
   var linii=t.split('\n');
   var cnp=ocrCauta(/\b(\d{13})\b/,t);
 
-  // Format nou (CIe): "Număr document" — literă/cifre lipite, ex. CJ1035505.
-  // Format vechi: serie (2 litere) + spațiu + 6 cifre, ex. "RD 123456".
+  // Model VECHI: seria (2 litere) ȘI numărul (6 cifre) — două câmpuri separate.
+  // Model NOU (CIe): un singur „Număr" — practic seria+numărul scrise împreună,
+  // fără spațiu (ex. CJ1035505) — de-asta îl păstrăm ca un singur câmp „numarDoc".
   var numarDocNou=ocrCauta(/\bnum[a\u0103]r\s*document[^a-zA-Z0-9]*([A-Z]{1,3}\d{5,9})/i,t);
   var serieNrVechi=t.match(/\b([A-Z]{2})\s?(\d{6})\b/);
+  var serie = serieNrVechi ? serieNrVechi[1] : '';
+  var numar = serieNrVechi ? serieNrVechi[2] : '';
   var numarDoc = numarDocNou || (serieNrVechi ? (serieNrVechi[1]+serieNrVechi[2]) : '');
 
   var nume=ocrValoareDupaEticheta(linii,/\bnume\b[^a-z]*(nom)?[^a-z]*(last\s*name)?/);
@@ -3573,6 +3662,8 @@ function extrageCampuriCI(text){
     nume:ocrCurataText(nume).toUpperCase(),
     prenume:ocrCurataText(prenume).toUpperCase(),
     cnp:cnp,
+    serie:ocrCurataText(serie).toUpperCase(),
+    numar:ocrCurataText(numar),
     numarDoc:ocrCurataText(numarDoc).toUpperCase(),
     domiciliu:ocrCurataText(domiciliu),
     locNasterii:ocrCurataText(locNasterii),
@@ -3580,6 +3671,7 @@ function extrageCampuriCI(text){
     dataEliberarii:dataEliberarii,
     dataValabilitate:dataValabilitate,
     modelCI:modelCI
+
   };
 }
 
@@ -4652,6 +4744,7 @@ var VIEW_META={
   expirari:{title:'Expirări',icon:'ti-calendar-x',filter:'expirari',toolbar:false},
   spv:{title:'Listă SPV',icon:'ti-id-badge-2',filter:'spv',toolbar:false},
   registre:{title:'Registre',icon:'ti-books',filter:'registre',toolbar:false},
+  dosare_onrc:{title:'Dosare ONRC',icon:'ti-building',filter:'dosare_onrc',toolbar:false},
   incasari:{title:'Încasări',icon:'ti-cash',filter:'incasari',toolbar:false},
   todo:{title:'Listă de făcut',icon:'ti-checklist',filter:'todo',toolbar:false},
   semnari:{title:'Semnări',icon:'ti-pencil',filter:'semnari',toolbar:false},
@@ -4796,6 +4889,20 @@ function renderGlobalSearchResults(query){
       html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openView(\'registre\')">'
         +'<div style="font-weight:700;color:var(--navy)">'+esc(r.serie||('Nr. '+r.nr))+(r.obiect?' — '+esc(r.obiect):'')+'</div>'
         +'<div style="'+subStyle+'">'+esc(r.parte||'')+(r.data?' · '+esc(r.data):'')+'</div>'
+        +'</div>';
+    });
+  }
+
+  // Dosare ONRC
+  var matchDos=((registreStore&&registreStore.dosare_onrc)||[]).filter(function(r){
+    return norm(r.clientNume).includes(q)||norm(r.nrDosar).includes(q)||norm(r.orc).includes(q);
+  }).slice(0,10);
+  if(matchDos.length){
+    html+='<div style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);letter-spacing:1px;margin:14px 0 6px">DOSARE ONRC ('+matchDos.length+')</div>';
+    matchDos.forEach(function(r){
+      html+='<div class="card" style="'+rowStyle+'" onclick="closeGlobalSearch();openView(\'dosare_onrc\')">'
+        +'<div style="font-weight:700;color:var(--navy)">Dosar '+esc(r.nrDosar||'')+(r.orc?' — '+esc(r.orc):'')+'</div>'
+        +'<div style="'+subStyle+'">'+esc(r.clientNume||'')+(r.data?' · '+esc(r.data):'')+'</div>'
         +'</div>';
     });
   }
@@ -6556,6 +6663,63 @@ function renderRegistreTab(){
   injectIcons();
 }
 
+var dosareOnrcArataArhivate=false;
+
+function toggleAratArhivateOnrc(){
+  dosareOnrcArataArhivate=!dosareOnrcArataArhivate;
+  renderDosareOnrcTab();
+}
+
+function toggleArhivareDosar(nr){
+  var list=registreStore.dosare_onrc||[];
+  var r=list.find(function(x){return x.nr===nr;});
+  if(!r)return;
+  r.arhivat=!r.arhivat;
+  saveRegistre();
+  renderDosareOnrcTab();
+}
+
+function renderDosareOnrcTab(){
+  var toate=registreStore.dosare_onrc||[];
+  var nrArhivate=toate.filter(function(r){return r.arhivat;}).length;
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +'<button class="btn-add-service" onclick="openAddDosarOnrc()"><i class="ti ti-plus"></i> Dosar nou</button>'
+    +(nrArhivate?'<button type="button" onclick="toggleAratArhivateOnrc()" style="background:none;border:none;color:rgba(7,33,68,0.5);font-size:12.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px"><i class="ti ti-folder" style="font-size:14px"></i> '+(dosareOnrcArataArhivate?'Arată active':'Arată arhivate ('+nrArhivate+')')+'</button>':'')
+    +'</div>';
+  var listO=toate.filter(function(r){return dosareOnrcArataArhivate?!!r.arhivat:!r.arhivat;}).sort(function(a,b){return b.nr-a.nr;});
+  if(!listO.length){html+='<div style="font-style:italic;color:rgba(7,33,68,0.4);font-size:14px;padding:6px 0">'+(dosareOnrcArataArhivate?'Niciun dosar arhivat':'Niciun dosar înregistrat')+'</div>';}
+  else{
+    var statusMapReg={inregistrat:{label:'Înregistrat',color:'#8a6d1a'},solutionat:{label:'Soluționat',color:'#1f5a9a'},eliberat:{label:'Documente eliberate',color:'#1a6a40'}};
+    var aniO={};listO.forEach(function(r){var an=r.data?r.data.split('.')[2]:'?';if(!aniO[an])aniO[an]=[];aniO[an].push(r);});
+    Object.keys(aniO).sort().reverse().forEach(function(an){
+      html+='<div class="reg-year-header">'+an+'</div>';
+      aniO[an].forEach(function(r){
+        var st=statusMapReg[r.status]||statusMapReg.inregistrat;
+        html+='<div class="reg-card"'+(r.arhivat?' style="opacity:0.6"':'')+'>'
+          +'<div class="reg-card-top">'
+          +'<span class="reg-card-nr">Dosar '+esc(r.nrDosar||'—')+'</span>'
+          +'<span class="reg-card-data">'+esc(r.data||'')+'</span>'
+          +'<div class="reg-card-actions">'
+          +'<button class="doc-btn" onclick="toggleArhivareDosar('+r.nr+')" title="'+(r.arhivat?'Dezarhivează':'Arhivează')+'"><i class="ti ti-'+(r.arhivat?'folder-plus':'folder')+'" style="font-size:14px"></i></button>'
+          +'<button class="doc-btn" onclick="editRegistruEntry(\'dosare_onrc\','+r.nr+')" title="Editează">'+pencilSvgSmall+'</button>'
+          +'<button class="doc-btn doc-btn-del" onclick="deleteRegistruEntry(\'dosare_onrc\','+r.nr+')" title="Șterge"><i class="ti ti-trash" style="font-size:14px"></i></button>'
+          +'</div></div>'
+          +'<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:'+st.color+'22;color:'+st.color+';font-weight:700;margin-bottom:6px">'+st.label+'</span>'
+          +(r.clientNume?'<div class="reg-card-row"><span class="reg-card-label">Client</span>'+esc(r.clientNume)+'</div>':'')
+          +(r.orc?'<div class="reg-card-row"><span class="reg-card-label">ORC</span>'+esc(r.orc)+'</div>':'')
+          +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'
+          +'<span class="exp-badge" style="'+(r.trimisMail?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:#eee;color:rgba(7,33,68,0.4)')+'"><i class="ti ti-mail" style="font-size:14px"></i> '+(r.trimisMail?'Trimis pe mail':'Netrimis pe mail')+'</span>'
+          +'<span class="exp-badge" style="'+(r.inmanat?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:#eee;color:rgba(7,33,68,0.4)')+'"><i class="ti ti-'+(r.inmanat?'check':'x')+'" style="font-size:14px"></i> '+(r.inmanat?('Înmânat ('+(r.modInmanare==='posta'?'poștă':'personal')+')'):'Neînmânat')+'</span>'
+          +'</div>'
+          +(r.obs?'<div class="reg-card-obs">'+esc(r.obs)+'</div>':'')
+          +'</div>';
+      });
+    });
+  }
+  document.getElementById('list').innerHTML=html;
+  injectIcons();
+}
+
 function openAddCorespondenta(){
   var nr=getNextNrCorespondenta();
   var html='<div style="padding:1rem"><div class="section-title" style="margin-bottom:1rem">Corespondență nr. <b>'+nr+'</b></div>'
@@ -6729,6 +6893,36 @@ function editRegistruEntry(tip,nr){
       +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="updateCorespondenta('+nr+')"><i class="ti ti-check"></i> Salvează</button></div>';
     document.getElementById('restanta-picker-body').innerHTML=html;
     document.getElementById('restanta-picker').querySelector('h2').textContent='Editează corespondență';
+  } else if(tip==='dosare_onrc'){
+    dosarClientId=r.clientId||null;
+    dosarClientNume=r.clientNume||'';
+    dosarStatus=r.status||'inregistrat';
+    dosarTrimisMail=!!r.trimisMail;
+    dosarInmanat=!!r.inmanat;
+    dosarModInmanare=r.modInmanare||'personal';
+    dosarEditNr=nr;
+    var stBtn=function(key,label){
+      var activ=(r.status||'inregistrat')===key;
+      return '<button type="button" id="dos-st-'+key+'" onclick="setDosarStatus(&quot;'+key+'&quot;)" style="flex:1;min-width:90px;font-size:12px;padding:8px 6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);cursor:pointer;font-family:inherit;'+(activ?'background:var(--navy);color:#fff':'background:transparent;color:rgba(7,33,68,0.5)')+'">'+label+'</button>';
+    };
+    var html='<div style="padding:1rem"><div class="section-title" style="margin-bottom:1rem">Editează dosar <b>'+esc(r.nrDosar||nr)+'</b></div>'
+      +'<div class="field"><label>Client</label><input type="text" id="dos-client-manual" value="'+esc(r.clientNume||'')+'" placeholder="Nume client / firmă" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+      +'<div class="field"><label>Număr dosar</label><input type="text" id="dos-nr-dosar" value="'+esc(r.nrDosar||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+      +'<div class="field"><label>ORC competent</label><input type="text" id="dos-orc" list="dos-orc-list" value="'+esc(r.orc||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"><datalist id="dos-orc-list">'+orcJudetOptions()+'</datalist></div>'
+      +'<div class="field"><label>Dată depunere</label><input type="text" id="dos-data" value="'+esc(r.data||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+      +'<div class="field"><label>Status dosar</label><div style="display:flex;gap:4px;flex-wrap:wrap">'
+      +stBtn('inregistrat','Înregistrat')+stBtn('solutionat','Soluționat')+stBtn('eliberat','Documente eliberate')
+      +'</div></div>'
+      +'<div class="field"><label>Trimis pe mail către client</label><button type="button" id="dos-mail-btn" onclick="toggleDosarMail()" class="status-btn" style="width:100%;'+(r.trimisMail?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:rgba(7,33,68,0.08);color:var(--navy)')+'">'+(r.trimisMail?'✔ Trimis pe mail':'Netrimis pe mail')+'</button></div>'
+      +'<div class="field"><label>Înmânat clientului</label><button type="button" id="dos-inmanat-btn" onclick="toggleDosarInmanat()" class="status-btn" style="width:100%;'+(r.inmanat?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:rgba(7,33,68,0.08);color:var(--navy)')+'">'+(r.inmanat?'✔ Înmânat clientului':'Neînmânat')+'</button></div>'
+      +'<div class="field" id="dos-mod-inmanare-wrap" style="display:'+(r.inmanat?'block':'none')+'"><label>Modalitate înmânare</label><div style="display:flex;gap:6px">'
+      +'<button type="button" id="dos-mod-personal" onclick="setDosarModInmanare(&quot;personal&quot;)" style="flex:1;font-size:13px;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);cursor:pointer;font-family:inherit;'+((r.modInmanare||'personal')==='personal'?'background:var(--navy);color:#fff':'background:transparent;color:rgba(7,33,68,0.5)')+'">Personal</button>'
+      +'<button type="button" id="dos-mod-posta" onclick="setDosarModInmanare(&quot;posta&quot;)" style="flex:1;font-size:13px;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);cursor:pointer;font-family:inherit;'+(r.modInmanare==='posta'?'background:var(--navy);color:#fff':'background:transparent;color:rgba(7,33,68,0.5)')+'">Poștă</button>'
+      +'</div></div>'
+      +'<div class="field"><label>Observații</label><input type="text" id="dos-obs" value="'+esc(r.obs||'')+'" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+      +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="updateDosarOnrc('+nr+')"><i class="ti ti-check"></i> Salvează</button></div>';
+    document.getElementById('restanta-picker-body').innerHTML=html;
+    document.getElementById('restanta-picker').querySelector('h2').textContent='Editează dosar ONRC';
   } else {
     var opts='<option value="">-- Selectează --</option>'+clients.map(function(c){return '<option value="'+esc(clientTitleLine(c))+'"'+(clientTitleLine(c)===r.parte?' selected':'')+'>'+esc(clientTitleLine(c))+'</option>';}).join('');
     var html='<div style="padding:1rem"><div class="section-title" style="margin-bottom:1rem">Editează nr. <b>'+nr+'</b></div>'
@@ -6765,10 +6959,209 @@ function updateContract(nr){
   saveRegistre();document.getElementById('restanta-picker').style.display='none';renderRegistreTab();
 }
 
+function updateDosarOnrc(nr){
+  var list=registreStore.dosare_onrc||[];
+  var idx=list.findIndex(function(x){return x.nr===nr;});
+  if(idx<0)return;
+  var clientNume=(document.getElementById('dos-client-manual').value||'').trim();
+  if(!clientNume){alert('Introdu numele clientului.');return;}
+  var nrDosarVal=(document.getElementById('dos-nr-dosar').value||'').trim();
+  if(!nrDosarVal){alert('Introdu numărul dosarului.');return;}
+  list[idx]={
+    nr:nr,
+    clientId:list[idx].clientId||null,
+    clientNume:clientNume,
+    nrDosar:nrDosarVal,
+    orc:(document.getElementById('dos-orc').value||'').trim(),
+    data:(document.getElementById('dos-data').value||'').trim(),
+    status:dosarStatus||'inregistrat',
+    trimisMail:!!dosarTrimisMail,
+    inmanat:!!dosarInmanat,
+    modInmanare:dosarInmanat?(dosarModInmanare||'personal'):'',
+    obs:(document.getElementById('dos-obs').value||'').trim(),
+    arhivat:!!list[idx].arhivat
+  };
+  saveRegistre();
+  document.getElementById('restanta-picker').style.display='none';
+  renderDosareOnrcTab();
+}
+
 function deleteRegistruEntry(tip,nr){
   if(!confirm('Ștergi înregistrarea nr. '+nr+'?'))return;
   registreStore[tip]=(registreStore[tip]||[]).filter(function(r){return r.nr!==nr;});
-  saveRegistre();renderRegistreTab();
+  saveRegistre();
+  if(tip==='dosare_onrc'){renderDosareOnrcTab();}else{renderRegistreTab();}
+}
+
+// ══ Dosare ONRC (registru urmărire dosare la Registrul Comerțului) ═══════
+var dosarClientId=null,dosarClientNume='',dosarStatus='inregistrat',dosarTrimisMail=false,dosarInmanat=false,dosarModInmanare='personal',dosarEditNr=null;
+
+function openAddDosarOnrc(){
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  dosarClientId=null;
+  dosarClientNume='';
+  dosarStatus='inregistrat';
+  dosarTrimisMail=false;
+  dosarInmanat=false;
+  dosarModInmanare='personal';
+  dosarEditNr=null;
+
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Dosar ONRC nou</div>'
+    +'<div class="field"><label>Caută client existent</label>'
+    +'<input type="text" id="dos-client-search" placeholder="Nume, firmă, CUI..." '
+    +'style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit" '
+    +'oninput="dosarSearchClients(this.value)">'
+    +'</div>'
+    +'<div id="dos-client-list" style="max-height:180px;overflow-y:auto;margin-bottom:8px"></div>'
+    +'<div id="dos-client-selected" style="display:none;padding:10px 12px;border:1px solid rgba(34,120,80,0.3);background:rgba(34,120,80,0.06);border-radius:8px;margin-bottom:10px;justify-content:space-between;align-items:center">'
+    +'<span id="dos-client-selected-name" style="font-weight:700;color:var(--navy);font-size:14px"></span>'
+    +'<button type="button" onclick="dosarClearClient()" style="background:none;border:none;color:rgba(7,33,68,0.5);cursor:pointer;font-size:13px">Schimbă</button>'
+    +'</div>'
+    +'<div class="field"><label>...sau introdu manual (dacă nu are fișă de client)</label>'
+    +'<input type="text" id="dos-client-manual" placeholder="Nume client / firmă" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit">'
+    +'</div>'
+    +'<div class="field"><label>Număr dosar</label>'
+    +'<input type="text" id="dos-nr-dosar" placeholder="ex: 12345/2026" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+    +'<div class="field"><label>ORC competent</label>'
+    +'<input type="text" id="dos-orc" list="dos-orc-list" placeholder="ex: ORC Harghita" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit">'
+    +'<datalist id="dos-orc-list">'+orcJudetOptions()+'</datalist>'
+    +'</div>'
+    +'<div class="field"><label>Dată depunere</label>'
+    +'<input type="text" id="dos-data" value="'+todayRo()+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+    +'<div class="field"><label>Status dosar</label>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+    +'<button type="button" id="dos-st-inregistrat" onclick="setDosarStatus(&quot;inregistrat&quot;)" style="flex:1;min-width:90px;font-size:12px;padding:8px 6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit">Înregistrat</button>'
+    +'<button type="button" id="dos-st-solutionat" onclick="setDosarStatus(&quot;solutionat&quot;)" style="flex:1;min-width:90px;font-size:12px;padding:8px 6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:transparent;color:rgba(7,33,68,0.5);cursor:pointer;font-family:inherit">Soluționat</button>'
+    +'<button type="button" id="dos-st-eliberat" onclick="setDosarStatus(&quot;eliberat&quot;)" style="flex:1;min-width:90px;font-size:12px;padding:8px 6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:transparent;color:rgba(7,33,68,0.5);cursor:pointer;font-family:inherit">Documente eliberate</button>'
+    +'</div></div>'
+    +'<div class="field"><label>Trimis pe mail către client</label>'
+    +'<button type="button" id="dos-mail-btn" class="status-btn" style="width:100%;background:rgba(7,33,68,0.08);color:var(--navy)" onclick="toggleDosarMail()">Netrimis pe mail</button>'
+    +'</div>'
+    +'<div class="field"><label>Înmânat clientului</label>'
+    +'<button type="button" id="dos-inmanat-btn" class="status-btn" style="width:100%;background:rgba(7,33,68,0.08);color:var(--navy)" onclick="toggleDosarInmanat()">Neînmânat</button>'
+    +'</div>'
+    +'<div class="field" id="dos-mod-inmanare-wrap" style="display:none"><label>Modalitate înmânare</label>'
+    +'<div style="display:flex;gap:6px">'
+    +'<button type="button" id="dos-mod-personal" onclick="setDosarModInmanare(&quot;personal&quot;)" style="flex:1;font-size:13px;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit">Personal</button>'
+    +'<button type="button" id="dos-mod-posta" onclick="setDosarModInmanare(&quot;posta&quot;)" style="flex:1;font-size:13px;padding:8px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:transparent;color:rgba(7,33,68,0.5);cursor:pointer;font-family:inherit">Poștă</button>'
+    +'</div></div>'
+    +'<div class="field"><label>Observații</label>'
+    +'<input type="text" id="dos-obs" placeholder="Observații (opțional)" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.15);border-radius:6px;padding:8px 10px;font-family:inherit"></div>'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:8px" onclick="saveDosarOnrc()"><i class="ti ti-check"></i> Salvează dosarul</button>'
+    +'</div>';
+
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Dosar ONRC nou';
+  document.getElementById('restanta-picker').style.display='flex';
+  try{dosarSearchClients('');}catch(e){console.error('dosarSearchClients error:',e);}
+  injectIcons();
+}
+
+function dosarSearchClients(q){
+  q=norm(q||'').trim();
+  var el=document.getElementById('dos-client-list');
+  if(!el)return;
+  if(!q){el.innerHTML='';return;}
+  var lista=clients.filter(function(c){
+    return norm(c.nume).includes(q)||norm(c.firma).includes(q)||norm(c.cui).includes(q)||norm(c.cnp).includes(q);
+  }).slice(0,20);
+  if(!lista.length){el.innerHTML='<div style="font-size:13px;color:rgba(7,33,68,0.4);padding:8px;font-style:italic">Niciun client găsit</div>';return;}
+  el.innerHTML=lista.map(function(c){
+    return '<div onclick="dosarSelectClient(\''+c.id+'\')" style="padding:10px 12px;border:1px solid rgba(7,33,68,0.1);border-radius:8px;margin-bottom:6px;cursor:pointer;background:#fff">'
+      +'<div style="font-weight:700;font-size:14px;color:var(--navy)">'+esc(clientTitleLine(c))+'</div>'
+      +'<div style="font-size:12px;color:rgba(7,33,68,0.5)">'+esc(clientSubLine(c))+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function dosarSelectClient(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  dosarClientId=clientId;
+  dosarClientNume=clientTitleLine(c);
+  var manualEl=document.getElementById('dos-client-manual');if(manualEl)manualEl.value='';
+  var searchEl=document.getElementById('dos-client-search');if(searchEl){searchEl.value='';searchEl.style.display='none';}
+  var listEl=document.getElementById('dos-client-list');if(listEl){listEl.innerHTML='';listEl.style.display='none';}
+  var selEl=document.getElementById('dos-client-selected');
+  var nameEl=document.getElementById('dos-client-selected-name');
+  if(nameEl)nameEl.textContent=dosarClientNume;
+  if(selEl)selEl.style.display='flex';
+}
+
+function dosarClearClient(){
+  dosarClientId=null;dosarClientNume='';
+  var searchEl=document.getElementById('dos-client-search');if(searchEl){searchEl.value='';searchEl.style.display='block';}
+  var listEl=document.getElementById('dos-client-list');if(listEl){listEl.style.display='block';}
+  var selEl=document.getElementById('dos-client-selected');if(selEl)selEl.style.display='none';
+}
+
+function setDosarStatus(st){
+  dosarStatus=st;
+  var map={inregistrat:'dos-st-inregistrat',solutionat:'dos-st-solutionat',eliberat:'dos-st-eliberat'};
+  Object.keys(map).forEach(function(key){
+    var btn=document.getElementById(map[key]);
+    if(!btn)return;
+    var activ=key===st;
+    btn.style.background=activ?'var(--navy)':'transparent';
+    btn.style.color=activ?'#fff':'rgba(7,33,68,0.5)';
+  });
+}
+
+function toggleDosarMail(){
+  dosarTrimisMail=!dosarTrimisMail;
+  var btn=document.getElementById('dos-mail-btn');
+  if(!btn)return;
+  btn.textContent=dosarTrimisMail?'✔ Trimis pe mail':'Netrimis pe mail';
+  btn.style.background=dosarTrimisMail?'rgba(34,120,80,0.15)':'rgba(7,33,68,0.08)';
+  btn.style.color=dosarTrimisMail?'#1a6a40':'var(--navy)';
+}
+
+function toggleDosarInmanat(){
+  dosarInmanat=!dosarInmanat;
+  var btn=document.getElementById('dos-inmanat-btn');
+  if(btn){
+    btn.textContent=dosarInmanat?'✔ Înmânat clientului':'Neînmânat';
+    btn.style.background=dosarInmanat?'rgba(34,120,80,0.15)':'rgba(7,33,68,0.08)';
+    btn.style.color=dosarInmanat?'#1a6a40':'var(--navy)';
+  }
+  var wrap=document.getElementById('dos-mod-inmanare-wrap');
+  if(wrap)wrap.style.display=dosarInmanat?'block':'none';
+}
+
+function setDosarModInmanare(mod){
+  dosarModInmanare=mod;
+  var pBtn=document.getElementById('dos-mod-personal');
+  var pBtn2=document.getElementById('dos-mod-posta');
+  if(pBtn){pBtn.style.background=mod==='personal'?'var(--navy)':'transparent';pBtn.style.color=mod==='personal'?'#fff':'rgba(7,33,68,0.5)';}
+  if(pBtn2){pBtn2.style.background=mod==='posta'?'var(--navy)':'transparent';pBtn2.style.color=mod==='posta'?'#fff':'rgba(7,33,68,0.5)';}
+}
+
+function saveDosarOnrc(){
+  var nrDosar=(document.getElementById('dos-nr-dosar').value||'').trim();
+  if(!nrDosar){alert('Introdu numărul dosarului.');return;}
+  var clientNumeManual=(document.getElementById('dos-client-manual').value||'').trim();
+  var clientNume=dosarClientId?dosarClientNume:clientNumeManual;
+  if(!clientNume){alert('Selectează un client din listă sau introdu numele manual.');return;}
+  var entry={
+    nr:getNextNrDosarOnrc(),
+    clientId:dosarClientId||null,
+    clientNume:clientNume,
+    nrDosar:nrDosar,
+    orc:(document.getElementById('dos-orc').value||'').trim(),
+    data:(document.getElementById('dos-data').value||'').trim()||todayRo(),
+    status:dosarStatus||'inregistrat',
+    trimisMail:!!dosarTrimisMail,
+    inmanat:!!dosarInmanat,
+    modInmanare:dosarInmanat?(dosarModInmanare||'personal'):'',
+    obs:(document.getElementById('dos-obs').value||'').trim(),
+    arhivat:false
+  };
+  if(!registreStore.dosare_onrc)registreStore.dosare_onrc=[];
+  registreStore.dosare_onrc.push(entry);
+  saveRegistre();
+  document.getElementById('restanta-picker').style.display='none';
+  renderDosareOnrcTab();
 }
 
 function renderSpvTab(){
@@ -7139,6 +7532,7 @@ function render(){
   if(currentFilter==='expirari'){renderExpirariTab();return;}
   if(currentFilter==='spv'){renderSpvTab();return;}
   if(currentFilter==='registre'){renderRegistreTab();return;}
+  if(currentFilter==='dosare_onrc'){renderDosareOnrcTab();return;}
   if(currentFilter==='incasari'){renderIncasariTab();return;}
   if(currentFilter==='todo'){renderTodoTab();return;}
   if(currentFilter==='semnari'){renderSemnariTab();return;}
@@ -8964,8 +9358,8 @@ function comparaBackupData(data){
     programari:comparaListaCuId(programariStore,data.programari),
     servicii:{localCount:numarChei(svcStore),backupCount:numarChei(data.servicii)},
     declaratieUnica:{localCount:numarChei(duStore),backupCount:numarChei(data.declaratieUnica)},
-    registre:{localCount:(registreStore.corespondenta||[]).length+(registreStore.contracte||[]).length,
-      backupCount:data.registre?((data.registre.corespondenta||[]).length+(data.registre.contracte||[]).length):0},
+    registre:{localCount:(registreStore.corespondenta||[]).length+(registreStore.contracte||[]).length+(registreStore.dosare_onrc||[]).length,
+      backupCount:data.registre?((data.registre.corespondenta||[]).length+(data.registre.contracte||[]).length+(data.registre.dosare_onrc||[]).length):0},
     todo:{localCount:getTodos().length,backupCount:(data.todo||[]).length},
     semnari:{localCount:getSemnari().length,backupCount:(data.semnari||[]).length},
     incasariDiverse:{localCount:JSON.parse(localStorage.getItem('crm_inc_diverse_v1')||'[]').length,backupCount:(data.incasariDiverse||[]).length},
@@ -10846,7 +11240,11 @@ var TABLER_ICONS = {
   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />`,
   "x": `<path d="M18 6l-12 12" />
-  <path d="M6 6l12 12" />`
+  <path d="M6 6l12 12" />`,
+  "folder": `<path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" />`,
+  "folder-plus": `<path d="M12 19h-7a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v3.5" />
+  <path d="M16 19h6" />
+  <path d="M19 16v6" />`
 };
 
 function injectIcons(){
