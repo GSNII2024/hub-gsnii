@@ -4624,7 +4624,9 @@ function shiftMonth(monthStr,delta){
   return d.getFullYear()+'-'+pad2(d.getMonth()+1);
 }
 function monthLabel(monthStr){
-  var parts=monthStr.split('-');var y=parseInt(parts[0],10),m=parseInt(parts[1],10)-1;
+  var parts=(monthStr||'').split('-');
+  var y=parseInt(parts[0],10),m=parseInt(parts[1],10)-1;
+  if(!monthStr||isNaN(y)||isNaN(m))return 'Dată nespecificată';
   var s=new Date(y,m,1).toLocaleDateString('ro-RO',{month:'long',year:'numeric'});
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
@@ -5085,7 +5087,24 @@ var currentServiceMonth=currentMonthStr();
 var svcStatsWholeYear=false;
 
 // ── Servicii prestate persoanelor fără fișă de client ─────
-function getServiciiDiverse(){try{return JSON.parse(localStorage.getItem('crm_servicii_diverse_v1')||'[]');}catch(e){return [];}}
+function getServiciiDiverse(){
+  var list;
+  try{list=JSON.parse(localStorage.getItem('crm_servicii_diverse_v1')||'[]');}catch(e){return [];}
+  // Reparație retroactivă: unele intrări mai vechi nu au deloc luna completată
+  // (sau au o valoare invalidă) — asta le făcea invizibile în totalurile pe
+  // lună din tab-ul Servicii ȘI arăta „Invalid Date" la Restanțe. Deducem
+  // luna din data încasării / data creării, sau folosim luna curentă ca ultimă
+  // soluție, și salvăm reparația o singură dată.
+  var reparat=false;
+  list.forEach(function(d){
+    if(d.month&&/^\d{4}-\d{2}$/.test(d.month))return;
+    var dt=parseRoDate(d.dataIncasare)||parseRoDate(d.data);
+    d.month=dt?(dt.getFullYear()+'-'+pad2(dt.getMonth()+1)):currentMonthStr();
+    reparat=true;
+  });
+  if(reparat)saveServiciiDiverse(list);
+  return list;
+}
 function saveServiciiDiverse(list){
   localStorage.setItem('crm_servicii_diverse_v1',JSON.stringify(list));
   sbSet('servicii_diverse',list).then(function(){setSyncStatus(true,'Servicii sincronizate');}).catch(function(){setSyncStatus(false,'Eroare sync servicii — verifică internetul');});
