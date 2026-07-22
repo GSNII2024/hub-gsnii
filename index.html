@@ -4740,16 +4740,33 @@ function reparaLuniInvalide(){
   if(!anCorectStr)return;
   var anCorect=parseInt(anCorectStr,10);
   if(!anCorect||anCorect<2000||anCorect>2100){alert('An invalid — nu am schimbat nimic.');return;}
-  var mutate=0,conflicte=[];
+  // O înregistrare "goală" (fără servicii, fără încasări, fără sold, fără
+  // observații) poate fi suprascrisă direct — de obicei apare doar pentru că
+  // fișa lunii a fost deschisă o dată, fără să se introducă nimic real acolo.
+  function ePracticGoala(rec){
+    var t=computeRecordTotal(rec);
+    return t.serviceTotal<=0.004&&t.sumaIncasata<=0.004&&t.soldPrecedent===0&&!(rec.diverse&&rec.diverse.length)&&!(rec.services_pf_diverse&&rec.services_pf_diverse.length)&&!(rec.observatii&&rec.observatii.trim());
+  }
+  var mutate=0,conflicteNerezolvate=[];
   problematice.forEach(function(p){
     var lunaNr=parseInt((p.rec.month.split('-')[1]||''),10);
-    if(!lunaNr||lunaNr<1||lunaNr>12){conflicte.push(p.key+' — luna necitibilă ('+p.rec.month+'), needs manual fix');return;}
+    if(!lunaNr||lunaNr<1||lunaNr>12){conflicteNerezolvate.push(p.key+' — luna necitibilă ('+p.rec.month+')');return;}
     var lunaNoua=anCorect+'-'+pad2(lunaNr);
     var cheieNoua=svcKey(p.rec.clientId,lunaNoua);
-    if(svcStore[cheieNoua]&&cheieNoua!==p.key){
+    var tinta=svcStore[cheieNoua];
+    if(tinta&&cheieNoua!==p.key&&!ePracticGoala(tinta)){
+      // Conflict real — ambele au date. Întrebăm explicit ce să facem.
       var c=clients.find(function(x){return x.id===p.rec.clientId;});
-      conflicte.push((c?clientTitleLine(c):p.rec.clientId)+' — '+lunaNoua+' există deja; nu am suprascris, verifică manual');
-      return;
+      var numeC=c?clientTitleLine(c):p.rec.clientId;
+      var tSursa=computeRecordTotal(p.rec),tTinta=computeRecordTotal(tinta);
+      var intrebare=numeC+' — '+lunaNoua+':\n'
+        +'Ce am găsit sub anul invalid: servicii '+money(tSursa.serviceTotal)+', încasat '+money(tSursa.sumaIncasata)+'\n'
+        +'Ce există deja la '+anCorect+': servicii '+money(tTinta.serviceTotal)+', încasat '+money(tTinta.sumaIncasata)+'\n\n'
+        +'Suprascriu '+anCorect+' cu ce am găsit sub anul invalid?';
+      if(!confirm(intrebare)){
+        conflicteNerezolvate.push(numeC+' — '+lunaNoua+' (păstrat ce era la '+anCorect+', ai zis nu la suprascriere)');
+        return;
+      }
     }
     p.rec.month=lunaNoua;
     svcStore[cheieNoua]=p.rec;
@@ -4758,7 +4775,7 @@ function reparaLuniInvalide(){
   });
   saveSvcStore();
   var msgFinal='Am mutat '+mutate+' înregistr'+(mutate===1?'are':'ări')+' la anul '+anCorect+'.';
-  if(conflicte.length)msgFinal+='\n\nATENȚIE — nu am putut muta automat:\n'+conflicte.join('\n');
+  if(conflicteNerezolvate.length)msgFinal+='\n\nNemutate (ai ales să păstrezi ce exista deja):\n'+conflicteNerezolvate.join('\n');
   alert(msgFinal);
   renderServiciiTab();
 }
