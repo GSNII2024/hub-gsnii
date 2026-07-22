@@ -4689,6 +4689,80 @@ function ruleazaRecalculareSolduri(){
   }
   renderRestanteTab();
 }
+
+// Repară MANUAL (doar la apăsare, niciodată automat) intrările "persoană fără
+// fișă" care au luna lipsă/invalidă, deducând-o din data încasării. Apăsat
+// explicit de utilizator, ca să nu mai riște vreo cursă cu sincronizarea din
+// cloud la pornirea aplicației.
+function ruleazaRepararaLuniServiciiDiverse(){
+  if(!confirm('Se vor completa lunile lipsă la serviciile pentru persoane fără fișă, pe baza datei încasării. Continui?'))return;
+  var list=getServiciiDiverse();
+  var reparate=0;
+  list.forEach(function(d){
+    if(d.month&&/^\d{4}-\d{2}$/.test(d.month))return;
+    var dt=parseRoDate(d.dataIncasare)||parseRoDate(d.data);
+    d.month=dt?(dt.getFullYear()+'-'+pad2(dt.getMonth()+1)):currentMonthStr();
+    reparate++;
+  });
+  if(reparate===0){
+    alert('Nu am găsit intrări cu luna lipsă — totul era deja corect.');
+  }else{
+    saveServiciiDiverse(list);
+    alert('Am completat luna la '+reparate+' intrar'+(reparate===1?'e':'i')+'.');
+  }
+  renderRestanteTab();
+}
+// Repară înregistrări de servicii salvate sub un an nevalid (ex. "NaN-05" —
+// se poate întâmpla dacă butonul de an, construit din datele existente,
+// includea din greșeală un an necitibil, iar apăsarea lui a salvat tot ce
+// s-a introdus ulterior sub acel an invalid, în loc de anul real). Arată
+// exact ce a găsit înainte să mute ceva, și nu suprascrie o lună care există
+// deja corect la anul țintă.
+function reparaLuniInvalide(){
+  var problematice=[];
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||!rec.month)return;
+    if(!/^\d{4}-\d{2}$/.test(rec.month))problematice.push({key:key,rec:rec});
+  });
+  if(!problematice.length){alert('Nu am găsit înregistrări cu anul invalid — totul e în regulă.');return;}
+  var rezumat={};
+  problematice.forEach(function(p){
+    var c=clients.find(function(x){return x.id===p.rec.clientId;});
+    var nume=c?clientTitleLine(c):('client necunoscut ('+p.rec.clientId+')');
+    if(!rezumat[nume])rezumat[nume]=[];
+    rezumat[nume].push(p.rec.month);
+  });
+  var mesaj='Am găsit '+problematice.length+' înregistr'+(problematice.length===1?'are':'ări')+' salvate sub un an invalid:\n\n';
+  Object.keys(rezumat).forEach(function(nume){mesaj+='• '+nume+': '+rezumat[nume].join(', ')+'\n';});
+  mesaj+='\nCu ce an ar trebui înlocuit anul invalid?';
+  var anCorectStr=prompt(mesaj,String(new Date().getFullYear()));
+  if(!anCorectStr)return;
+  var anCorect=parseInt(anCorectStr,10);
+  if(!anCorect||anCorect<2000||anCorect>2100){alert('An invalid — nu am schimbat nimic.');return;}
+  var mutate=0,conflicte=[];
+  problematice.forEach(function(p){
+    var lunaNr=parseInt((p.rec.month.split('-')[1]||''),10);
+    if(!lunaNr||lunaNr<1||lunaNr>12){conflicte.push(p.key+' — luna necitibilă ('+p.rec.month+'), needs manual fix');return;}
+    var lunaNoua=anCorect+'-'+pad2(lunaNr);
+    var cheieNoua=svcKey(p.rec.clientId,lunaNoua);
+    if(svcStore[cheieNoua]&&cheieNoua!==p.key){
+      var c=clients.find(function(x){return x.id===p.rec.clientId;});
+      conflicte.push((c?clientTitleLine(c):p.rec.clientId)+' — '+lunaNoua+' există deja; nu am suprascris, verifică manual');
+      return;
+    }
+    p.rec.month=lunaNoua;
+    svcStore[cheieNoua]=p.rec;
+    if(cheieNoua!==p.key)delete svcStore[p.key];
+    mutate++;
+  });
+  saveSvcStore();
+  var msgFinal='Am mutat '+mutate+' înregistr'+(mutate===1?'are':'ări')+' la anul '+anCorect+'.';
+  if(conflicte.length)msgFinal+='\n\nATENȚIE — nu am putut muta automat:\n'+conflicte.join('\n');
+  alert(msgFinal);
+  renderServiciiTab();
+}
+
 function money(n){return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' lei';}
 // Formatare simplă (fără „lei"), pentru subtotaluri afișate direct în formulare
 function fmtNum2(n){return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -5088,23 +5162,15 @@ var svcStatsWholeYear=false;
 
 // ── Servicii prestate persoanelor fără fișă de client ─────
 function getServiciiDiverse(){
-  var list;
-  try{list=JSON.parse(localStorage.getItem('crm_servicii_diverse_v1')||'[]');}catch(e){return [];}
-  // Reparație retroactivă: unele intrări mai vechi nu au deloc luna completată
-  // (sau au o valoare invalidă) — asta le făcea invizibile în totalurile pe
-  // lună din tab-ul Servicii ȘI arăta „Invalid Date" la Restanțe. Deducem
-  // luna din data încasării / data creării, sau folosim luna curentă ca ultimă
-  // soluție, și salvăm reparația o singură dată.
-  var reparat=false;
-  list.forEach(function(d){
-    if(d.month&&/^\d{4}-\d{2}$/.test(d.month))return;
-    var dt=parseRoDate(d.dataIncasare)||parseRoDate(d.data);
-    d.month=dt?(dt.getFullYear()+'-'+pad2(dt.getMonth()+1)):currentMonthStr();
-    reparat=true;
-  });
-  if(reparat)saveServiciiDiverse(list);
-  return list;
+  try{return JSON.parse(localStorage.getItem('crm_servicii_diverse_v1')||'[]');}catch(e){return [];}
 }
+// NU adăuga aici nicio reparație automată care salvează/sincronizează — o
+// funcție de CITIRE nu trebuie niciodată să scrie/trimită date către cloud ca
+// efect secundar. Asta a cauzat o pierdere de date reală: la pornire, citirea
+// se putea întâmpla ÎNAINTE ca sincronizarea din cloud (syncFromCloud, async)
+// să termine, iar salvarea automată din citire trimitea varianta locală
+// (neactualizată încă) peste cea corectă din cloud. Dacă e nevoie de o
+// reparație pe date vechi, se face manual, o singură dată, NU la fiecare citire.
 function saveServiciiDiverse(list){
   localStorage.setItem('crm_servicii_diverse_v1',JSON.stringify(list));
   sbSet('servicii_diverse',list).then(function(){setSyncStatus(true,'Servicii sincronizate');}).catch(function(){setSyncStatus(false,'Eroare sync servicii — verifică internetul');});
@@ -5550,7 +5616,8 @@ function renderRestanteTab(){
     +'<input type="text" id="restante-search" placeholder="Caută client, firmă, CUI..." value="'+esc(restanteSearchQuery)+'" oninput="restanteSearchQuery=this.value;renderRestanteTab()" style="font-size:15px">'
     +'</div>';
 
-  html+='<button type="button" onclick="ruleazaRecalculareSolduri()" style="background:none;border:none;color:rgba(7,33,68,0.45);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;margin-bottom:8px"><i class="ti ti-history" style="font-size:14px"></i> Recalculează soldurile (corectează reportul dintre luni)</button>';
+  html+='<button type="button" onclick="ruleazaRecalculareSolduri()" style="background:none;border:none;color:rgba(7,33,68,0.45);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;margin-bottom:6px"><i class="ti ti-history" style="font-size:14px"></i> Recalculează soldurile (corectează reportul dintre luni)</button>';
+  html+='<button type="button" onclick="ruleazaRepararaLuniServiciiDiverse()" style="background:none;border:none;color:rgba(7,33,68,0.45);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;margin-bottom:8px"><i class="ti ti-calendar" style="font-size:14px"></i> Repară lunile lipsă (persoane fără fișă)</button>';
 
   html+='<div class="bday-today" style="justify-content:space-between">'
     +'<span><i class="ti ti-alert-triangle"></i> '+filteredItems.length+' cu restan&#539;e</span>'
@@ -6130,8 +6197,13 @@ function renderIncasariTab(){
   });
 
   var aniSet={};
-  toateIncasarile.forEach(function(i){aniSet[i.an]=1;});
-  Object.keys(svcStore).forEach(function(key){var rec=svcStore[key];if(rec&&rec.month)aniSet[parseInt(rec.month.split('-')[0])]=1;});
+  toateIncasarile.forEach(function(i){if(!isNaN(i.an))aniSet[i.an]=1;});
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||!rec.month)return;
+    var anParsat=parseInt(rec.month.split('-')[0],10);
+    if(!isNaN(anParsat))aniSet[anParsat]=1;
+  });
   var anCurent=new Date().getFullYear();
   var aniArr=Object.keys(aniSet).map(Number);
   if(aniArr.length){var anMin=Math.min.apply(null,aniArr);for(var a=anMin;a<=anCurent;a++)aniSet[a]=1;}
@@ -7486,7 +7558,9 @@ function renderServiciiTab(){
   var aniSet={};
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
-    if(rec&&rec.month)aniSet[parseInt(rec.month.split('-')[0])]=1;
+    if(!rec||!rec.month)return;
+    var anParsat=parseInt(rec.month.split('-')[0],10);
+    if(!isNaN(anParsat))aniSet[anParsat]=1;
   });
   var anCurent=new Date().getFullYear();
   aniSet[anCurent]=1;
@@ -7509,6 +7583,7 @@ function renderServiciiTab(){
     html+='<button onclick="currentServiceMonth=\''+a+'-'+(lunaSel<10?'0':'')+lunaSel+'\';renderServiciiTab()" style="padding:5px 12px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(anSel==a?'var(--navy)':'#fff')+';color:'+(anSel==a?'#fff':'var(--navy)')+';font-size:13px;cursor:pointer;font-family:inherit">'+a+'</button>';
   });
   html+='</div>';
+  html+='<button type="button" onclick="reparaLuniInvalide()" style="background:none;border:none;color:rgba(7,33,68,0.4);font-size:11.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;margin-bottom:8px"><i class="ti ti-calendar-x" style="font-size:13px"></i> Repară înregistrări salvate sub an invalid</button>';
   // Filtre luni (+ Tot anul)
   html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">';
   html+='<button onclick="svcStatsWholeYear=true;renderServiciiTab()" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(7,33,68,0.2);background:'+(svcStatsWholeYear?'var(--navy)':'#fff')+';color:'+(svcStatsWholeYear?'#fff':'var(--navy)')+';font-size:12px;cursor:pointer;font-family:inherit">Tot anul</button>';
