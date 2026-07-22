@@ -4630,15 +4630,62 @@ function monthLabel(monthStr){
 }
 function currentMonthStr(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1);}
 function suggestedSoldPrecedent(clientId,month){
-  var total=0;
+  // Soldul precedent trebuie să fie soldul din ULTIMA lună anterioară cu
+  // înregistrare — acel sold include deja, prin construcție, tot ce s-a
+  // acumulat înainte. Însumarea soldurilor tuturor lunilor anterioare
+  // (cum se făcea înainte) dubla/multiplica restanța la fiecare lună nouă.
+  var celMaiRecent=null;
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
     if(rec.clientId!==clientId)return;
     if(rec.month>=month)return;
-    var t=computeRecordTotal(rec);
-    if(t.soldNou>0.001)total+=t.soldNou;
+    if(!celMaiRecent||rec.month>celMaiRecent.month)celMaiRecent=rec;
   });
-  return Math.round(total*100)/100;
+  if(!celMaiRecent)return 0;
+  var t=computeRecordTotal(celMaiRecent);
+  return Math.round((t.soldNou>0.001?t.soldNou:0)*100)/100;
+}
+
+// Repară retroactiv soldurile deja salvate, corupte de vechiul bug (care aduna
+// soldNou din TOATE lunile anterioare în loc să preia doar din ultima). Pentru
+// fiecare client, parcurge lunile în ordine cronologică și recalculează
+// soldPrecedent = soldNou-ul lunii imediat anterioare (calculat corect, în
+// cascadă). Prima lună a fiecărui client NU e atinsă — poate fi un sold de
+// deschidere introdus manual, dinainte de aplicație.
+function recalculeazaSoldurile(){
+  var clientiRecs={};
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!clientiRecs[rec.clientId])clientiRecs[rec.clientId]=[];
+    clientiRecs[rec.clientId].push(rec);
+  });
+  var corectate=0,clientiAfectati=0;
+  Object.keys(clientiRecs).forEach(function(clientId){
+    var recs=clientiRecs[clientId].sort(function(a,b){return a.month<b.month?-1:a.month>b.month?1:0;});
+    var aAvutCorectie=false;
+    for(var i=1;i<recs.length;i++){
+      var precedent=computeRecordTotal(recs[i-1]);
+      var soldCorect=Math.round((precedent.soldNou>0.001?precedent.soldNou:0)*100)/100;
+      if(Math.abs((parseFloat(recs[i].soldPrecedent)||0)-soldCorect)>0.004){
+        recs[i].soldPrecedent=soldCorect;
+        corectate++;aAvutCorectie=true;
+      }
+    }
+    if(aAvutCorectie)clientiAfectati++;
+  });
+  if(corectate>0)saveSvcStore();
+  return {corectate:corectate,clientiAfectati:clientiAfectati};
+}
+
+function ruleazaRecalculareSolduri(){
+  if(!confirm('Se vor recalcula soldurile precedente pentru toți clienții, pe baza lunii imediat anterioare (corectând bug-ul de însumare). Prima lună a fiecărui client nu e modificată. Continui?'))return;
+  var rezultat=recalculeazaSoldurile();
+  if(rezultat.corectate===0){
+    alert('Nu am găsit solduri de corectat — totul era deja corect.');
+  }else{
+    alert('Am corectat '+rezultat.corectate+' lun'+(rezultat.corectate===1?'ă':'i')+' la '+rezultat.clientiAfectati+' client'+(rezultat.clientiAfectati===1?'':'i')+'.');
+  }
+  renderRestanteTab();
 }
 function money(n){return (parseFloat(n)||0).toLocaleString('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2})+' lei';}
 // Formatare simplă (fără „lei"), pentru subtotaluri afișate direct în formulare
@@ -5461,6 +5508,8 @@ function renderRestanteTab(){
   var html='<div class="view-toolbar" style="padding:0 0 10px;background:transparent">'
     +'<input type="text" id="restante-search" placeholder="Caută client, firmă, CUI..." value="'+esc(restanteSearchQuery)+'" oninput="restanteSearchQuery=this.value;renderRestanteTab()" style="font-size:15px">'
     +'</div>';
+
+  html+='<button type="button" onclick="ruleazaRecalculareSolduri()" style="background:none;border:none;color:rgba(7,33,68,0.45);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;margin-bottom:8px"><i class="ti ti-history" style="font-size:14px"></i> Recalculează soldurile (corectează reportul dintre luni)</button>';
 
   html+='<div class="bday-today" style="justify-content:space-between">'
     +'<span><i class="ti ti-alert-triangle"></i> '+filteredItems.length+' cu restan&#539;e</span>'
@@ -7833,13 +7882,21 @@ function ensureDocCategories(c){
     c.docCategories.forEach(function(cat){
       if(!cat.folderName){cat.folderName=(cat.label||cat.key).replace(/[\/\\:*?"<>|]/g,'_').trim()||cat.key;completat=true;}
     });
+    // adăugăm retroactiv categoriile prestabilite noi (ex. Procură Specială),
+    // introduse ulterior, la clienții care aveau deja o listă salvată.
+    var arePeCare=c.docCategories.some(function(cat){return cat.key==='procura_speciala';});
+    if(!arePeCare){
+      c.docCategories.push({key:'procura_speciala',label:'Procură Specială',folderName:'Procură Specială'});
+      completat=true;
+    }
     if(completat)save();
     return c.docCategories;
   }
   var defaults=[
     {key:'ci',label:'Carte de identitate',folderName:'Carte de identitate'},
     {key:'cert',label:'Certificat de înregistrare',folderName:'Certificat de înregistrare'},
-    {key:'contract',label:'Contract prestări servicii',folderName:'Contract prestări servicii'}
+    {key:'contract',label:'Contract prestări servicii',folderName:'Contract prestări servicii'},
+    {key:'procura_speciala',label:'Procură Specială',folderName:'Procură Specială'}
   ];
   var custom=(c.foldereCustom||[]).map(function(f){return {key:f.key,label:f.label,folderName:(f.label||f.key).replace(/[\/\\:*?"<>|]/g,'_').trim()||f.key};});
   c.docCategories=defaults.concat(custom);
