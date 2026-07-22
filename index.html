@@ -8852,6 +8852,7 @@ function generateClientServicePDF(c,rec){
   doc.setFont('CrimsonPro','normal');doc.setFontSize(13);
 
   var total=0,anyLine=false;
+  var descColWidthSvc=90; // lățimea disponibilă înainte de coloana CANT. (margin+96)
   // Servicii firmă (PJ)
   var hasPJsvc=Object.keys(rec.services||{}).some(function(k){return rec.services[k]&&rec.services[k].qty;});
   var hasPFsvc=Object.keys(rec.services_pf||{}).some(function(k){return rec.services_pf[k]&&rec.services_pf[k].qty;});
@@ -8863,25 +8864,29 @@ function generateClientServicePDF(c,rec){
   Object.keys(rec.services||{}).forEach(function(k){
     var it=rec.services[k]||{qty:0,price:0};
     if(!it.qty)return;
+    checkPageSvc();
     anyLine=true;
     var sub=(it.qty||0)*(it.price||0);total+=sub;
     doc.setTextColor(navy[0],navy[1],navy[2]);
-    doc.text(labelForService(k),margin,y);
+    var descLines=doc.splitTextToSize(labelForService(k),descColWidthSvc);
+    doc.text(descLines,margin,y);
     doc.text(String(it.qty||0),margin+96,y,{align:'right'});
     doc.text(money(it.price),margin+130,y,{align:'right'});
     doc.text(money(sub),pageW-margin,y,{align:'right'});
-    y+=6.5;
+    y+=6.5*descLines.length;
   });
   (rec.diverse||[]).forEach(function(d){
     if(!d.qty&&!d.price&&!d.desc)return;
+    checkPageSvc();
     anyLine=true;
     var sub=(d.qty||0)*(d.price||0);total+=sub;
     doc.setTextColor(navy[0],navy[1],navy[2]);
-    doc.text(d.desc||'Divers',margin,y);
+    var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidthSvc);
+    doc.text(descLines,margin,y);
     doc.text(String(d.qty||0),margin+96,y,{align:'right'});
     doc.text(money(d.price),margin+130,y,{align:'right'});
     doc.text(money(sub),pageW-margin,y,{align:'right'});
-    y+=6.5;
+    y+=6.5*descLines.length;
   });
   // Servicii persoană fizică (PF)
   if(hasPFsvc){
@@ -8891,14 +8896,16 @@ function generateClientServicePDF(c,rec){
     Object.keys(rec.services_pf||{}).forEach(function(k){
       var it=rec.services_pf[k]||{qty:0,price:0};
       if(!it.qty)return;
+      checkPageSvc();
       anyLine=true;
       var sub=(it.qty||0)*(it.price||0);total+=sub;
       doc.setTextColor(34,100,60);
-      doc.text(labelForService(k),margin,y);
+      var descLines=doc.splitTextToSize(labelForService(k),descColWidthSvc);
+      doc.text(descLines,margin,y);
       doc.text(String(it.qty||0),margin+96,y,{align:'right'});
       doc.text(money(it.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=6.5;
+      y+=6.5*descLines.length;
     });
     doc.setTextColor(navy[0],navy[1],navy[2]);
   }
@@ -9440,6 +9447,7 @@ function generateFisaIstoric(){
 
     // Services
     var hasLines=false;
+    var descColWidth=94; // lățimea disponibilă înainte de coloana CANT. (margin+100)
     Object.keys(rec.services||{}).forEach(function(k){
       var it=rec.services[k];
       if(!it||!it.qty)return;
@@ -9447,21 +9455,23 @@ function generateFisaIstoric(){
       hasLines=true;
       var sub=(it.qty||0)*(it.price||0);
       doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
-      doc.text(labelForService(k),margin+2,y);
+      var descLines=doc.splitTextToSize(labelForService(k),descColWidth);
+      doc.text(descLines,margin+2,y);
       doc.text(String(it.qty||0),margin+100,y,{align:'right'});
       doc.text(money(it.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=5.8;
+      y+=5.8*descLines.length;
     });
     (rec.diverse||[]).forEach(function(d){
       if(!d.qty&&!d.price&&!d.desc)return;
       checkP();hasLines=true;
       var sub=(d.qty||0)*(d.price||0);
-      doc.text(d.desc||'Divers',margin+2,y);
+      var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidth);
+      doc.text(descLines,margin+2,y);
       doc.text(String(d.qty||0),margin+100,y,{align:'right'});
       doc.text(money(d.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=5.8;
+      y+=5.8*descLines.length;
     });
     // PF services
     var pfKeys=Object.keys(rec.services_pf||{});
@@ -9476,11 +9486,12 @@ function generateFisaIstoric(){
         checkP();hasLines=true;
         var sub=(it.qty||0)*(it.price||0);
         doc.setTextColor(34,100,60);
-        doc.text(labelForService(k),margin+2,y);
+        var descLines=doc.splitTextToSize(labelForService(k),descColWidth);
+        doc.text(descLines,margin+2,y);
         doc.text(String(it.qty||0),margin+100,y,{align:'right'});
         doc.text(money(it.price),margin+130,y,{align:'right'});
         doc.text(money(sub),pageW-margin,y,{align:'right'});
-        y+=5.8;
+        y+=5.8*descLines.length;
       });
       doc.setTextColor(navy[0],navy[1],navy[2]);
     }
