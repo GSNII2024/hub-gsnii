@@ -4851,7 +4851,7 @@ function updateBnav(view){
 function updateLpStats(){
   var now=new Date();
   var restanteCount=clients.filter(function(c){
-    return clientRestanteLuni(c.id).length>0;
+    return clientRestantaCurenta(c.id,null)>0.004;
   }).length;
   var numeDiverseRestante={};
   getServiciiDiverse().forEach(function(d){
@@ -5461,10 +5461,31 @@ function clientRestanteLuni(clientId){
   });
 }
 
+// Soldul (soldNou) e cumulativ — fiecare lună îl include deja pe cel dinainte
+// (soldNou = soldPrecedent + servicii − încasat). De aceea restanța REALĂ,
+// curentă, a unui client e soldNou-ul ULTIMEI luni înregistrate — nu suma
+// soldNou din mai multe luni (asta ar aduna de mai multe ori aceeași datorie
+// reportată). Dacă ultima lună are sold ≤0, clientul nu mai are restanțe,
+// chiar dacă o lună anterioară avea sold pozitiv (a fost stinsă între timp).
+function clientLatestRecord(clientId,anLimita){
+  var latest=null;
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||rec.clientId!==clientId)return;
+    if(anLimita!=null&&parseInt((rec.month||'').split('-')[0])>anLimita)return;
+    if(!latest||rec.month>latest.month)latest=rec;
+  });
+  return latest;
+}
+function clientRestantaCurenta(clientId,anLimita){
+  var rec=clientLatestRecord(clientId,anLimita);
+  if(!rec)return 0;
+  var t=computeRecordTotal(rec);
+  return t.soldNou>0.004?Math.round(t.soldNou*100)/100:0;
+}
+
 function clientTotalRestante(clientId){
-  return clientRestanteLuni(clientId).reduce(function(s,r){
-    return s + computeRecordTotal(r).soldNou;
-  }, 0);
+  return clientRestantaCurenta(clientId,null);
 }
 
 var restanteSearchQuery='';
@@ -5473,9 +5494,10 @@ function renderRestanteTab(){
   // Clienți cu fișă — la fel ca înainte
   var items=[];
   clients.forEach(function(c){
+    var totalRestant=clientRestantaCurenta(c.id,null);
+    if(totalRestant<=0.004)return;
     var luni=clientRestanteLuni(c.id);
     if(!luni.length)return;
-    var totalRestant=luni.reduce(function(s,r){return s+computeRecordTotal(r).soldNou;},0);
     items.push({isDivers:false,c:c,luni:luni,totalRestant:totalRestant});
   });
   // Persoane fără fișă (Servicii → Persoană fără fișă) cu sumă neîncasată —
@@ -5573,12 +5595,14 @@ function renderRestanteTab(){
         +'</div>';
       // Detaliu pe luni (collapsed implicit)
       html+='<div class="restanta-detail" id="rdet-'+it.c.id+'" style="display:none">';
+      var ultimaLunaDetaliu=it.luni.length?it.luni[it.luni.length-1].month:null;
       it.luni.forEach(function(rec){
         var t=computeRecordTotal(rec);
+        var eCurenta=rec.month===ultimaLunaDetaliu;
         html+='<div class="restanta-luna-row">'
           +'<div class="restanta-luna-header">'
-          +'<span class="restanta-luna-label">'+monthLabel(rec.month)+'</span>'
-          +'<span class="exp-badge exp-red" style="font-size:11px">'+money(t.soldNou)+' restant</span>'
+          +'<span class="restanta-luna-label">'+monthLabel(rec.month)+(eCurenta?' <span style="font-size:11px;background:rgba(34,120,80,0.15);color:#1a6a40;padding:1px 6px;border-radius:10px">sold curent</span>':'')+'</span>'
+          +'<span class="exp-badge exp-red" style="font-size:11px">'+money(t.soldNou)+(eCurenta?'':' (istoric)')+'</span>'
           +'</div>'
           +'<div class="restanta-luna-detaliu">'
           +'<span>Servicii: '+money(t.serviceTotal)+'</span>'
@@ -6073,10 +6097,17 @@ function renderIncasariTab(){
     var t=computeRecordTotal(rec);
     totalServicii+=t.serviceTotal;
   });
+  // Restanțele sunt un sold curent (cumulativ) — nu se adună pe mai multe luni
+  // ale aceluiași client (fiecare lună îl include deja pe cel dinainte).
+  // Luăm doar ultima înregistrare a fiecărui client.
+  var clientiCuRecordIT={};
   Object.keys(svcStore).forEach(function(key){
-    var rec=svcStore[key];if(!rec)return;
-    var t=computeRecordTotal(rec);
-    if(t.soldNou>0.01)totalRestante+=t.soldNou;
+    var rec=svcStore[key];
+    if(rec&&rec.clientId)clientiCuRecordIT[rec.clientId]=1;
+  });
+  Object.keys(clientiCuRecordIT).forEach(function(cid){
+    var r=clientRestantaCurenta(cid,null);
+    if(r>0.01)totalRestante+=r;
   });
 
   var aniSet={};
@@ -6137,12 +6168,19 @@ function renderIncasariTab(){
   }else{
     perioadaLabel = incasariFilterLuna>0 ? luniRo[incasariFilterLuna]+' '+incasariFilterAn : 'An '+incasariFilterAn;
   }
-  // Restanțe aferente perioadei selectate
+  // Restanțe aferente perioadei selectate — soldNou e cumulativ, deci dacă
+  // perioada acoperă mai multe luni, luăm o singură dată, per client, ultima
+  // lui înregistrare din interval (nu suma tuturor lunilor lui din interval).
   var totalRestanteLuna=0;
+  var clientiInPerioadaRL={};
   Object.keys(svcStore).forEach(function(key){
-    var rec=svcStore[key];if(!rec)return;
+    var rec=svcStore[key];
+    if(!rec||!rec.clientId)return;
     if(!recMonthInPerioada(rec.month))return;
-    var t=computeRecordTotal(rec);
+    if(!clientiInPerioadaRL[rec.clientId]||rec.month>clientiInPerioadaRL[rec.clientId].month)clientiInPerioadaRL[rec.clientId]=rec;
+  });
+  Object.keys(clientiInPerioadaRL).forEach(function(cid){
+    var t=computeRecordTotal(clientiInPerioadaRL[cid]);
     if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
   });
 
@@ -6646,11 +6684,19 @@ function selectIncasareClient(clientId){
   if(!lunii.length){
     luniEl.innerHTML='<div style="font-size:13px;color:rgba(7,33,68,0.4);font-style:italic;padding:8px">Nu există luni cu sold neachitat.</div>';
   } else {
+    // Soldul e cumulativ (fiecare lună îl include deja pe cel dinainte), deci
+    // NU se pot bifa/aduna mai multe luni deodată — ar dubla restanța. Folosim
+    // radio (o singură selecție), implicit pe ULTIMA lună, care e singura care
+    // reflectă corect suma chiar datorată acum. Lunile mai vechi rămân doar
+    // pentru referință istorică / dacă vrei explicit să înregistrezi o plată
+    // pe o perioadă anume.
+    var ultimaLuna=lunii[lunii.length-1].month;
     luniEl.innerHTML=lunii.map(function(r){
+      var eCurenta=r.month===ultimaLuna;
       return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(7,33,68,0.03);border:1px solid rgba(7,33,68,0.1);border-radius:8px;margin-bottom:8px;cursor:pointer">'
-        +'<input type="checkbox" class="inc-luna-check" data-month="'+r.month+'" data-sold="'+r.total.soldNou.toFixed(2)+'" onchange="updateIncTotalBifat()" style="width:18px;height:18px;accent-color:var(--navy)">'
+        +'<input type="radio" name="inc-luna-radio" class="inc-luna-check" data-month="'+r.month+'" data-sold="'+r.total.soldNou.toFixed(2)+'"'+(eCurenta?' checked':'')+' onchange="updateIncTotalBifat()" style="width:18px;height:18px;accent-color:var(--navy)">'
         +'<div style="flex:1">'
-        +'<div style="font-weight:700;font-size:14px;color:var(--navy)">'+monthLabel(r.month)+'</div>'
+        +'<div style="font-weight:700;font-size:14px;color:var(--navy)">'+monthLabel(r.month)+(eCurenta?' <span style="font-size:11px;background:rgba(34,120,80,0.15);color:#1a6a40;padding:1px 6px;border-radius:10px">sold curent</span>':'')+'</div>'
         +'<div style="font-size:12px;color:rgba(7,33,68,0.5)">Total: '+money(r.total.serviceTotal)+' · Încasat: '+money(r.total.sumaIncasata)+'</div>'
         +'</div>'
         +'<span class="exp-badge exp-red">'+money(r.total.soldNou)+'</span>'
@@ -6659,11 +6705,13 @@ function selectIncasareClient(clientId){
   }
 
   document.getElementById('inc-luni-section').style.display='block';
+  updateIncTotalBifat();
 }
 
 function updateIncTotalBifat(){
   var total=0;
-  document.querySelectorAll('.inc-luna-check:checked').forEach(function(cb){total+=parseFloat(cb.getAttribute('data-sold'))||0;});
+  var bifat=document.querySelector('.inc-luna-check:checked');
+  if(bifat)total=parseFloat(bifat.getAttribute('data-sold'))||0;
   var el=document.getElementById('inc-total-bifat');if(el)el.textContent=money(total);
   var sumaEl=document.getElementById('inc-suma-ef');if(sumaEl)sumaEl.value=total.toFixed(2);
 }
@@ -7389,6 +7437,20 @@ function renderServiciiTab(){
     var t=computeRecordTotal(rec);
     totalServiciiAn+=t.serviceTotal;
     totalIncasatAn+=t.sumaIncasata;
+  });
+  // RESTANȚE nu se pot aduna pe lună — soldNou e cumulativ (fiecare lună îl
+  // include deja pe cel dinainte). Luăm, per client, doar ultima lui
+  // înregistrare până la finalul anului selectat.
+  var clientiPanaLaAn={};
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||!rec.clientId)return;
+    var anRec=parseInt((rec.month||'').split('-')[0]);
+    if(anRec>an)return;
+    if(!clientiPanaLaAn[rec.clientId]||rec.month>clientiPanaLaAn[rec.clientId].month)clientiPanaLaAn[rec.clientId]=rec;
+  });
+  Object.keys(clientiPanaLaAn).forEach(function(cid){
+    var t=computeRecordTotal(clientiPanaLaAn[cid]);
     if(t.soldNou>0.01)totalRestanteAn+=t.soldNou;
   });
   getServiciiDiverse().forEach(function(d){
@@ -8366,11 +8428,13 @@ function addRestantaRow(){
   if(!restante.length){alert('Nu există restanțe anterioare pentru acest client.');return;}
 
   var html='<div style="padding:1rem"><div class="section-title" style="margin-bottom:12px">Stinge restanțe</div>'
-    +'<div style="font-size:13px;color:rgba(7,33,68,0.5);margin-bottom:12px">Bifează lunile pe care vrei să le stingi:</div>';
+    +'<div style="font-size:13px;color:rgba(7,33,68,0.5);margin-bottom:12px">Soldul e cumulativ (fiecare lună îl include deja pe cel dinainte) — selectează o singură lună; cea mai recentă reflectă suma chiar datorată acum.</div>';
+  var ultimaRestanta=restante[restante.length-1].month;
   restante.forEach(function(r){
+    var eCurenta=r.month===ultimaRestanta;
     html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(7,33,68,0.03);border:1px solid rgba(7,33,68,0.1);border-radius:8px;margin-bottom:8px;cursor:pointer">'
-      +'<input type="checkbox" class="restanta-check" data-month="'+r.month+'" data-sold="'+r.total.soldNou.toFixed(2)+'" onchange="updateRestantaTotal()" style="width:18px;height:18px;accent-color:var(--navy)">'
-      +'<div style="flex:1"><div style="font-weight:700;font-size:14px;color:var(--navy)">'+monthLabel(r.month)+'</div>'
+      +'<input type="radio" name="restanta-radio" class="restanta-check" data-month="'+r.month+'" data-sold="'+r.total.soldNou.toFixed(2)+'"'+(eCurenta?' checked':'')+' onchange="updateRestantaTotal()" style="width:18px;height:18px;accent-color:var(--navy)">'
+      +'<div style="flex:1"><div style="font-weight:700;font-size:14px;color:var(--navy)">'+monthLabel(r.month)+(eCurenta?' <span style="font-size:11px;background:rgba(34,120,80,0.15);color:#1a6a40;padding:1px 6px;border-radius:10px">sold curent</span>':'')+'</div>'
       +'<div style="font-size:12px;color:rgba(7,33,68,0.5)">Servicii: '+money(r.total.serviceTotal)+' · Încasat: '+money(r.total.sumaIncasata)+'</div></div>'
       +'<span class="exp-badge exp-red">'+money(r.total.soldNou)+'</span></label>';
   });
@@ -8387,11 +8451,13 @@ function addRestantaRow(){
   document.getElementById('restanta-picker').querySelector('h2').textContent='Stinge restanțe';
   document.getElementById('restanta-picker').style.display='flex';
   injectIcons();
+  updateRestantaTotal();
 }
 
 function updateRestantaTotal(){
   var total=0;
-  document.querySelectorAll('.restanta-check:checked').forEach(function(cb){total+=parseFloat(cb.getAttribute('data-sold'))||0;});
+  var bifat=document.querySelector('.restanta-check:checked');
+  if(bifat)total=parseFloat(bifat.getAttribute('data-sold'))||0;
   var el=document.getElementById('restanta-total-sel');if(el)el.textContent=money(total);
   var sumaEl=document.getElementById('restanta-suma-efectiva');if(sumaEl)sumaEl.value=total.toFixed(2);
 }
@@ -9169,7 +9235,9 @@ function generateRaportRestante(clientId){
     doc.setTextColor(navy[0],navy[1],navy[2]);
     y+=8;
 
-    grandRestant+=t.soldNou;
+    // grandRestant = soldNou-ul ultimei luni parcurse (luni e ordonat crescător
+    // cronologic) — soldNou e deja cumulativ, deci NU se adună pe mai multe luni.
+    grandRestant=t.soldNou;
   });
 
   // Total restant general
@@ -9349,7 +9417,10 @@ function generateFisaIstoric(){
 
     grandTotal+=t.serviceTotal;
     grandIncasat+=t.sumaIncasata;
-    grandSold+=t.soldNou;
+    // SOLD e cumulativ (fiecare lună îl include deja pe cel dinainte) — reținem
+    // doar ultima valoare parcursă (recs e ordonat cronologic crescător), NU
+    // suma tuturor lunilor din interval.
+    grandSold=t.soldNou;
   });
 
   // Grand total
