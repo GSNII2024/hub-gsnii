@@ -10929,6 +10929,12 @@ function stergeDocumentSemnare(docId){
   saveSemnari(list);
   renderSemnariTab();
   if(doc){
+    // Ștergem folderul întreg din Drive (nu doar fișierele individuale de mai
+    // jos) — altfel, după ștergere, rămâne un folder gol dar vizibil în
+    // "Semnări/", care se acumulează la fiecare document șters.
+    if(doc.folderName){
+      gdriveDelete('Semnări/'+doc.folderName).catch(function(){});
+    }
     if(doc.pdfPath)gdriveDelete(doc.pdfPath).catch(function(){});
     if(doc.lucruPdfPath&&doc.lucruPdfPath!==doc.pdfPath)gdriveDelete(doc.lucruPdfPath).catch(function(){});
     (doc.signers||[]).forEach(function(s){
