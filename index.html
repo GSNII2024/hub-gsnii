@@ -4032,28 +4032,51 @@ function gdriveUploadBlobPath(fullPath,blob,mimeType){
   return gdriveUploadBlob(folderPath,filename,blob,mimeType);
 }
 // Obține bytes-ii unui fișier direct ca ArrayBuffer (pentru pdf-lib).
-function gdriveFetchArrayBuffer(path){
-  return gdriveFetchFileBlob(path).then(function(res){return res.blob.arrayBuffer();});
+function gdriveFetchArrayBuffer(path,onProgress){
+  return gdriveFetchFileBlob(path,onProgress).then(function(res){return res.blob.arrayBuffer();});
 }
 
 // Descarcă fișierul (codificat text de către script) și îl reconstituie ca Blob în browser.
-function gdriveFetchFileBlob(path){
+// onProgress(fraction 0..1) e opțional — dacă serverul expune Content-Length,
+// primește progres real; altfel pur și simplu nu e apelat (apelantul decide
+// cum arată o așteptare fără progres exact, de ex. cu un procent estimat).
+function gdriveFetchFileBlob(path,onProgress){
   if(docBlobCache[path])return Promise.resolve({blob:docBlobCache[path],sursa:'memorie'});
   return getCachedBlobPersistent(path).then(function(cached){
     if(cached){docBlobCache[path]=cached;return {blob:cached,sursa:'cache persistent'};}
-    return fetch(GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now())
-      .then(function(r){return r.json();})
-      .then(function(res){
-        if(!res||res.error||!res.base64)throw new Error('not_found');
-        var byteChars=atob(res.base64);
-        var byteNumbers=new Array(byteChars.length);
-        for(var i=0;i<byteChars.length;i++)byteNumbers[i]=byteChars.charCodeAt(i);
-        var byteArray=new Uint8Array(byteNumbers);
-        var blob=new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
-        docBlobCache[path]=blob;
-        setCachedBlobPersistent(path,blob);
-        return {blob:blob,sursa:'Drive (descărcat acum)'};
-      });
+    var url=GDRIVE_SCRIPT_URL+'?action=file&path='+encodeURIComponent(path)+'&t='+Date.now();
+    return fetch(url).then(function(r){
+      if(!onProgress||!r.body||!r.body.getReader)return r.json();
+      var totalStr=r.headers.get('Content-Length');
+      var total=totalStr?parseInt(totalStr,10):0;
+      var reader=r.body.getReader();
+      var received=0,chunks=[];
+      function pump(){
+        return reader.read().then(function(step){
+          if(step.done){
+            var full=new Uint8Array(received);
+            var offset=0;
+            chunks.forEach(function(c){full.set(c,offset);offset+=c.length;});
+            return JSON.parse(new TextDecoder('utf-8').decode(full));
+          }
+          chunks.push(step.value);
+          received+=step.value.length;
+          if(total>0)onProgress(Math.min(0.99,received/total));
+          return pump();
+        });
+      }
+      return pump();
+    }).then(function(res){
+      if(!res||res.error||!res.base64)throw new Error('not_found');
+      var byteChars=atob(res.base64);
+      var byteArray=new Uint8Array(byteChars.length);
+      for(var i=0;i<byteChars.length;i++)byteArray[i]=byteChars.charCodeAt(i);
+      var blob=new Blob([byteArray],{type:res.mimeType||'application/octet-stream'});
+      docBlobCache[path]=blob;
+      setCachedBlobPersistent(path,blob);
+      if(onProgress)onProgress(1);
+      return {blob:blob,sursa:'Drive (descărcat acum)'};
+    });
   });
 }
 
@@ -10984,7 +11007,15 @@ function renderSignUI(doc,signer){
     +'<div style="font-size:19px;font-weight:700;color:var(--navy)">'+esc(doc.titlu)+'</div>'
     +'<div style="font-size:13.5px;color:rgba(7,33,68,0.55);margin-top:4px">Salut, '+esc(signer.nume)+'! Te rog să citești documentul de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul acestuia, să îl semnezi.</div>'
     +'</div>';
-  html+='<div id="sign-pdf-pages"><div style="text-align:center;padding:30px;color:rgba(7,33,68,0.4)">Se încarcă documentul...</div></div>';
+  html+='<div id="sign-pdf-pages">'
+    +'<div style="text-align:center;padding:30px 20px">'
+    +'<div style="font-size:13.5px;color:rgba(7,33,68,0.55);margin-bottom:10px" id="sign-load-label">Se deschide documentul...</div>'
+    +'<div style="height:8px;border-radius:5px;background:rgba(7,33,68,0.1);overflow:hidden;max-width:280px;margin:0 auto">'
+    +'<div id="sign-load-bar" style="height:100%;width:0%;background:var(--gold);border-radius:5px;transition:width 0.25s ease"></div>'
+    +'</div>'
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.4);margin-top:6px" id="sign-load-pct">0%</div>'
+    +'</div>'
+    +'</div>';
   html+='<div class="section-title" style="margin-top:16px">Semnătura ta</div>'
     +'<div style="border:1px solid rgba(7,33,68,0.2);border-radius:10px;background:#fff">'
     +'<canvas id="sign-pad-canvas" style="width:100%;height:180px;display:block;touch-action:none"></canvas>'
@@ -10997,14 +11028,52 @@ function renderSignUI(doc,signer){
   container.innerHTML=html;
 
   setupSignaturePad();
+  startSemnProgress();
 
-  gdriveFetchArrayBuffer(doc.lucruPdfPath).then(function(buf){
+  // Descărcarea documentului (0 → 70% din bară). Dacă serverul nu expune
+  // Content-Length, ticăitul simulat din startSemnProgress ține bara vizibil
+  // în mișcare oricum — utilizatorul vede mereu un procent care crește.
+  gdriveFetchArrayBuffer(doc.lucruPdfPath,function(frac){
+    updateSemnProgress(frac*0.7,'Se descarcă documentul...');
+  }).then(function(buf){
     semnPdfBytesCache={path:doc.lucruPdfPath,buf:buf};
+    updateSemnProgress(0.7,'Se pregătesc paginile...');
     renderSignPdfPages(doc,signer,buf);
   }).catch(function(){
+    finishSemnProgress();
     var el=document.getElementById('sign-pdf-pages');
     if(el)el.innerHTML='<div class="empty">Nu am putut încărca documentul.</div>';
   });
+}
+
+// ── Bara de progres pentru deschiderea documentului de semnat ──────────────
+// Combină progresul real (descărcare pe bytes, apoi pagini randate) cu un
+// tic simulat, lent, care ține bara vizibil în mișcare chiar dacă rețeaua nu
+// oferă progres exact — procentul nu stagnează niciodată și nu dă înapoi.
+var semnProgressVal=0,semnProgressTimer=null;
+function startSemnProgress(){
+  semnProgressVal=0;
+  if(semnProgressTimer)clearInterval(semnProgressTimer);
+  semnProgressTimer=setInterval(function(){
+    // urcă lin spre 65%, din ce în ce mai încet — restul îl completează
+    // progresul real (descărcare/randare pagini)
+    var tinta=0.65;
+    if(semnProgressVal<tinta)updateSemnProgress(semnProgressVal+(tinta-semnProgressVal)*0.06);
+  },200);
+}
+function updateSemnProgress(frac,label){
+  if(frac<semnProgressVal)return; // nu dăm niciodată înapoi
+  semnProgressVal=Math.max(0,Math.min(1,frac));
+  var bar=document.getElementById('sign-load-bar');
+  var pct=document.getElementById('sign-load-pct');
+  var lbl=document.getElementById('sign-load-label');
+  if(bar)bar.style.width=(semnProgressVal*100).toFixed(0)+'%';
+  if(pct)pct.textContent=(semnProgressVal*100).toFixed(0)+'%';
+  if(lbl&&label)lbl.textContent=label;
+}
+function finishSemnProgress(){
+  if(semnProgressTimer){clearInterval(semnProgressTimer);semnProgressTimer=null;}
+  semnProgressVal=1;
 }
 
 // Memorăm bytes-ii documentului deja descărcați (la afișare), ca la trimiterea
@@ -11021,48 +11090,61 @@ function scrollToSignaturePad(){
 function renderSignPdfPages(doc,signer,arrayBuffer){
   var container=document.getElementById('sign-pdf-pages');
   if(!container)return;
-  container.innerHTML='';
   var myZones=(doc.zones||[]).filter(function(z){return z.signerId===signer.id;});
   pdfjsLib.getDocument({data:arrayBuffer.slice(0)}).promise.then(function(pdf){
-    var chain=Promise.resolve();
+    // Pregătim din timp un wrap gol per pagină, în ordine, ca paginile să
+    // apară mereu în ordinea corectă în pagină chiar dacă randarea lor (mai
+    // jos, în paralel) se termină într-o altă ordine.
+    container.innerHTML='';
+    var wraps=[];
+    for(var i=0;i<pdf.numPages;i++){
+      var w=document.createElement('div');
+      w.style.position='relative';w.style.marginBottom='14px';
+      w.style.border='1px solid rgba(7,33,68,0.15)';w.style.borderRadius='8px';w.style.overflow='hidden';
+      w.style.minHeight='120px';w.style.background='rgba(7,33,68,0.03)';
+      container.appendChild(w);
+      wraps.push(w);
+    }
+    var gata=0;
+    // Randăm toate paginile în paralel (nu mai așteptăm rând pe rând) — mult
+    // mai rapid pe documente cu mai multe pagini, mai ales pe conexiuni bune.
+    var randari=[];
     var _loop=function(pageNum){
-      chain=chain.then(function(){
-        return pdf.getPage(pageNum).then(function(page){
-          var viewport=page.getViewport({scale:1.3});
-          var pageWrap=document.createElement('div');
-          pageWrap.style.position='relative';
-          pageWrap.style.marginBottom='14px';
-          pageWrap.style.border='1px solid rgba(7,33,68,0.15)';
-          pageWrap.style.borderRadius='8px';
-          pageWrap.style.overflow='hidden';
-          container.appendChild(pageWrap);
-          var canvas=document.createElement('canvas');
-          canvas.width=viewport.width;canvas.height=viewport.height;
-          canvas.style.width='100%';canvas.style.display='block';
-          pageWrap.appendChild(canvas);
-          return page.render({canvasContext:canvas.getContext('2d'),viewport:viewport}).promise.then(function(){
-            myZones.filter(function(z){return z.page===(pageNum-1);}).forEach(function(z){
-              var box=document.createElement('div');
-              box.style.position='absolute';
-              box.style.left=(z.xPct*100)+'%';box.style.top=(z.yPct*100)+'%';
-              box.style.width=(z.wPct*100)+'%';box.style.height=(z.hPct*100)+'%';
-              box.style.border='2px dashed #1a6a40';
-              box.style.background='rgba(34,120,80,0.12)';
-              box.style.display='flex';box.style.alignItems='center';box.style.justifyContent='center';
-              box.style.cursor='pointer';
-              box.title='Apasă ca să ajungi direct la semnătură';
-              box.innerHTML='<span style="font-size:10px;font-weight:700;color:#1a6a40;background:#fff;padding:1px 5px;border-radius:4px;pointer-events:none">Semnează aici</span>';
-              box.addEventListener('click',scrollToSignaturePad);
-              pageWrap.appendChild(box);
-            });
+      randari.push(pdf.getPage(pageNum).then(function(page){
+        var viewport=page.getViewport({scale:1.3});
+        var pageWrap=wraps[pageNum-1];
+        pageWrap.style.minHeight='';pageWrap.style.background='';
+        var canvas=document.createElement('canvas');
+        canvas.width=viewport.width;canvas.height=viewport.height;
+        canvas.style.width='100%';canvas.style.display='block';
+        pageWrap.appendChild(canvas);
+        return page.render({canvasContext:canvas.getContext('2d'),viewport:viewport}).promise.then(function(){
+          myZones.filter(function(z){return z.page===(pageNum-1);}).forEach(function(z){
+            var box=document.createElement('div');
+            box.style.position='absolute';
+            box.style.left=(z.xPct*100)+'%';box.style.top=(z.yPct*100)+'%';
+            box.style.width=(z.wPct*100)+'%';box.style.height=(z.hPct*100)+'%';
+            box.style.border='2px dashed #1a6a40';
+            box.style.background='rgba(34,120,80,0.12)';
+            box.style.display='flex';box.style.alignItems='center';box.style.justifyContent='center';
+            box.style.cursor='pointer';
+            box.title='Apasă ca să ajungi direct la semnătură';
+            box.innerHTML='<span style="font-size:10px;font-weight:700;color:#1a6a40;background:#fff;padding:1px 5px;border-radius:4px;pointer-events:none">Semnează aici</span>';
+            box.addEventListener('click',scrollToSignaturePad);
+            pageWrap.appendChild(box);
           });
+          gata++;
+          updateSemnProgress(0.7+0.3*(gata/pdf.numPages),'Se pregătesc paginile ('+gata+'/'+pdf.numPages+')...');
         });
-      });
+      }));
     };
-    for(var i=1;i<=pdf.numPages;i++)_loop(i);
-    return chain;
+    for(var pn=1;pn<=pdf.numPages;pn++)_loop(pn);
+    return Promise.all(randari);
+  }).then(function(){
+    finishSemnProgress();
   }).catch(function(e){
     console.error('Eroare randare PDF:',e);
+    finishSemnProgress();
     container.innerHTML='<div class="empty">Nu am putut afișa documentul.</div>';
   });
 }
