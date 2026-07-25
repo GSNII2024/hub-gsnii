@@ -4521,26 +4521,35 @@ function uploadDocsCatDU(input,clientId,year){
     if(loadEl)loadEl.textContent='Se încarcă (0/'+files.length+')...';
     var uploadPromises=files.map(function(file){
       return readFileOptimizat(file).then(function(res){
-        if(!res)return null;
+        if(!res)return {eroare:'nu am putut citi fișierul „'+file.name+'"'};
         var safeName=Date.now()+'_'+Math.random().toString(36).slice(2,6)+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         return gdriveUpload(folderPath,safeName,res.dataURL,res.type).then(function(uploadRes){
           done++;
           if(loadEl)loadEl.textContent='Se încarcă ('+done+'/'+files.length+')...';
-          if(!uploadRes||!uploadRes.success)return null;
+          if(!uploadRes||!uploadRes.success)return {eroare:'serverul a refuzat „'+file.name+'"'+(uploadRes&&uploadRes.error?' ('+uploadRes.error+')':'')};
           return {path:folderPath+'/'+safeName,name:file.name,type:res.type,category:'du',duYear:String(year),date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
-        }).catch(function(){return null;});
+        }).catch(function(err){return {eroare:'eroare de rețea la „'+file.name+'": '+(err&&err.message?err.message:'necunoscută')};});
       });
     });
     return Promise.all(uploadPromises);
   }).then(function(results){
-    var reusite=(results||[]).filter(function(r){return r;});
+    var reusite=(results||[]).filter(function(r){return r&&!r.eroare;});
+    var esuate=(results||[]).filter(function(r){return r&&r.eroare;});
+    // Nu mai eșuăm silențios — dacă ceva n-a mers, utilizatorul trebuie să știe
+    // exact ce, altfel pare că "nu se întâmplă nimic" (fix pentru un bug real).
+    if(esuate.length){
+      alert('Nu am putut încărca '+esuate.length+' din '+files.length+' fișier'+(files.length===1?'':'e')+':\n\n'+esuate.map(function(e){return '• '+e.eroare;}).join('\n'));
+    }
     if(!reusite.length)return null;
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
       reusite.forEach(function(r){meta.push(r);});
       return gdriveSet('doc_meta_'+clientId,meta);
     });
-  }).then(function(){
+  }).catch(function(err){
+    console.error('Eroare la încărcarea documentelor DU:',err);
+    alert('Nu am putut încărca documentele. Detaliu tehnic: '+(err&&err.message?err.message:'necunoscut'));
+  }).finally(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
     loadDocsDU(clientId);
@@ -11018,7 +11027,7 @@ function initSignPage(token){
       return;
     }
     if(signer.status==='semnat'){
-      container.innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ai semnat deja acest document.</div><div style="margin-top:8px;color:rgba(7,33,68,0.5)">Mulțumim!</div></div>';
+      container.innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ați semnat deja acest document.</div><div style="margin-top:8px;color:rgba(7,33,68,0.5)">Vă mulțumim!</div></div>';
       return;
     }
     if(!signer.deschisAt){
@@ -11028,7 +11037,7 @@ function initSignPage(token){
     }
     renderSignUI(doc,signer);
   }).catch(function(){
-    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:#b23b3b">Nu m-am putut conecta. Verifică internetul și reîncearcă.</div>';
+    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:#b23b3b">Nu am putut stabili conexiunea. Vă rog verificați internetul și reîncercați.</div>';
   });
 }
 
@@ -11036,7 +11045,7 @@ function renderSignUI(doc,signer){
   var container=document.getElementById('sign-page-content');
   var html='<div style="text-align:center;padding:16px 0">'
     +'<div style="font-size:19px;font-weight:700;color:var(--navy)">'+esc(doc.titlu)+'</div>'
-    +'<div style="font-size:13.5px;color:rgba(7,33,68,0.55);margin-top:4px">Salut, '+esc(signer.nume)+'! Te rog să citești documentul de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul acestuia, să îl semnezi.</div>'
+    +'<div style="font-size:13.5px;color:rgba(7,33,68,0.55);margin-top:4px">Bună ziua, '+esc(signer.nume)+'. Vă rog să citiți documentul de mai jos și să verificați corectitudinea datelor. Dacă sunteți de acord cu conținutul, vă rog să semnați mai jos.</div>'
     +'</div>';
   html+='<div id="sign-pdf-pages">'
     +'<div style="text-align:center;padding:30px 20px">'
@@ -11055,7 +11064,7 @@ function renderSignUI(doc,signer){
     +'<button type="button" onclick="clearSignPad()" style="flex:1;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer">Șterge</button>'
     +'<button type="button" onclick="imbunatatesteSemnatura()" style="flex:1.3;padding:12px;border-radius:8px;border:1px solid rgba(26,58,143,0.35);background:#fff;color:rgb(26,58,143);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">✒️ Îmbunătățește</button>'
     +'</div>';
-  html+='<button type="button" id="sign-submit-btn" onclick="submitSemnatura(\''+doc.id+'\',\''+signer.id+'\')" style="width:100%;margin-top:8px;padding:13px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">Trimite semnătura</button>';
+  html+='<button type="button" id="sign-submit-btn" onclick="submitSemnatura(\''+doc.id+'\',\''+signer.id+'\')" style="width:100%;margin-top:8px;padding:13px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">Trimiteți semnătura</button>';
   container.innerHTML=html;
 
   setupSignaturePad();
@@ -11159,7 +11168,7 @@ function renderSignPdfPages(doc,signer,arrayBuffer){
             box.style.background='rgba(34,120,80,0.12)';
             box.style.display='flex';box.style.alignItems='center';box.style.justifyContent='center';
             box.style.cursor='pointer';
-            box.title='Apasă ca să ajungi direct la semnătură';
+            box.title='Apăsați pentru a ajunge direct la semnătură';
             box.innerHTML='<span style="font-size:10px;font-weight:700;color:#1a6a40;background:#fff;padding:1px 5px;border-radius:4px;pointer-events:none">Semnează aici</span>';
             box.addEventListener('click',scrollToSignaturePad);
             pageWrap.appendChild(box);
@@ -11400,7 +11409,7 @@ function fetchPublicIP(){
 }
 
 function submitSemnatura(docId,signerId){
-  if(!signPadHasContent){alert('Te rugăm să desenezi semnătura înainte de a trimite.');return;}
+  if(!signPadHasContent){alert('Vă rog să desenați semnătura înainte de a trimite.');return;}
   // Aplic automat îmbunătățirea de cerneală înainte de trimitere, dacă nu a fost deja apăsat butonul.
   if(signStrokes.length)imbunatatesteSemnatura();
   var btn=document.getElementById('sign-submit-btn');
@@ -11477,7 +11486,7 @@ function submitSemnatura(docId,signerId){
     });
   }).then(function(result){
     if(result.alreadySigned){
-      document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ai semnat deja acest document.</div></div>';
+      document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">Ați semnat deja acest document.</div></div>';
       return;
     }
     try{
@@ -11487,20 +11496,20 @@ function submitSemnatura(docId,signerId){
       var wrap=document.createElement('div');
       wrap.style.cssText='text-align:center;padding:60px 20px';
       wrap.innerHTML='<div style="font-size:48px;margin-bottom:14px">✓</div>'
-        +'<div style="font-size:19px;font-weight:700;color:#1a6a40">Mulțumesc! Documentul a fost semnat.</div>'
-        +'<div style="margin-top:8px;margin-bottom:22px;color:rgba(7,33,68,0.5);font-size:14px">Poți descărca o copie mai jos, înainte să închizi pagina.</div>';
+        +'<div style="font-size:19px;font-weight:700;color:#1a6a40">Vă mulțumesc! Documentul a fost semnat cu succes.</div>'
+        +'<div style="margin-top:8px;margin-bottom:22px;color:rgba(7,33,68,0.5);font-size:14px">Puteți descărca o copie mai jos, înainte să închideți pagina.</div>';
       var btnRow=document.createElement('div');
       btnRow.style.cssText='display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto';
 
       var btn1=document.createElement('button');
       btn1.type='button';
-      btn1.textContent='⬇️ Descarcă documentul semnat';
+      btn1.textContent='⬇️ Descărcați documentul semnat';
       btn1.style.cssText='padding:12px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer';
       btn1.addEventListener('click',function(){descarcaDocumentSemnatFinal(pathSemnat,doc.titlu);});
 
       var btn2=document.createElement('button');
       btn2.type='button';
-      btn2.textContent='📄 Deschide certificatul de semnare';
+      btn2.textContent='📄 Deschideți certificatul de semnare';
       btn2.style.cssText='padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer';
       btn2.addEventListener('click',function(){genereazaRaportSemnare(doc.id,doc);});
 
@@ -11510,18 +11519,18 @@ function submitSemnatura(docId,signerId){
 
       var note=document.createElement('div');
       note.style.cssText='margin-top:16px;color:rgba(7,33,68,0.35);font-size:12px';
-      note.textContent='Poți închide pagina oricând, după ce ai descărcat ce ai nevoie.';
+      note.textContent='Puteți închide pagina oricând, după ce ați descărcat ce aveți nevoie.';
       wrap.appendChild(note);
 
       cont.appendChild(wrap);
     }catch(uiErr){
       console.error('Eroare la afișarea confirmării:',uiErr);
-      document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:14px">✓</div><div style="font-size:19px;font-weight:700;color:#1a6a40">Mulțumesc! Documentul a fost semnat.</div></div>';
+      document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:14px">✓</div><div style="font-size:19px;font-weight:700;color:#1a6a40">Vă mulțumesc! Documentul a fost semnat cu succes.</div></div>';
     }
   }).catch(function(e){
     console.error('Eroare la trimiterea semnăturii:',e);
-    alert('A apărut o eroare. Verifică internetul și încearcă din nou.');
-    if(btn){btn.disabled=false;btn.textContent='Trimite semnătura';}
+    alert('A apărut o eroare. Vă rog verificați internetul și încercați din nou.');
+    if(btn){btn.disabled=false;btn.textContent='Trimiteți semnătura';}
   });
 }
 
