@@ -3964,7 +3964,7 @@ function sbStorageUrl(path){
 // ══ GOOGLE DRIVE (Apps Script) pentru documentele clienților ══
 // Notă: Semnările (contracte de semnat) rămân pe Supabase Storage deocamdată;
 // migrarea lor e o etapă separată.
-var GDRIVE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyq4IxUIrvQWoQL3gbKibNesDd9ICJvOXLsTM7XHscXpkGIdeeTIZ_k1qZkWc2tZ3o/exec';
+var GDRIVE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyq4IxUIrvQWoQL3gbKibNesDd9lCJvOXLsTM7XHscXpkGIdeeTlZ_k1qZkWc2tZ3o/exec';
 
 function gdriveGet(key){
   return fetch(GDRIVE_SCRIPT_URL+'?action=get&key='+encodeURIComponent(key)+'&t='+Date.now())
