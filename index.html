@@ -4083,7 +4083,9 @@ function gdriveFetchFileBlob(path,onProgress){
       }
       return pump();
     }).then(function(res){
-      if(!res||res.error||!res.base64)throw new Error('not_found');
+      if(!res)throw new Error('răspuns gol de la server');
+      if(res.error)throw new Error(typeof res.error==='string'?res.error:'eroare de la script (fără mesaj)');
+      if(!res.base64)throw new Error('serverul nu a returnat conținutul fișierului (base64 lipsă în răspuns)');
       var byteChars=atob(res.base64);
       var byteArray=new Uint8Array(byteChars.length);
       for(var i=0;i<byteChars.length;i++)byteArray[i]=byteChars.charCodeAt(i);
@@ -4108,9 +4110,10 @@ function viewDocDirect(path,btnEl){
     if(newTab&&!newTab.closed){newTab.location.href=url;}
     else{window.open(url,'_blank');}
     aratToastDiagnostic('Sursă: '+res.sursa+' · '+ms+' ms');
-  }).catch(function(){
+  }).catch(function(err){
     if(newTab&&!newTab.closed)newTab.close();
-    alert('Nu am putut deschide documentul. Verifică internetul și încearcă din nou.');
+    console.error('Eroare la deschiderea documentului ('+path+'):',err);
+    alert('Nu am putut deschide documentul.\n\nDetaliu tehnic: '+(err&&err.message?err.message:'necunoscut')+'\n\nVerifică internetul și încearcă din nou.');
   })
   .finally(function(){if(btnEl){btnEl.innerHTML=originalHtml;btnEl.style.pointerEvents='';}});
 }
