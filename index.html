@@ -10753,6 +10753,10 @@ var SEMN_I18N={
     enhanceBtn:'✒️ Îmbunătățește',
     submitBtn:'Trimiteți semnătura',
     submittingBtn:'Se trimite...',
+    preparingSubmit:'Se pregătește documentul...',
+    embeddingSignature:'Se inserează semnătura...',
+    uploadingSignature:'Se încarcă semnătura...',
+    finalizing:'Se finalizează...',
     signHereTooltip:'Apăsați pentru a ajunge direct la semnătură',
     signHereLabel:'Semnați aici',
     needSignatureAlert:'Vă rog să desenați semnătura înainte de a trimite.',
@@ -10780,6 +10784,10 @@ var SEMN_I18N={
     enhanceBtn:'✒️ Javítás',
     submitBtn:'Aláírás elküldése',
     submittingBtn:'Küldés folyamatban...',
+    preparingSubmit:'A dokumentum előkészítése...',
+    embeddingSignature:'Az aláírás beillesztése...',
+    uploadingSignature:'Az aláírás feltöltése...',
+    finalizing:'Véglegesítés...',
     signHereTooltip:'Koppintson ide, hogy az aláíráshoz ugorjon',
     signHereLabel:'Aláírás itt',
     needSignatureAlert:'Kérem, rajzolja meg az aláírását, mielőtt elküldi.',
@@ -11227,6 +11235,13 @@ function renderSignUI(doc,signer){
     +'<button type="button" onclick="imbunatatesteSemnatura()" style="flex:1.3;padding:12px;border-radius:8px;border:1px solid rgba(26,58,143,0.35);background:#fff;color:rgb(26,58,143);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">'+t('enhanceBtn')+'</button>'
     +'</div>';
   html+='<button type="button" id="sign-submit-btn" onclick="submitSemnatura(\''+doc.id+'\',\''+signer.id+'\')" style="width:100%;margin-top:8px;padding:13px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">'+t('submitBtn')+'</button>';
+  html+='<div id="submit-progress-wrap" style="display:none;margin-top:10px;text-align:center">'
+    +'<div style="font-size:12.5px;color:rgba(7,33,68,0.55);margin-bottom:6px" id="submit-progress-label">'+t('preparingSubmit')+'</div>'
+    +'<div style="height:7px;border-radius:5px;background:rgba(7,33,68,0.1);overflow:hidden;max-width:260px;margin:0 auto">'
+    +'<div id="submit-progress-bar" style="height:100%;width:0%;background:var(--gold);border-radius:5px;transition:width 0.25s ease"></div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:rgba(7,33,68,0.4);margin-top:5px" id="submit-progress-pct">0%</div>'
+    +'</div>';
   container.innerHTML=html;
 
   setupSignaturePad();
@@ -11276,6 +11291,36 @@ function updateSemnProgress(frac,label){
 function finishSemnProgress(){
   if(semnProgressTimer){clearInterval(semnProgressTimer);semnProgressTimer=null;}
   semnProgressVal=1;
+}
+
+// ── Bara de progres la TRIMITEREA semnăturii (separată de cea de încărcare
+// a documentului) — vizibilă sub buton, din momentul apăsării până la final.
+var submitProgressVal=0,submitProgressTimer=null;
+function showSubmitProgress(){
+  var wrap=document.getElementById('submit-progress-wrap');
+  if(wrap)wrap.style.display='block';
+  submitProgressVal=0;
+  updateSubmitProgress(0.02,t('preparingSubmit'));
+  if(submitProgressTimer)clearInterval(submitProgressTimer);
+  submitProgressTimer=setInterval(function(){
+    var tinta=0.9;
+    if(submitProgressVal<tinta)updateSubmitProgress(submitProgressVal+(tinta-submitProgressVal)*0.08);
+  },200);
+}
+function updateSubmitProgress(frac,label){
+  if(frac<submitProgressVal)return;
+  submitProgressVal=Math.max(0,Math.min(1,frac));
+  var bar=document.getElementById('submit-progress-bar');
+  var pct=document.getElementById('submit-progress-pct');
+  var lbl=document.getElementById('submit-progress-label');
+  if(bar)bar.style.width=(submitProgressVal*100).toFixed(0)+'%';
+  if(pct)pct.textContent=(submitProgressVal*100).toFixed(0)+'%';
+  if(lbl&&label)lbl.textContent=label;
+}
+function hideSubmitProgress(){
+  if(submitProgressTimer){clearInterval(submitProgressTimer);submitProgressTimer=null;}
+  var wrap=document.getElementById('submit-progress-wrap');
+  if(wrap)wrap.style.display='none';
 }
 
 // Memorăm bytes-ii documentului deja descărcați (la afișare), ca la trimiterea
@@ -11576,6 +11621,7 @@ function submitSemnatura(docId,signerId){
   if(signStrokes.length)imbunatatesteSemnatura();
   var btn=document.getElementById('sign-submit-btn');
   if(btn){btn.disabled=true;btn.textContent=t('submittingBtn');}
+  showSubmitProgress();
 
   var canvas=document.getElementById('sign-pad-canvas');
   var signatureDataUrl=canvas.toDataURL('image/png');
@@ -11590,11 +11636,13 @@ function submitSemnatura(docId,signerId){
     if(!signer)throw new Error('Semnatar negăsit');
     if(signer.status==='semnat')return{list:list,alreadySigned:true};
 
+    updateSubmitProgress(0.15,t('preparingSubmit'));
     var pdfBytesPromise=(semnPdfBytesCache&&semnPdfBytesCache.path===doc.lucruPdfPath)
       ?Promise.resolve(semnPdfBytesCache.buf)
       :gdriveFetchArrayBuffer(doc.lucruPdfPath);
 
     return pdfBytesPromise.then(function(pdfBytes){
+      updateSubmitProgress(0.3,t('embeddingSignature'));
       return PDFLib.PDFDocument.load(pdfBytes).then(function(pdfDoc){
         var myZones=doc.zones.filter(function(z){return z.signerId===signerId;});
         var rotatedCache={};
@@ -11621,6 +11669,7 @@ function submitSemnatura(docId,signerId){
         });
         return Promise.all(zonePromises).then(function(){return pdfDoc.save();});
       }).then(function(newPdfBytes){
+        updateSubmitProgress(0.55,t('uploadingSignature'));
         var blob=new Blob([newPdfBytes],{type:'application/pdf'});
         return gdriveUploadBlobPath(doc.lucruPdfPath,blob,'application/pdf').then(function(){
           // Documentul tocmai s-a suprascris cu varianta semnată — ștergem orice
@@ -11632,6 +11681,7 @@ function submitSemnatura(docId,signerId){
           var sigBlob=dataURLtoBlob(signatureDataUrl);
           var sigPath='Semnări/'+folderDoc+'/semnaturi/'+signerId+'.png';
           return gdriveUploadBlob('Semnări/'+folderDoc+'/semnaturi',signerId+'.png',sigBlob,'image/png').then(function(){
+            updateSubmitProgress(0.75,t('finalizing'));
             return ipPromise;
           }).then(function(ip){
             signer.status='semnat';
@@ -11722,6 +11772,7 @@ function submitSemnatura(docId,signerId){
     }
   }).catch(function(e){
     console.error('Eroare la trimiterea semnăturii:',e);
+    hideSubmitProgress();
     alert(t('submitErrorAlert'));
     if(btn){btn.disabled=false;btn.textContent=t('submitBtn');}
   });
