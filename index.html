@@ -10209,7 +10209,9 @@ function renderSemnariTab(){
   var inCurs=docs.filter(function(d){return d.status!=='semnat';});
   var semnate=docs.filter(function(d){return d.status==='semnat';});
 
-  var html='<div class="bday-today"><i class="ti ti-pencil"></i> DOCUMENTE DE SEMNAT</div>';
+  var html='<div class="bday-today" style="justify-content:space-between"><span><i class="ti ti-pencil"></i> DOCUMENTE DE SEMNAT</span>'
+    +(semnariSubTab!=='nou'?'<button type="button" onclick="refreshSemnariDinCloud()" id="semnari-refresh-btn" style="background:none;border:none;color:rgba(7,33,68,0.45);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px"><i class="ti ti-history" style="font-size:14px"></i> Reîmprospătează</button>':'')
+    +'</div>';
   html+='<div class="todo-tabs" style="margin-bottom:14px">'
     +'<button class="todo-tab'+(semnariSubTab==='nou'?' active':'')+'" onclick="semnariSubTab=\'nou\';renderSemnariTab()">Semnare nouă</button>'
     +'<button class="todo-tab'+(semnariSubTab==='incurs'?' active':'')+'" onclick="semnariSubTab=\'incurs\';renderSemnariTab()">În curs ('+inCurs.length+')</button>'
@@ -10222,20 +10224,24 @@ function renderSemnariTab(){
   if(semnariSubTab==='nou')renderSemnareNoua();
   else if(semnariSubTab==='incurs')renderSemnariListaIncurs(inCurs);
   else renderSemnariListaSemnate(semnate);
+}
 
-  // Reîmprospătăm din cloud de fiecare dată când se deschide tab-ul — altfel,
-  // dacă un client tocmai a semnat pe alt dispozitiv, statusul rămâne "vechi"
-  // (necitit din memoria locală) până la o reîncărcare completă a aplicației.
-  // Nu suprascriem nimic în cloud aici — doar citim și, dacă e ceva nou,
-  // actualizăm afișajul local.
-  if(semnariSubTab!=='nou'){
-    sbGet('semnari').then(function(raw){
-      var fresh=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
-      if(JSON.stringify(fresh)===JSON.stringify(docs))return;
-      localStorage.setItem('crm_semnari_v1',JSON.stringify(fresh));
-      if(semnariSubTab!=='nou')renderSemnariTab();
-    }).catch(function(){});
-  }
+// Reîmprospătare EXPLICITĂ (doar la apăsare, niciodată automat) a listei din
+// cloud — ca să vezi dacă un client a semnat între timp pe alt dispozitiv,
+// fără să reîncarci toată aplicația. Declanșată doar de utilizator, ca să nu
+// mai riște vreo cursă cu o scriere locală recentă (ex. tocmai salvat un
+// document nou) — exact genul de bug întâlnit anterior în aplicație.
+function refreshSemnariDinCloud(){
+  var btn=document.getElementById('semnari-refresh-btn');
+  if(btn)btn.textContent='Se verifică...';
+  sbGet('semnari').then(function(raw){
+    var fresh=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
+    localStorage.setItem('crm_semnari_v1',JSON.stringify(fresh));
+    renderSemnariTab();
+  }).catch(function(){
+    if(btn){btn.innerHTML='<i class="ti ti-history" style="font-size:14px"></i> Reîmprospătează';injectIcons();}
+    alert('Nu am putut verifica actualizări — verifică internetul.');
+  });
 }
 
 // ── Semnare nouă: creare document ─────────────────────────
@@ -10657,16 +10663,16 @@ function salveazaSemnareNoua(){
   var numeFolder=numeFisier+'_'+docId.slice(-6);
   var blob=new Blob([semnareDraft.pdfBytes],{type:'application/pdf'});
   var creatorIPPromise=fetchPublicIP();
-  gdriveUploadBlob('Semnări/'+numeFolder,numeFisier+'.pdf',blob,'application/pdf').then(function(res){
-    if(!res||!res.success)throw new Error('upload_failed');
-    return gdriveUploadBlob('Semnări/'+numeFolder,numeFisier+'_semnat.pdf',blob,'application/pdf');
-  }).then(function(res){
+  // Un singur fișier la creare (nu o copie separată "nesemnat" + una "de lucru"
+  // identică) — copia de lucru pornește nesemnată și se suprascrie progresiv
+  // cu semnăturile pe măsură ce fiecare semnatar termină.
+  gdriveUploadBlob('Semnări/'+numeFolder,numeFisier+'_semnat.pdf',blob,'application/pdf').then(function(res){
     if(!res||!res.success)throw new Error('upload_failed');
     return creatorIPPromise.then(function(creatorIP){
     var doc={
       id:docId,titlu:titlu,createdAt:Date.now(),
       folderName:numeFolder,
-      pdfPath:'Semnări/'+numeFolder+'/'+numeFisier+'.pdf',
+      pdfPath:null,
       lucruPdfPath:'Semnări/'+numeFolder+'/'+numeFisier+'_semnat.pdf',
       semnatPdfPath:null,
       signers:semnareDraft.signers,
@@ -11094,25 +11100,39 @@ function deschideSauGenereazaRaportSemnare(docId,btnEl){
 }
 
 function stergeDocumentSemnare(docId){
-  if(!confirm('Ștergi acest document și tot procesul de semnare? Această acțiune nu poate fi anulată.'))return;
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(!doc)return;
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:10px">Șterge documentul</div>'
+    +'<div style="font-size:13.5px;color:rgba(7,33,68,0.6);margin-bottom:16px">Ce vrei să faci cu „'+esc(doc.titlu)+'"?</div>'
+    +'<button type="button" onclick="confirmaStergereSemnare(\''+docId+'\',false)" style="width:100%;margin-bottom:8px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer;text-align:left">Șterge doar din aplicație<br><span style="font-size:11.5px;font-weight:400;color:rgba(7,33,68,0.5)">Folderul rămâne în Google Drive</span></button>'
+    +'<button type="button" onclick="confirmaStergereSemnare(\''+docId+'\',true)" style="width:100%;margin-bottom:8px;padding:12px;border-radius:8px;border:1px solid rgba(178,59,59,0.3);background:rgba(178,59,59,0.06);color:#b23b3b;font-family:inherit;font-size:14px;cursor:pointer;text-align:left">Șterge și folderul din Drive<br><span style="font-size:11.5px;font-weight:400;color:rgba(178,59,59,0.6)">Nu se poate anula</span></button>'
+    +'<button type="button" onclick="document.getElementById(\'restanta-picker\').style.display=\'none\'" style="width:100%;padding:10px;border-radius:8px;border:none;background:none;color:rgba(7,33,68,0.4);font-family:inherit;font-size:13px;cursor:pointer">Anulează</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Șterge documentul';
+  document.getElementById('restanta-picker').style.display='flex';
+}
+
+function confirmaStergereSemnare(docId,siDinDrive){
+  document.getElementById('restanta-picker').style.display='none';
   var doc=getSemnari().find(function(d){return d.id===docId;});
   var list=getSemnari().filter(function(d){return d.id!==docId;});
   saveSemnari(list);
   renderSemnariTab();
-  if(doc){
-    // Ștergem folderul întreg din Drive (nu doar fișierele individuale de mai
-    // jos) — altfel, după ștergere, rămâne un folder gol dar vizibil în
-    // "Semnări/", care se acumulează la fiecare document șters.
-    if(doc.folderName){
-      gdriveDeleteFolder('Semnări/'+doc.folderName).catch(function(){});
-    }
-    if(doc.pdfPath)gdriveDelete(doc.pdfPath).catch(function(){});
-    if(doc.lucruPdfPath&&doc.lucruPdfPath!==doc.pdfPath)gdriveDelete(doc.lucruPdfPath).catch(function(){});
-    if(doc.certificatPath)gdriveDelete(doc.certificatPath).catch(function(){});
-    (doc.signers||[]).forEach(function(s){
-      if(s.semnaturaPath)gdriveDelete(s.semnaturaPath).catch(function(){});
-    });
+  if(!doc||!siDinDrive)return;
+  // Ștergem folderul întreg din Drive (nu doar fișierele individuale de mai
+  // jos) — altfel, după ștergere, rămâne un folder gol dar vizibil în
+  // "Semnări/", care se acumulează la fiecare document șters.
+  if(doc.folderName){
+    gdriveDeleteFolder('Semnări/'+doc.folderName).catch(function(){});
   }
+  if(doc.pdfPath)gdriveDelete(doc.pdfPath).catch(function(){});
+  if(doc.lucruPdfPath&&doc.lucruPdfPath!==doc.pdfPath)gdriveDelete(doc.lucruPdfPath).catch(function(){});
+  if(doc.certificatPath)gdriveDelete(doc.certificatPath).catch(function(){});
+  (doc.signers||[]).forEach(function(s){
+    if(s.semnaturaPath)gdriveDelete(s.semnaturaPath).catch(function(){});
+  });
 }
 
 // ── Listă „Semnate" ────────────────────────────────────────
@@ -11637,7 +11657,13 @@ function submitSemnatura(docId,signerId){
               doc.signers.forEach(function(s){
                 if(s.semnaturaPath)curatari.push(gdriveDelete(s.semnaturaPath).catch(function(){}));
               });
-              return Promise.all(curatari);
+              return Promise.all(curatari).then(function(){
+                // Subfolderul "semnaturi" rămâne gol (dar vizibil) după ce
+                // pozele din el sunt șterse mai sus — îl eliminăm și pe el,
+                // ca în folderul documentului să rămână STRICT documentul
+                // semnat + certificatul, nimic altceva.
+                return gdriveDeleteFolder('Semnări/'+folderDoc+'/semnaturi').catch(function(){});
+              });
             }).catch(function(e){
               console.error('Nu am putut genera automat certificatul de semnare — păstrez fișierele brute pentru o reîncercare ulterioară:',e);
             }).then(function(){
