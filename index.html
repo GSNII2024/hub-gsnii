@@ -10222,6 +10222,20 @@ function renderSemnariTab(){
   if(semnariSubTab==='nou')renderSemnareNoua();
   else if(semnariSubTab==='incurs')renderSemnariListaIncurs(inCurs);
   else renderSemnariListaSemnate(semnate);
+
+  // Reîmprospătăm din cloud de fiecare dată când se deschide tab-ul — altfel,
+  // dacă un client tocmai a semnat pe alt dispozitiv, statusul rămâne "vechi"
+  // (necitit din memoria locală) până la o reîncărcare completă a aplicației.
+  // Nu suprascriem nimic în cloud aici — doar citim și, dacă e ceva nou,
+  // actualizăm afișajul local.
+  if(semnariSubTab!=='nou'){
+    sbGet('semnari').then(function(raw){
+      var fresh=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
+      if(JSON.stringify(fresh)===JSON.stringify(docs))return;
+      localStorage.setItem('crm_semnari_v1',JSON.stringify(fresh));
+      if(semnariSubTab!=='nou')renderSemnariTab();
+    }).catch(function(){});
+  }
 }
 
 // ── Semnare nouă: creare document ─────────────────────────
@@ -10748,8 +10762,8 @@ var SEMN_I18N={
     invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
     alreadySignedTitle:'Ön már aláírta ezt a dokumentumot.',
     alreadySignedThanks:'Köszönjük!',
-    connectionError:'Nem sikerült kapcsolódni. Kérjük, ellenőrizze az internetkapcsolatot, és próbálja újra.',
-    greeting:'Tisztelt {nume}! Kérjük, olvassa el az alábbi dokumentumot, és ellenőrizze az adatok helyességét. Amennyiben egyetért a tartalommal, kérjük, írja alá alul.',
+    connectionError:'Nem sikerült kapcsolódni. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
+    greeting:'Tisztelt {nume}! Kérem, olvassa el az alábbi dokumentumot, és ellenőrizze az adatok helyességét. Amennyiben egyetért a tartalommal, kérem, írja alá alul.',
     openingDoc:'A dokumentum megnyitása...',
     downloadingDoc:'A dokumentum letöltése...',
     preparingPages:'Az oldalak előkészítése ({gata}/{total})...',
@@ -10762,8 +10776,8 @@ var SEMN_I18N={
     submittingBtn:'Küldés folyamatban...',
     signHereTooltip:'Koppintson ide, hogy az aláíráshoz ugorjon',
     signHereLabel:'Aláírás itt',
-    needSignatureAlert:'Kérjük, rajzolja meg az aláírását, mielőtt elküldi.',
-    submitErrorAlert:'Hiba történt. Kérjük, ellenőrizze az internetkapcsolatot, és próbálja újra.',
+    needSignatureAlert:'Kérem, rajzolja meg az aláírását, mielőtt elküldi.',
+    submitErrorAlert:'Hiba történt. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
     successTitle:'Köszönöm! A dokumentumot sikeresen aláírta.',
     successNote:'Az alábbiakban letöltheti a dokumentum egy példányát, mielőtt bezárja az oldalt.',
     downloadSignedBtn:'⬇️ Aláírt dokumentum letöltése',
@@ -10951,13 +10965,13 @@ function sha256Hex(buffer){
   });
 }
 
-function genereazaRaportSemnare(docId,docOverride){
+function genereazaRaportSemnare(docId,docOverride,uploadMode){
   var doc=docOverride||getSemnari().find(function(d){return d.id===docId;});
-  if(!doc){alert('Documentul nu a fost găsit.');return;}
+  if(!doc){if(!uploadMode)alert('Documentul nu a fost găsit.');return uploadMode?Promise.reject(new Error('doc_negasit')):undefined;}
   var semnatari=doc.signers.filter(function(s){return s.status==='semnat';});
-  if(!semnatari.length){alert('Niciun semnatar nu a semnat încă acest document.');return;}
-  if(typeof window.jspdf==='undefined'){alert('Librăria PDF se încarcă, încearcă din nou.');return;}
-  var __pdfTab=deschideFilaGoala('Se generează certificatul...');
+  if(!semnatari.length){if(!uploadMode)alert('Niciun semnatar nu a semnat încă acest document.');return uploadMode?Promise.reject(new Error('niciun_semnatar')):undefined;}
+  if(typeof window.jspdf==='undefined'){if(!uploadMode)alert('Librăria PDF se încarcă, încearcă din nou.');return uploadMode?Promise.reject(new Error('lib_neincarcata')):undefined;}
+  var __pdfTab=uploadMode?null:deschideFilaGoala('Se generează certificatul...');
 
   var jsPDF=window.jspdf.jsPDF;
   var pdfDoc=new jsPDF({unit:'mm',format:'a4'});
@@ -11002,7 +11016,7 @@ function genereazaRaportSemnare(docId,docOverride){
     return gdriveFetchFileBlob(s.semnaturaPath).then(function(res){return blobToDataURL(res.blob);}).catch(function(){return null;});
   });
 
-  Promise.all([hashPromise,Promise.all(imgPromises)]).then(function(rez){
+  var chain=Promise.all([hashPromise,Promise.all(imgPromises)]).then(function(rez){
     var hash=rez[0],imgs=rez[1];
     var ultimaSemnatura=Math.max.apply(null,semnatari.map(function(s){return s.semnatAt||0;}));
 
@@ -11050,12 +11064,33 @@ function genereazaRaportSemnare(docId,docOverride){
 
     drawFooter(pdfDoc,margin,pageW);
     var fileName='Certificat_semnare_'+(doc.titlu||'document').replace(/[^a-zA-Z0-9._-]/g,'_')+'.pdf';
+    if(uploadMode){
+      // Salvăm certificatul direct în Drive, în același folder cu documentul —
+      // de acum încolo, deschiderea lui se face direct din fișierul salvat,
+      // fără să mai fie nevoie de pozele brute ale semnăturilor.
+      var certPath='Semnări/'+(doc.folderName||docId)+'/'+fileName;
+      var pdfBlob=pdfDoc.output('blob');
+      return gdriveUploadBlobPath(certPath,pdfBlob,'application/pdf').then(function(){return certPath;});
+    }
     outputPdf(pdfDoc,fileName,__pdfTab);
   }).catch(function(e){
     console.error('Eroare generare raport:',e);
     if(__pdfTab&&!__pdfTab.closed)__pdfTab.close();
-    alert('A apărut o eroare la generarea raportului. Verifică internetul și încearcă din nou.');
+    if(!uploadMode)alert('A apărut o eroare la generarea raportului. Verifică internetul și încearcă din nou.');
+    if(uploadMode)throw e;
   });
+  if(uploadMode)return chain;
+}
+
+// Butonul „Raport de semnare" pentru un document FINALIZAT: dacă certificatul
+// a fost deja generat și salvat automat (cazul normal, de acum încolo),
+// deschidem direct fișierul salvat — mult mai rapid, și funcționează chiar
+// dacă pozele brute ale semnăturilor au fost între timp șterse din Drive.
+// Doar pentru documente vechi (fără certificatPath salvat) mai regenerăm pe loc.
+function deschideSauGenereazaRaportSemnare(docId,btnEl){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
+  if(doc&&doc.certificatPath){viewDocDirect(doc.certificatPath,btnEl);return;}
+  genereazaRaportSemnare(docId);
 }
 
 function stergeDocumentSemnare(docId){
@@ -11069,10 +11104,11 @@ function stergeDocumentSemnare(docId){
     // jos) — altfel, după ștergere, rămâne un folder gol dar vizibil în
     // "Semnări/", care se acumulează la fiecare document șters.
     if(doc.folderName){
-      gdriveDelete('Semnări/'+doc.folderName).catch(function(){});
+      gdriveDeleteFolder('Semnări/'+doc.folderName).catch(function(){});
     }
     if(doc.pdfPath)gdriveDelete(doc.pdfPath).catch(function(){});
     if(doc.lucruPdfPath&&doc.lucruPdfPath!==doc.pdfPath)gdriveDelete(doc.lucruPdfPath).catch(function(){});
+    if(doc.certificatPath)gdriveDelete(doc.certificatPath).catch(function(){});
     (doc.signers||[]).forEach(function(s){
       if(s.semnaturaPath)gdriveDelete(s.semnaturaPath).catch(function(){});
     });
@@ -11093,7 +11129,7 @@ function renderSemnariListaSemnate(list){
       +'<button type="button" onclick="viewDocDirect(\''+(d.semnatPdfPath||d.lucruPdfPath).replace(/'/g,"\\'")+'\',this)" class="doc-btn" style="border:none"><i class="ti ti-file-type-pdf"></i></button>'
       +'</div>'
       +'<div style="margin-top:10px;display:flex;gap:14px">'
-      +'<button type="button" onclick="genereazaRaportSemnare(\''+d.id+'\')" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
+      +'<button type="button" onclick="deschideSauGenereazaRaportSemnare(\''+d.id+'\',this)" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
       +'<button type="button" onclick="stergeDocumentSemnare(\''+d.id+'\')" style="font-size:12px;color:rgba(178,59,59,0.6);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge documentul</button>'
       +'</div>'
       +'</div>';
@@ -11583,9 +11619,31 @@ function submitSemnatura(docId,signerId){
             signer.semnatIP=ip;
             signer.semnaturaPath=sigPath;
             var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
-            if(toateSemnate){doc.status='semnat';doc.semnatPdfPath=doc.lucruPdfPath;}
-            localStorage.setItem('crm_semnari_v1',JSON.stringify(list));
-            return sbSet('semnari',list).then(function(){return {list:list,alreadySigned:false};});
+            if(!toateSemnate){
+              localStorage.setItem('crm_semnari_v1',JSON.stringify(list));
+              return sbSet('semnari',list).then(function(){return {list:list,alreadySigned:false};});
+            }
+            doc.status='semnat';doc.semnatPdfPath=doc.lucruPdfPath;
+            // Ultimul semnatar tocmai a terminat — generăm certificatul o
+            // singură dată și îl salvăm în Drive, apoi curățăm ce nu mai e
+            // necesar (documentul nesemnat original + pozele brute ale
+            // semnăturilor), ca în folder să rămână doar documentul semnat
+            // și certificatul. Curățarea se face DOAR dacă certificatul chiar
+            // s-a salvat cu succes — altfel păstrăm totul, pentru o reîncercare.
+            return genereazaRaportSemnare(docId,doc,true).then(function(certPath){
+              doc.certificatPath=certPath;
+              var curatari=[];
+              if(doc.pdfPath)curatari.push(gdriveDelete(doc.pdfPath).catch(function(){}));
+              doc.signers.forEach(function(s){
+                if(s.semnaturaPath)curatari.push(gdriveDelete(s.semnaturaPath).catch(function(){}));
+              });
+              return Promise.all(curatari);
+            }).catch(function(e){
+              console.error('Nu am putut genera automat certificatul de semnare — păstrez fișierele brute pentru o reîncercare ulterioară:',e);
+            }).then(function(){
+              localStorage.setItem('crm_semnari_v1',JSON.stringify(list));
+              return sbSet('semnari',list).then(function(){return {list:list,alreadySigned:false};});
+            });
           });
         });
       });
@@ -11617,7 +11675,10 @@ function submitSemnatura(docId,signerId){
       btn2.type='button';
       btn2.textContent=t('openCertBtn');
       btn2.style.cssText='padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:14px;cursor:pointer';
-      btn2.addEventListener('click',function(){genereazaRaportSemnare(doc.id,doc);});
+      btn2.addEventListener('click',function(){
+        if(doc.certificatPath){viewDocDirect(doc.certificatPath,btn2);}
+        else{genereazaRaportSemnare(doc.id,doc);}
+      });
 
       btnRow.appendChild(btn1);
       btnRow.appendChild(btn2);
