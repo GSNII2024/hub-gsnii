@@ -3239,9 +3239,8 @@ function servicesForClient(c){
 }
 function allServicesForClient(c){
   return SERVICES.concat(customServices.map(function(s){
-    var sk=typeof s==='string'?s:(s.k||'');
     var sl=typeof s==='string'?s:(s.l||s.k||'');
-    return {k:'custom_'+sk,l:sl};
+    return {k:fullKeyCustom(s),l:sl};
   }));
 }
 // svcStore, duStore, customServices și funcțiile de salvare sunt definite în blocul Supabase de mai sus
@@ -4505,7 +4504,7 @@ function uploadDocsCat(input,clientId,category,categoryLabel,folderName){
   }).then(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
-    loadDocsCatMerged(clientId,category,'docs-cat-'+clientId+'-'+category);
+    refreshDocCategoriesUI(clientId);
   });
 }
 
@@ -8087,6 +8086,7 @@ function buildForm(c){
       var cid=(c&&c.id)||'__new__';
       html+='<div class="section-title" style="margin-top:12px"><i class="ti ti-paperclip"></i> Documente scanate</div>';
       html+='<div id="doc-custom-cats-'+cid+'">'+renderDocCategoriesBlock(cid,c)+'</div>';
+      if(cid!=='__new__')setTimeout(function(){refreshDocCategoriesUI(cid);},0);
 
       // Declarație Unică - gestionată din tabul DU, nu din documente client
       // (eliminat din fișa client)
@@ -8166,38 +8166,122 @@ function renderDocCategoriesBlock(cid,c){
   if(cid==='__new__'){
     return '<div class="card-firma" style="font-style:italic;color:rgba(7,33,68,0.4);margin-bottom:10px">Salvează mai întâi fișa, ca să poți gestiona categoriile de documente.</div>';
   }
-  var toate=ensureDocCategories(c);
-  var html='';
-  toate.forEach(function(cat){
-    var labelEsc=(cat.label||'').replace(/'/g,"\\'");
-    var folderEsc=(cat.folderName||cat.label||'').replace(/'/g,"\\'");
-    html+='<div class="doc-cat-block">'
-      +'<div class="doc-cat-header">'
-      +'<i class="ti ti-folder"></i> <span>'+esc(cat.label)+'</span>'
-      +'<button type="button" id="doc-cat-share-'+cid+'-'+cat.key+'" onclick="event.stopPropagation();shareDocCategory(\''+cid+'\',\''+cat.key+'\',\''+labelEsc+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:2px 5px" title="Distribuie toate documentele din această categorie"><i class="ti ti-share" style="font-size:14px"></i></button>'
-      +'<button type="button" onclick="event.stopPropagation();redenumesteCategorie(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:2px 5px" title="Redenumește categoria">'+pencilSvgSmall+'</button>'
-      +'<button type="button" onclick="event.stopPropagation();stergeCategorie(\''+cid+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:2px 5px" title="Șterge categoria"><i class="ti ti-trash" style="font-size:14px"></i></button>'
-      +'<label class="doc-cat-add-btn" title="Adaugă documente (poți selecta mai multe deodată)">'
-      +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
-      +' onchange="uploadDocsCat(this,\''+cid+'\',\''+cat.key+'\',\''+labelEsc+'\',\''+folderEsc+'\')">'
-      +'<i class="ti ti-plus"></i></label>'
-      +'</div>'
-      +'<div class="docs-list" id="docs-cat-'+cid+'-'+cat.key+'"></div>'
-      +'</div>';
-  });
-  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="adaugaCategorieNoua(\''+cid+'\')"><i class="ti ti-folder-plus"></i> Adaugă categorie nouă</button>';
-  return html;
+  return '<div id="doc-cats-inner-'+cid+'" style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:6px 0">Se încarcă...</div>';
 }
 
 function refreshDocCategoriesUI(clientId){
   var c=clients.find(function(x){return x.id===clientId;});
   var wrap=document.getElementById('doc-custom-cats-'+clientId);
-  if(!wrap)return;
-  wrap.innerHTML=renderDocCategoriesBlock(clientId,c);
-  injectIcons();
-  ensureDocCategories(c).forEach(function(cat){
-    loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
+  if(!wrap||!c)return;
+  wrap.innerHTML='<div id="doc-cats-inner-'+clientId+'" style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:6px 0">Se încarcă...</div>';
+  var inner=document.getElementById('doc-cats-inner-'+clientId);
+  var toate=ensureDocCategories(c);
+
+  gdriveGetChecked('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    var countByCat={};
+    allMeta.forEach(function(m){
+      if(!m.category||m.category==='du')return;
+      countByCat[m.category]=(countByCat[m.category]||0)+1;
+    });
+    // Arătăm doar categoriile care chiar au fișiere — o categorie goală nu se
+    // mai afișează deloc (dar rămâne selectabilă din butonul de încărcare).
+    var cuFisiere=toate.filter(function(cat){return countByCat[cat.key]>0;});
+
+    var html='';
+    cuFisiere.forEach(function(cat){
+      var labelEsc=(cat.label||'').replace(/'/g,"\\'");
+      var folderEsc=(cat.folderName||cat.label||'').replace(/'/g,"\\'");
+      html+='<div class="doc-cat-block">'
+        +'<div class="doc-cat-header">'
+        +'<i class="ti ti-folder"></i> <span>'+esc(cat.label)+'</span>'
+        +'<span style="font-size:11px;color:rgba(7,33,68,0.35);font-weight:400">('+countByCat[cat.key]+')</span>'
+        +'<button type="button" id="doc-cat-share-'+clientId+'-'+cat.key+'" onclick="event.stopPropagation();shareDocCategory(\''+clientId+'\',\''+cat.key+'\',\''+labelEsc+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:2px 5px" title="Distribuie toate documentele din această categorie"><i class="ti ti-share" style="font-size:14px"></i></button>'
+        +'<button type="button" onclick="event.stopPropagation();redenumesteCategorie(\''+clientId+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(7,33,68,0.4);cursor:pointer;padding:2px 5px" title="Redenumește categoria">'+pencilSvgSmall+'</button>'
+        +'<button type="button" onclick="event.stopPropagation();stergeCategorie(\''+clientId+'\',\''+cat.key+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:2px 5px" title="Șterge categoria"><i class="ti ti-trash" style="font-size:14px"></i></button>'
+        +'<label class="doc-cat-add-btn" title="Adaugă documente (poți selecta mai multe deodată)">'
+        +'<input type="file" accept=".pdf,image/jpeg,image/png" multiple style="display:none"'
+        +' onchange="uploadDocsCat(this,\''+clientId+'\',\''+cat.key+'\',\''+labelEsc+'\',\''+folderEsc+'\')">'
+        +'<i class="ti ti-plus"></i></label>'
+        +'</div>'
+        +'<div class="docs-list" id="docs-cat-'+clientId+'-'+cat.key+'"></div>'
+        +'</div>';
+    });
+    html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="openUploadDocModal(\''+clientId+'\')"><i class="ti ti-upload"></i> Încarcă documente</button>';
+    inner.outerHTML=html;
+
+    cuFisiere.forEach(function(cat){
+      loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
+    });
+  }).catch(function(err){
+    console.error('Eroare la încărcarea categoriilor de documente:',err);
+    inner.outerHTML='<div style="font-size:11.5px;color:#b23b3b;padding:4px 0 8px">Nu am putut încărca documentele (eroare de conexiune). '
+      +'<button type="button" onclick="refreshDocCategoriesUI(\''+clientId+'\')" style="background:none;border:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-size:11.5px;padding:0;font-family:inherit">Reîncearcă</button></div>'
+      +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="openUploadDocModal(\''+clientId+'\')"><i class="ti ti-upload"></i> Încarcă documente</button>';
   });
+  injectIcons();
+}
+
+// ── Modalul universal de încărcare: alegi o categorie existentă (chiar dacă
+// e goală/ascunsă momentan) SAU tastezi o categorie nouă, apoi fișierele.
+var uploadDocCatSelectata=null;
+function openUploadDocModal(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c){alert('Salvează mai întâi fișa clientului.');return;}
+  var cats=ensureDocCategories(c);
+  uploadDocCatSelectata=cats.length?cats[0].key:null;
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:12px">Încarcă documente</div>'
+    +'<label style="font-size:12.5px;color:rgba(7,33,68,0.5);display:block;margin-bottom:6px">Alege categoria:</label>'
+    +'<div id="upload-doc-cats-list" style="max-height:180px;overflow-y:auto;margin-bottom:10px">'
+    +cats.map(function(cat,idx){
+      return '<div class="upload-doc-cat-opt" data-key="'+cat.key+'" onclick="selecteazaCategorieUpload(this,\''+cat.key+'\')" style="padding:9px 12px;border:1px solid '+(idx===0?'var(--navy)':'rgba(7,33,68,0.15)')+';background:'+(idx===0?'rgba(7,33,68,0.05)':'#fff')+';border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px;color:var(--navy)">'+esc(cat.label)+'</div>';
+    }).join('')
+    +'</div>'
+    +'<label style="font-size:12.5px;color:rgba(7,33,68,0.5);display:block;margin-bottom:6px">...sau categorie nouă:</label>'
+    +'<input type="text" id="upload-doc-cat-noua" placeholder="ex: Facturi, Poze, Diverse..." oninput="document.getElementById(\'upload-doc-cats-list\').style.opacity=this.value.trim()?0.35:1" style="width:100%;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:9px 12px;font-family:inherit;margin-bottom:14px">'
+    +'<label style="font-size:12.5px;color:rgba(7,33,68,0.5);display:block;margin-bottom:6px">Fișiere:</label>'
+    +'<input type="file" id="upload-doc-files" accept=".pdf,image/jpeg,image/png" multiple style="width:100%;margin-bottom:14px">'
+    +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center" onclick="confirmaUploadDocModal(\''+clientId+'\')"><i class="ti ti-upload"></i> Încarcă</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Încarcă documente';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+function selecteazaCategorieUpload(el,key){
+  uploadDocCatSelectata=key;
+  var numaEl=document.getElementById('upload-doc-cat-noua');
+  if(numaEl)numaEl.value='';
+  var listEl=document.getElementById('upload-doc-cats-list');
+  if(listEl)listEl.style.opacity=1;
+  document.querySelectorAll('.upload-doc-cat-opt').forEach(function(o){
+    var activ=o.getAttribute('data-key')===key;
+    o.style.border=activ?'1px solid var(--navy)':'1px solid rgba(7,33,68,0.15)';
+    o.style.background=activ?'rgba(7,33,68,0.05)':'#fff';
+  });
+}
+function confirmaUploadDocModal(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  var numeNou=(document.getElementById('upload-doc-cat-noua').value||'').trim();
+  var input=document.getElementById('upload-doc-files');
+  if(!input.files||!input.files.length){alert('Selectează cel puțin un fișier.');return;}
+  var cats=ensureDocCategories(c);
+  var catKey,catLabel,folderName;
+  if(numeNou){
+    catKey='cat_'+Date.now();
+    catLabel=numeNou;
+    folderName=numeNou.replace(/[\/\\:*?"<>|]/g,'_').trim()||catKey;
+    cats.push({key:catKey,label:catLabel,folderName:folderName});
+    save();
+  }else{
+    var cat=cats.find(function(x){return x.key===uploadDocCatSelectata;});
+    if(!cat){alert('Alege o categorie sau tastează una nouă.');return;}
+    catKey=cat.key;catLabel=cat.label;folderName=cat.folderName;
+  }
+  document.getElementById('restanta-picker').style.display='none';
+  uploadDocsCat(input,clientId,catKey,catLabel.replace(/'/g,"\\'"),folderName.replace(/'/g,"\\'"));
 }
 
 function adaugaCategorieNoua(clientId){
@@ -8354,7 +8438,19 @@ function closeModal(){document.getElementById('modal-bg').style.display='none';}
 var svcEditClientId=null;
 
 // customServices definit în blocul Supabase
-function allServices(){return SERVICES.concat(SERVICES_PF).concat(customServices.map(function(s){var sk=typeof s==='string'?s:(s.k||'');var sl=typeof s==='string'?s:(s.l||s.k||'');return {k:'custom_'+sk,l:sl};}));}
+// Calculează cheia completă ("custom_...") a unui serviciu custom, indiferent
+// de formatul în care e stocat (string simplu, sau obiect cu .k deja complet
+// ori doar id-ul brut) — evită prefixarea dublă ("custom_custom_...") care
+// producea nepotriviri și făcea eticheta scrisă de utilizator să nu se
+// regăsească niciodată la căutare.
+function fullKeyCustom(s){
+  var raw=typeof s==='string'?s:(s.k||'');
+  return raw.indexOf('custom_')===0?raw:'custom_'+raw;
+}
+function allServices(){return SERVICES.concat(SERVICES_PF).concat(customServices.map(function(s){
+  var sl=typeof s==='string'?s:(s.l||s.k||'');
+  return {k:fullKeyCustom(s),l:sl};
+}));}
 function labelForService(k){var s=allServices().find(function(x){return x.k===k;});return s?s.l:k;}
 
 function buildServiceRow(k,label,it){
@@ -8378,17 +8474,23 @@ function updateCustomServiceLabel(input){
   var k=input.getAttribute('data-k');
   var newLabel=input.value.trim();
   if(!newLabel)return;
-  var idx=customServices.findIndex(function(s){return (typeof s==='string'?'custom_'+s:s.k)===k;});
+  var idx=customServices.findIndex(function(s){return fullKeyCustom(s)===k;});
   if(idx>=0){
     if(typeof customServices[idx]==='string') customServices[idx]={k:k,l:newLabel};
     else customServices[idx].l=newLabel;
-    saveCustomServices();
+  }else{
+    // Nu exista încă în lista globală (serviciu custom mai vechi, sau prima
+    // editare a etichetei) — îl creăm acum. Altfel eticheta scrisă de
+    // utilizator nu se salva NICIODATĂ, și la redeschidere reapărea cheia
+    // brută ("custom_...") în loc de denumire.
+    customServices.push({k:k,l:newLabel});
   }
+  saveCustomServices();
 }
 
 function removeCustomServiceRow(btn,k){
   if(!confirm('Ștergi acest serviciu?'))return;
-  customServices=customServices.filter(function(s){return (typeof s==='string'?'custom_'+s:s.k)!==k;});
+  customServices=customServices.filter(function(s){return fullKeyCustom(s)!==k;});
   saveCustomServices();
   var row=btn.closest('.serviciu-row');
   if(row)row.remove();
@@ -8425,7 +8527,7 @@ function buildSvcForm(clientId,month){
       if(k.indexOf('custom_')!==0)return;
       var it=rec.services[k];
       if(!it||((parseFloat(it.qty)||0)===0&&(parseFloat(it.price)||0)===0))return;
-      var cs=customServices.find(function(s){return (typeof s==='string'?'custom_'+s:s.k)===k;});
+      var cs=customServices.find(function(s){return fullKeyCustom(s)===k;});
       var label=cs?(typeof cs==='string'?cs:(cs.l||cs.k||k)):k;
       html+=buildServiceRow(k,label,it);
     });
@@ -8819,6 +8921,11 @@ function saveSvcSheet(){
   var rec=svcBuildRecordFromForm();
   svcStore[svcKey(svcEditClientId,currentServiceMonth)]=rec;
   saveSvcStore();
+  // Dacă am editat o lună din trecut, orice lună ULTERIOARĂ deja existentă
+  // pentru acest client avea soldul precedent calculat pe baza vechii valori
+  // — îl recalculăm acum automat, în cascadă, altfel restanța nu s-ar
+  // actualiza decât apăsând manual "Recalculează soldurile".
+  recalculeazaSoldurile();
   closeSvcModal();
   renderServiciiTab();
 }
@@ -8827,6 +8934,7 @@ function svcGeneratePDF(){
   var rec=svcBuildRecordFromForm();
   svcStore[svcKey(svcEditClientId,currentServiceMonth)]=rec;
   saveSvcStore();
+  recalculeazaSoldurile();
   var c=clients.find(function(x){return x.id===svcEditClientId;});
   generateClientServicePDF(c,rec);
   renderServiciiTab();
@@ -9342,28 +9450,31 @@ function generateRaportRestante(clientId){
 
     // Servicii firmă
     var hasLines=false;
+    var descColWidthRestante=94; // lățimea disponibilă înainte de coloana CANT. (margin+100)
     Object.keys(rec.services||{}).forEach(function(k){
       var it=rec.services[k];
       if(!it||!it.qty)return;
       checkP();hasLines=true;
       var sub=(it.qty||0)*(it.price||0);
       doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
-      doc.text(labelForService(k),margin+2,y);
+      var descLines=doc.splitTextToSize(labelForService(k),descColWidthRestante);
+      doc.text(descLines,margin+2,y);
       doc.text(String(it.qty||0),margin+100,y,{align:'right'});
       doc.text(money(it.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=5.8;
+      y+=5.8*descLines.length;
     });
     (rec.diverse||[]).forEach(function(d){
       if(!d.qty&&!d.price&&!d.desc)return;
       checkP();hasLines=true;
       var sub=(d.qty||0)*(d.price||0);
       doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(navy[0],navy[1],navy[2]);
-      doc.text(d.desc||'Divers',margin+2,y);
+      var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidthRestante);
+      doc.text(descLines,margin+2,y);
       doc.text(String(d.qty||0),margin+100,y,{align:'right'});
       doc.text(money(d.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=5.8;
+      y+=5.8*descLines.length;
     });
     // Servicii PF
     var pfKeys=Object.keys(rec.services_pf||{});
@@ -9378,11 +9489,12 @@ function generateRaportRestante(clientId){
         checkP();hasLines=true;
         var sub=(it.qty||0)*(it.price||0);
         doc.setTextColor(34,100,60);
-        doc.text(labelForService(k),margin+2,y);
+        var descLines=doc.splitTextToSize(labelForService(k),descColWidthRestante);
+        doc.text(descLines,margin+2,y);
         doc.text(String(it.qty||0),margin+100,y,{align:'right'});
         doc.text(money(it.price),margin+130,y,{align:'right'});
         doc.text(money(sub),pageW-margin,y,{align:'right'});
-        y+=5.8;
+        y+=5.8*descLines.length;
       });
       doc.setTextColor(navy[0],navy[1],navy[2]);
     }
@@ -9391,11 +9503,12 @@ function generateRaportRestante(clientId){
       checkP();hasLines=true;
       var sub=(d.qty||0)*(d.price||0);
       doc.setTextColor(34,100,60);
-      doc.text(d.desc||'Divers',margin+2,y);
+      var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidthRestante);
+      doc.text(descLines,margin+2,y);
       doc.text(String(d.qty||0),margin+100,y,{align:'right'});
       doc.text(money(d.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
-      y+=5.8;
+      y+=5.8*descLines.length;
       doc.setTextColor(navy[0],navy[1],navy[2]);
     });
     if(!hasLines){
