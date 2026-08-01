@@ -3226,8 +3226,7 @@ var SERVICES=[
   {k:'efact_inc',l:'\u00cenc\u0103rcare e-Factura',defaultPrice:10},
   {k:'efact_desc',l:'Desc\u0103rcare e-Factura',defaultPrice:10},
   {k:'rc',l:'Opera\u021biuni Registrul Comer\u021bului'},
-  {k:'consultanta',l:'Consultan\u021b\u0103'},
-  {k:'du',l:'Declara\u021bie Unic\u0103',defaultPrice:200}
+  {k:'consultanta',l:'Consultan\u021b\u0103'}
 ];
 var SERVICES_PF=[
   {k:'consultanta',l:'Consultan\u021b\u0103'},
@@ -10848,88 +10847,172 @@ function renderSemnariListaIncurs(list){
 
 // ── Mesaj formal de trimis semnatarului (RO / HU la alegere) ──────────────
 // ── Traduceri pentru TOT ecranul de semnare (nu doar mesajul trimis) ──────
+// Structură: SEMN_I18N[limba][ton][cheie] — limba: 'ro'/'hu', ton: 'formal' (dvs./Ön) / 'informal' (tu/te)
 var SEMN_I18N={
   ro:{
-    loadingDoc:'Se încarcă documentul...',
-    invalidLink:'Acest link nu este valid sau documentul a fost șters.',
-    alreadySignedTitle:'Ați semnat deja acest document.',
-    alreadySignedThanks:'Vă mulțumim!',
-    connectionError:'Nu am putut stabili conexiunea. Vă rog verificați internetul și reîncercați.',
-    greeting:'Bună ziua, {nume}. Vă rog să citiți documentul de mai jos și să verificați corectitudinea datelor. Dacă sunteți de acord cu conținutul, vă rog să semnați mai jos.',
-    openingDoc:'Se deschide documentul...',
-    downloadingDoc:'Se descarcă documentul...',
-    preparingPages:'Se pregătesc paginile ({gata}/{total})...',
-    couldNotLoadDoc:'Nu am putut încărca documentul.',
-    couldNotShowDoc:'Nu am putut afișa documentul.',
-    signatureTitle:'Semnătura dumneavoastră',
-    clearBtn:'Șterge',
-    enhanceBtn:'✒️ Îmbunătățește',
-    submitBtn:'Trimiteți semnătura',
-    submittingBtn:'Se trimite...',
-    preparingSubmit:'Se pregătește documentul...',
-    embeddingSignature:'Se inserează semnătura...',
-    uploadingSignature:'Se încarcă semnătura...',
-    finalizing:'Se finalizează...',
-    signHereTooltip:'Apăsați pentru a ajunge direct la semnătură',
-    signHereLabel:'Semnați aici',
-    needSignatureAlert:'Vă rog să desenați semnătura înainte de a trimite.',
-    submitErrorAlert:'A apărut o eroare. Vă rog verificați internetul și încercați din nou.',
-    successTitle:'Vă mulțumesc! Documentul a fost semnat cu succes.',
-    successNote:'Puteți descărca o copie mai jos, înainte să închideți pagina.',
-    downloadSignedBtn:'⬇️ Descărcați documentul semnat',
-    openCertBtn:'📄 Deschideți certificatul de semnare',
-    closeNote:'Puteți închide pagina oricând, după ce ați descărcat ce aveți nevoie.'
+    formal:{
+      loadingDoc:'Se încarcă documentul...',
+      invalidLink:'Acest link nu este valid sau documentul a fost șters.',
+      alreadySignedTitle:'Ați semnat deja acest document.',
+      alreadySignedThanks:'Vă mulțumim!',
+      connectionError:'Nu am putut stabili conexiunea. Vă rog verificați internetul și reîncercați.',
+      greeting:'Bună ziua, {nume}. Vă rog să citiți documentul de mai jos și să verificați corectitudinea datelor. Dacă sunteți de acord cu conținutul, vă rog să semnați mai jos.',
+      openingDoc:'Se deschide documentul...',
+      downloadingDoc:'Se descarcă documentul...',
+      preparingPages:'Se pregătesc paginile ({gata}/{total})...',
+      couldNotLoadDoc:'Nu am putut încărca documentul.',
+      couldNotShowDoc:'Nu am putut afișa documentul.',
+      signatureTitle:'Semnătura dumneavoastră',
+      clearBtn:'Șterge',
+      enhanceBtn:'✒️ Îmbunătățește',
+      submitBtn:'Trimiteți semnătura',
+      submittingBtn:'Se trimite...',
+      preparingSubmit:'Se pregătește documentul...',
+      embeddingSignature:'Se inserează semnătura...',
+      uploadingSignature:'Se încarcă semnătura...',
+      finalizing:'Se finalizează...',
+      signHereTooltip:'Apăsați pentru a ajunge direct la semnătură',
+      signHereLabel:'Semnați aici',
+      needSignatureAlert:'Vă rog să desenați semnătura înainte de a trimite.',
+      submitErrorAlert:'A apărut o eroare. Vă rog verificați internetul și încercați din nou.',
+      successTitle:'Vă mulțumesc! Documentul a fost semnat cu succes.',
+      successNote:'Puteți descărca o copie mai jos, înainte să închideți pagina.',
+      downloadSignedBtn:'⬇️ Descărcați documentul semnat',
+      openCertBtn:'📄 Deschideți certificatul de semnare',
+      closeNote:'Puteți închide pagina oricând, după ce ați descărcat ce aveți nevoie.'
+    },
+    informal:{
+      loadingDoc:'Se încarcă documentul...',
+      invalidLink:'Acest link nu este valid sau documentul a fost șters.',
+      alreadySignedTitle:'Ai semnat deja acest document.',
+      alreadySignedThanks:'Mulțumim!',
+      connectionError:'Nu am putut stabili conexiunea. Te rog verifică internetul și reîncearcă.',
+      greeting:'Bună, {nume}! Te rog să citești documentul de mai jos și să verifici corectitudinea datelor. Dacă ești de acord cu conținutul, te rog să semnezi mai jos.',
+      openingDoc:'Se deschide documentul...',
+      downloadingDoc:'Se descarcă documentul...',
+      preparingPages:'Se pregătesc paginile ({gata}/{total})...',
+      couldNotLoadDoc:'Nu am putut încărca documentul.',
+      couldNotShowDoc:'Nu am putut afișa documentul.',
+      signatureTitle:'Semnătura ta',
+      clearBtn:'Șterge',
+      enhanceBtn:'✒️ Îmbunătățește',
+      submitBtn:'Trimite semnătura',
+      submittingBtn:'Se trimite...',
+      preparingSubmit:'Se pregătește documentul...',
+      embeddingSignature:'Se inserează semnătura...',
+      uploadingSignature:'Se încarcă semnătura...',
+      finalizing:'Se finalizează...',
+      signHereTooltip:'Apasă pentru a ajunge direct la semnătură',
+      signHereLabel:'Semnează aici',
+      needSignatureAlert:'Te rog să desenezi semnătura înainte de a trimite.',
+      submitErrorAlert:'A apărut o eroare. Te rog verifică internetul și încearcă din nou.',
+      successTitle:'Mulțumesc! Documentul a fost semnat cu succes.',
+      successNote:'Poți descărca o copie mai jos, înainte să închizi pagina.',
+      downloadSignedBtn:'⬇️ Descarcă documentul semnat',
+      openCertBtn:'📄 Deschide certificatul de semnare',
+      closeNote:'Poți închide pagina oricând, după ce ai descărcat ce ai nevoie.'
+    }
   },
   hu:{
-    loadingDoc:'A dokumentum betöltése folyamatban...',
-    invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
-    alreadySignedTitle:'Ön már aláírta ezt a dokumentumot.',
-    alreadySignedThanks:'Köszönjük!',
-    connectionError:'Nem sikerült kapcsolódni. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
-    greeting:'Tisztelt {nume}! Kérem, olvassa el az alábbi dokumentumot, és ellenőrizze az adatok helyességét. Amennyiben egyetért a tartalommal, kérem, írja alá alul.',
-    openingDoc:'A dokumentum megnyitása...',
-    downloadingDoc:'A dokumentum letöltése...',
-    preparingPages:'Az oldalak előkészítése ({gata}/{total})...',
-    couldNotLoadDoc:'Nem sikerült betölteni a dokumentumot.',
-    couldNotShowDoc:'Nem sikerült megjeleníteni a dokumentumot.',
-    signatureTitle:'Az Ön aláírása',
-    clearBtn:'Törlés',
-    enhanceBtn:'✒️ Javítás',
-    submitBtn:'Aláírás elküldése',
-    submittingBtn:'Küldés folyamatban...',
-    preparingSubmit:'A dokumentum előkészítése...',
-    embeddingSignature:'Az aláírás beillesztése...',
-    uploadingSignature:'Az aláírás feltöltése...',
-    finalizing:'Véglegesítés...',
-    signHereTooltip:'Koppintson ide, hogy az aláíráshoz ugorjon',
-    signHereLabel:'Aláírás itt',
-    needSignatureAlert:'Kérem, rajzolja meg az aláírását, mielőtt elküldi.',
-    submitErrorAlert:'Hiba történt. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
-    successTitle:'Köszönöm! A dokumentumot sikeresen aláírta.',
-    successNote:'Az alábbiakban letöltheti a dokumentum egy példányát, mielőtt bezárja az oldalt.',
-    downloadSignedBtn:'⬇️ Aláírt dokumentum letöltése',
-    openCertBtn:'📄 Aláírási igazolás megnyitása',
-    closeNote:'Az oldalt bármikor bezárhatja, miután letöltötte a szükséges fájlokat.'
+    formal:{
+      loadingDoc:'A dokumentum betöltése folyamatban...',
+      invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
+      alreadySignedTitle:'Ön már aláírta ezt a dokumentumot.',
+      alreadySignedThanks:'Köszönjük!',
+      connectionError:'Nem sikerült kapcsolódni. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
+      greeting:'Tisztelt {nume}! Kérem, olvassa el az alábbi dokumentumot, és ellenőrizze az adatok helyességét. Amennyiben egyetért a tartalommal, kérem, írja alá alul.',
+      openingDoc:'A dokumentum megnyitása...',
+      downloadingDoc:'A dokumentum letöltése...',
+      preparingPages:'Az oldalak előkészítése ({gata}/{total})...',
+      couldNotLoadDoc:'Nem sikerült betölteni a dokumentumot.',
+      couldNotShowDoc:'Nem sikerült megjeleníteni a dokumentumot.',
+      signatureTitle:'Az Ön aláírása',
+      clearBtn:'Törlés',
+      enhanceBtn:'✒️ Javítás',
+      submitBtn:'Aláírás elküldése',
+      submittingBtn:'Küldés folyamatban...',
+      preparingSubmit:'A dokumentum előkészítése...',
+      embeddingSignature:'Az aláírás beillesztése...',
+      uploadingSignature:'Az aláírás feltöltése...',
+      finalizing:'Véglegesítés...',
+      signHereTooltip:'Koppintson ide, hogy az aláíráshoz ugorjon',
+      signHereLabel:'Aláírás itt',
+      needSignatureAlert:'Kérem, rajzolja meg az aláírását, mielőtt elküldi.',
+      submitErrorAlert:'Hiba történt. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
+      successTitle:'Köszönöm! A dokumentumot sikeresen aláírta.',
+      successNote:'Az alábbiakban letöltheti a dokumentum egy példányát, mielőtt bezárja az oldalt.',
+      downloadSignedBtn:'⬇️ Aláírt dokumentum letöltése',
+      openCertBtn:'📄 Aláírási igazolás megnyitása',
+      closeNote:'Az oldalt bármikor bezárhatja, miután letöltötte a szükséges fájlokat.'
+    },
+    informal:{
+      loadingDoc:'A dokumentum betöltése folyamatban...',
+      invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
+      alreadySignedTitle:'Már aláírtad ezt a dokumentumot.',
+      alreadySignedThanks:'Köszönjük!',
+      connectionError:'Nem sikerült kapcsolódni. Kérlek, ellenőrizd az internetkapcsolatot, és próbáld újra.',
+      greeting:'Szia {nume}! Kérlek, olvasd el az alábbi dokumentumot, és ellenőrizd az adatok helyességét. Ha egyetértesz a tartalommal, kérlek, írd alá alul.',
+      openingDoc:'A dokumentum megnyitása...',
+      downloadingDoc:'A dokumentum letöltése...',
+      preparingPages:'Az oldalak előkészítése ({gata}/{total})...',
+      couldNotLoadDoc:'Nem sikerült betölteni a dokumentumot.',
+      couldNotShowDoc:'Nem sikerült megjeleníteni a dokumentumot.',
+      signatureTitle:'Aláírásod',
+      clearBtn:'Törlés',
+      enhanceBtn:'✒️ Javítás',
+      submitBtn:'Aláírás elküldése',
+      submittingBtn:'Küldés folyamatban...',
+      preparingSubmit:'A dokumentum előkészítése...',
+      embeddingSignature:'Az aláírás beillesztése...',
+      uploadingSignature:'Az aláírás feltöltése...',
+      finalizing:'Véglegesítés...',
+      signHereTooltip:'Koppints ide, hogy az aláíráshoz ugorj',
+      signHereLabel:'Aláírás itt',
+      needSignatureAlert:'Kérlek, rajzold meg az aláírásod, mielőtt elküldöd.',
+      submitErrorAlert:'Hiba történt. Kérlek, ellenőrizd az internetkapcsolatot, és próbáld újra.',
+      successTitle:'Köszönöm! A dokumentumot sikeresen aláírtad.',
+      successNote:'Az alábbiakban letöltheted a dokumentum egy példányát, mielőtt bezárod az oldalt.',
+      downloadSignedBtn:'⬇️ Aláírt dokumentum letöltése',
+      openCertBtn:'📄 Aláírási igazolás megnyitása',
+      closeNote:'Az oldalt bármikor bezárhatod, miután letöltötted a szükséges fájlokat.'
+    }
   }
 };
 var semnPageLimba='ro';
+var semnPageTon='formal';
 var semnCurrentDoc=null,semnCurrentSigner=null;
 function t(key,vars){
-  var s=(SEMN_I18N[semnPageLimba]&&SEMN_I18N[semnPageLimba][key])||SEMN_I18N.ro[key]||key;
+  var s=(SEMN_I18N[semnPageLimba]&&SEMN_I18N[semnPageLimba][semnPageTon]&&SEMN_I18N[semnPageLimba][semnPageTon][key])
+    ||(SEMN_I18N.ro.formal[key])||key;
   if(vars)Object.keys(vars).forEach(function(k){s=s.replace('{'+k+'}',vars[k]);});
   return s;
 }
-// Bara de limbă vizibilă TOT timpul pe pagina de semnare (din primul moment,
-// chiar înainte ca documentul să se încarce) — clientul poate comuta oricând.
+// Bara de limbă + ton, vizibilă TOT timpul pe pagina de semnare (din primul
+// moment, chiar înainte ca documentul să se încarce) — clientul poate comuta
+// oricând, atât limba cât și tonul (formal/informal).
 function renderSemnLangBar(){
   var el=document.getElementById('sign-lang-toggle');
   if(!el)return;
-  el.innerHTML='<button type="button" onclick="setSemnPageLimba(\'ro\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='ro'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='ro'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">🇷🇴 Română</button>'
-    +'<button type="button" onclick="setSemnPageLimba(\'hu\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='hu'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='hu'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:8px">🇭🇺 Magyar</button>';
+  el.innerHTML='<div style="display:flex;justify-content:center;gap:8px;margin-bottom:6px">'
+    +'<button type="button" onclick="setSemnPageLimba(\'ro\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='ro'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='ro'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">🇷🇴 Română</button>'
+    +'<button type="button" onclick="setSemnPageLimba(\'hu\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='hu'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='hu'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">🇭🇺 Magyar</button>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:center;gap:8px">'
+    +'<button type="button" onclick="setSemnPageTon(\'formal\')" style="padding:3px 12px;border-radius:20px;border:1px solid rgba(225,195,64,0.3);background:'+(semnPageTon==='formal'?'rgba(225,195,64,0.25)':'transparent')+';color:rgba(225,195,64,0.9);font-size:11px;cursor:pointer;font-family:inherit">'+(semnPageLimba==='hu'?'Ön':'Dvs.')+'</button>'
+    +'<button type="button" onclick="setSemnPageTon(\'informal\')" style="padding:3px 12px;border-radius:20px;border:1px solid rgba(225,195,64,0.3);background:'+(semnPageTon==='informal'?'rgba(225,195,64,0.25)':'transparent')+';color:rgba(225,195,64,0.9);font-size:11px;cursor:pointer;font-family:inherit">'+(semnPageLimba==='hu'?'Te':'Tu')+'</button>'
+    +'</div>';
 }
 function setSemnPageLimba(lang){
   semnPageLimba=lang;
   renderSemnLangBar();
+  reflowSemnPage();
+}
+function setSemnPageTon(ton){
+  semnPageTon=ton;
+  renderSemnLangBar();
+  reflowSemnPage();
+}
+function reflowSemnPage(){
   if(!semnCurrentDoc||!semnCurrentSigner)return;
   if(semnCurrentSigner.status==='semnat'){
     var c=document.getElementById('sign-page-content');
@@ -10940,15 +11023,30 @@ function setSemnPageLimba(lang){
 }
 
 var semnMesajLimba='ro';
+var semnMesajTon='formal';
 
-function buildMesajSemnare(doc,signer,limba){
+function buildMesajSemnare(doc,signer,limba,ton){
   var link=location.origin+location.pathname+'?semneaza='+signer.token;
+  if(limba==='hu'&&ton==='informal'){
+    return 'Szia '+signer.nume+'!\n\n'
+      +'Elküldöm neked a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
+      +'Kérlek, nyisd meg az alábbi linket, ellenőrizd az adatok helyességét, és amennyiben egyetértesz a tartalommal, írd alá közvetlenül a telefonodról:\n\n'
+      +'👉 Aláírás itt: '+link+'\n\n'
+      +'Köszönöm a gyors ügyintézést!';
+  }
   if(limba==='hu'){
     return 'Tisztelt '+signer.nume+'!\n\n'
       +'Elküldöm Önnek a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
       +'Kérem, nyissa meg az alábbi linket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'
       +'👉 Aláírás itt: '+link+'\n\n'
       +'Köszönöm a gyors ügyintézést!';
+  }
+  if(ton==='informal'){
+    return 'Bună, '+signer.nume+'!\n\n'
+      +'Îți trimit documentul „'+doc.titlu+'” pentru semnare.\n\n'
+      +'Te rog să deschizi link-ul de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul, să semnezi direct de pe telefon:\n\n'
+      +'👉 Semnează aici: '+link+'\n\n'
+      +'Mulțumesc pentru promptitudine!';
   }
   return 'Bună ziua, '+signer.nume+',\n\n'
     +'Vă trimit documentul „'+doc.titlu+'” pentru semnare.\n\n'
@@ -10961,21 +11059,31 @@ function openTrimiteSemnare(docId,signerId){
   var doc=getSemnari().find(function(d){return d.id===docId;});
   var signer=doc&&doc.signers.find(function(s){return s.id===signerId;});
   semnMesajLimba=(signer&&signer.limba)||'ro';
+  semnMesajTon=(signer&&signer.ton)||'formal';
   renderTrimiteSemnareModal(docId,signerId);
 }
 
-// Salvează alegerea de limbă direct pe semnatar — astfel, când clientul
-// deschide link-ul, pagina de semnare pornește automat în limba aleasă aici,
-// nu doar mesajul care se trimite.
+// Salvează alegerea de limbă ȘI ton direct pe semnatar — astfel, când
+// clientul deschide link-ul, pagina de semnare pornește automat în limba și
+// tonul alese aici, nu doar mesajul care se trimite.
 function setSemnMesajLimbaSiSalveaza(docId,signerId,limba){
   semnMesajLimba=limba;
+  salveazaPreferintaSemnatar(docId,signerId,{limba:limba});
+  renderTrimiteSemnareModal(docId,signerId);
+}
+function setSemnMesajTonSiSalveaza(docId,signerId,ton){
+  semnMesajTon=ton;
+  salveazaPreferintaSemnatar(docId,signerId,{ton:ton});
+  renderTrimiteSemnareModal(docId,signerId);
+}
+function salveazaPreferintaSemnatar(docId,signerId,patch){
   var list=getSemnari();
   var doc=list.find(function(d){return d.id===docId;});
-  if(doc){
-    var signer=doc.signers.find(function(s){return s.id===signerId;});
-    if(signer){signer.limba=limba;saveSemnari(list);}
-  }
-  renderTrimiteSemnareModal(docId,signerId);
+  if(!doc)return;
+  var signer=doc.signers.find(function(s){return s.id===signerId;});
+  if(!signer)return;
+  Object.keys(patch).forEach(function(k){signer[k]=patch[k];});
+  saveSemnari(list);
 }
 
 function renderTrimiteSemnareModal(docId,signerId){
@@ -10983,15 +11091,19 @@ function renderTrimiteSemnareModal(docId,signerId){
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
-  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba,semnMesajTon);
   var link=location.origin+location.pathname+'?semneaza='+signer.token;
 
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:4px">Trimite spre semnare</div>'
-    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:10px">Limba aleasă mai jos se aplică și mesajului, și întregii pagini de semnare pe care o va vedea semnatarul.</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:10px">Alegerile de mai jos se aplică și mesajului, și întregii pagini de semnare pe care o va vedea semnatarul.</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px">'
     +'<button type="button" onclick="setSemnMesajLimbaSiSalveaza(\''+docId+'\',\''+signerId+'\',\'ro\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMesajLimba==='ro'?'var(--navy)':'#fff')+';color:'+(semnMesajLimba==='ro'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇷🇴 Română</button>'
     +'<button type="button" onclick="setSemnMesajLimbaSiSalveaza(\''+docId+'\',\''+signerId+'\',\'hu\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMesajLimba==='hu'?'var(--navy)':'#fff')+';color:'+(semnMesajLimba==='hu'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇭🇺 Magyar</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+    +'<button type="button" onclick="setSemnMesajTonSiSalveaza(\''+docId+'\',\''+signerId+'\',\'formal\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.15);background:'+(semnMesajTon==='formal'?'rgba(7,33,68,0.08)':'#fff')+';color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer">'+(semnMesajLimba==='hu'?'Ön (formal)':'Dumneavoastră (formal)')+'</button>'
+    +'<button type="button" onclick="setSemnMesajTonSiSalveaza(\''+docId+'\',\''+signerId+'\',\'informal\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.15);background:'+(semnMesajTon==='informal'?'rgba(7,33,68,0.08)':'#fff')+';color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer">'+(semnMesajLimba==='hu'?'Te (informal)':'Tu (informal)')+'</button>'
     +'</div>'
     +'<textarea readonly style="width:100%;min-height:190px;font-size:12.5px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px;font-family:inherit;color:var(--navy);background:rgba(7,33,68,0.02);resize:vertical">'+esc(mesaj)+'</textarea>'
     +(typeof navigator.share==='function'
@@ -11024,7 +11136,7 @@ function copiazaMesajSemnare(docId,signerId){
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
-  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba,semnMesajTon);
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(mesaj).then(function(){alert('Mesaj copiat! Îl poți lipi direct în WhatsApp, SMS sau email.');}).catch(function(){prompt('Copiază acest mesaj:',mesaj);});
   }else{
@@ -11052,7 +11164,7 @@ function distribuieMesajSemnare(docId,signerId){
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
-  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba,semnMesajTon);
   var subiect=buildSubiectSemnare(doc,semnMesajLimba);
   if(navigator.share){
     navigator.share({title:subiect,text:mesaj}).catch(function(){});
@@ -11068,7 +11180,7 @@ function trimiteEmailSemnare(docId,signerId){
   if(!doc){alert('Documentul nu a fost găsit.');return;}
   var signer=doc.signers.find(function(s){return s.id===signerId;});
   if(!signer){alert('Semnatarul nu a fost găsit.');return;}
-  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba);
+  var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba,semnMesajTon);
   var subiect=buildSubiectSemnare(doc,semnMesajLimba);
   var emailDest=gasesteEmailSemnatar(signer);
   window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
@@ -11308,6 +11420,7 @@ function initSignPage(token){
     }
     semnCurrentDoc=doc;semnCurrentSigner=signer;
     semnPageLimba=signer.limba||doc.limba||'ro';
+    semnPageTon=signer.ton||doc.ton||'formal';
     renderSemnLangBar();
     if(signer.status==='semnat'){
       container.innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">'+t('alreadySignedTitle')+'</div><div style="margin-top:8px;color:rgba(7,33,68,0.5)">'+t('alreadySignedThanks')+'</div></div>';
