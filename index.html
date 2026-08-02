@@ -6249,16 +6249,19 @@ function renderIncasariTab(){
     if(i.tip==='virament')totalVirament+=i.suma;
     if(i.tip==='numerar')totalNumerar+=i.suma;
   });
-  var totalServicii=0,totalRestante=0;
+  var totalServicii=0;
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];if(!rec)return;
     if(!recMonthInPerioada(rec.month))return;
     var t=computeRecordTotal(rec);
     totalServicii+=t.serviceTotal;
   });
-  // Restanțele sunt un sold curent (cumulativ) — nu se adună pe mai multe luni
-  // ale aceluiași client (fiecare lună îl include deja pe cel dinainte).
-  // Luăm doar ultima înregistrare a fiecărui client.
+  // Restanțele sunt un sold curent (cumulativ, "cât mai e de plată ACUM"),
+  // nu au sens filtrate pe o perioadă de vizualizare a încasărilor — un
+  // client fără nicio operație în anul selectat tot poate avea o datorie
+  // veche, și ar dispărea din total dacă am filtra greșit pe an/lună.
+  // Afișăm mereu restanța curentă reală, identică cu cea din tab-ul Restanțe.
+  var totalRestante=0;
   var clientiCuRecordIT={};
   Object.keys(svcStore).forEach(function(key){
     var rec=svcStore[key];
@@ -6335,25 +6338,13 @@ function renderIncasariTab(){
   // Restanțe aferente perioadei selectate — soldNou e cumulativ, deci dacă
   // perioada acoperă mai multe luni, luăm o singură dată, per client, ultima
   // lui înregistrare din interval (nu suma tuturor lunilor lui din interval).
-  var totalRestanteLuna=0;
-  var clientiInPerioadaRL={};
-  Object.keys(svcStore).forEach(function(key){
-    var rec=svcStore[key];
-    if(!rec||!rec.clientId)return;
-    if(!recMonthInPerioada(rec.month))return;
-    if(!clientiInPerioadaRL[rec.clientId]||rec.month>clientiInPerioadaRL[rec.clientId].month)clientiInPerioadaRL[rec.clientId]=rec;
-  });
-  Object.keys(clientiInPerioadaRL).forEach(function(cid){
-    var t=computeRecordTotal(clientiInPerioadaRL[cid]);
-    if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
-  });
 
   // Statistici
   html+='<div style="background:rgba(7,33,68,0.03);border:1px solid rgba(7,33,68,0.08);border-radius:12px;padding:12px;margin-bottom:14px">'
     +'<div style="font-size:11px;color:rgba(7,33,68,0.4);font-weight:700;letter-spacing:1px;margin-bottom:10px">'+perioadaLabel.toUpperCase()+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
     +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(34,120,80,0.7);margin-bottom:3px">TOTAL ÎNCASAT</div><div style="font-size:16px;font-weight:800;color:#1a6a40">'+money(totalIncasat)+'</div></div>'
-    +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(178,59,59,0.7);margin-bottom:3px">RESTANȚE PERIOADĂ</div><div style="font-size:16px;font-weight:800;color:#b23b3b">'+money(totalRestanteLuna)+'</div></div>'
+    +'<div style="background:#fff;border:1px solid rgba(178,59,59,0.2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(178,59,59,0.7);margin-bottom:3px">RESTANȚE CURENTE (toți clienții)</div><div style="font-size:16px;font-weight:800;color:#b23b3b">'+money(totalRestante)+'</div></div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     +'<div style="background:#fff;border:1px solid rgba(34,120,80,0.15);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;color:rgba(34,120,80,0.7);margin-bottom:3px">🏦 VIRAMENT</div><div style="font-size:16px;font-weight:800;color:#1a6a40">'+money(totalVirament)+'</div></div>'
