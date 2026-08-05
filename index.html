@@ -4448,10 +4448,10 @@ function invalidateDocCache(path){
 // Descarcă documentele unei categorii în fundal, unul câte unul (cu pauză mică
 // între ele), ca să fie deja în cache până apeși pe „ochi" — fără să afecteze
 // fluiditatea aplicației și fără să consume rețeaua excesiv.
-function prefetchDocsInBackground(items){
+function prefetchDocsInBackground(items,onDone){
   var i=0;
   function next(){
-    if(i>=items.length)return;
+    if(i>=items.length){if(onDone)onDone();return;}
     var m=items[i++];
     if(docBlobCache[m.path]){setTimeout(next,20);return;}
     gdriveFetchFileBlob(m.path).catch(function(){}).then(function(){
@@ -4459,6 +4459,27 @@ function prefetchDocsInBackground(items){
     });
   }
   next();
+}
+
+// Preîncărcare silențioasă, în fundal, a documentelor TUTUROR clienților, la
+// pornirea aplicației — nu blochează nimic vizibil, nu grăbește nimic, se
+// derulează lent (un client, apoi altul, cu pauze) în timp ce utilizatorul
+// deja lucrează în aplicație. Efectul: prima dată când deschizi efectiv fișa
+// unui client și un document, e deja în cache (memorie/IndexedDB) — apare
+// instant, în loc să aștepți descărcarea în acel moment.
+function prefetchAllClientDocsInBackground(){
+  var listaClienti=clients.slice();
+  var ci=0;
+  function nextClient(){
+    if(ci>=listaClienti.length)return;
+    var c=listaClienti[ci++];
+    gdriveGet('doc_meta_'+c.id).then(function(meta){
+      var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+      if(!allMeta.length){setTimeout(nextClient,150);return;}
+      prefetchDocsInBackground(allMeta,function(){setTimeout(nextClient,400);});
+    }).catch(function(){setTimeout(nextClient,400);});
+  }
+  nextClient();
 }
 
 
@@ -4503,7 +4524,7 @@ function uploadDocsCat(input,clientId,category,categoryLabel,folderName){
   }).then(function(){
     if(loadEl)loadEl.textContent='';
     input.value='';
-    refreshDocCategoriesUI(clientId);
+    delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);
   });
 }
 
@@ -5967,29 +5988,7 @@ function loadDocsCatMerged(clientId,category,containerId){
   gdriveGetChecked('doc_meta_'+clientId).then(function(meta){
     var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
     var catMeta=allMeta.filter(function(m){return m.category===category;});
-    if(!catMeta.length){el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';return;}
-    var eyeSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-    var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
-    var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
-    var html=catMeta.map(function(m,idx){
-      var nameE=(m.name||'').replace(/'/g,"\\'");
-      var pathE=(m.path||'').replace(/'/g,"\\'");
-      var typeE=(m.type||'').replace(/'/g,"\\'");
-      var ascunsInitial=idx>=PRAG_AFISARE_DOCS;
-      return '<div class="doc-row" data-doc-idx="'+idx+'"'+(ascunsInitial?' style="display:none"':'')+'><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
-        +'<div class="doc-row-actions">'
-        +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\',this)" title="Vizualizează">'+eyeSvg+'</button>'
-        +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
-        +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
-        +'</div></div>';
-    }).join('');
-    if(catMeta.length>PRAG_AFISARE_DOCS){
-      html+='<button type="button" id="'+containerId+'-toggle" data-expanded="0" onclick="toggleDocsExtra(\''+containerId+'\')" style="width:100%;text-align:center;font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;padding:7px 0;border-top:1px dashed rgba(7,33,68,0.15);margin-top:2px">Arată toate ('+catMeta.length+')</button>';
-    }
-    el.innerHTML=html;
-    // Pre-încărcăm silențios, în fundal, documentele acestei categorii —
-    // până apeși pe „ochi", sunt deja gata în cache, deschidere aproape instantă.
-    prefetchDocsInBackground(catMeta);
+    renderDocsListFromMeta(clientId,category,containerId,catMeta);
   }).catch(function(err){
     // Eroare reală (rețea/server) — NU o confundăm cu o categorie goală, ca să
     // nu pară că fișierele au dispărut. Arătăm clar problema + reîncercare.
@@ -5997,6 +5996,39 @@ function loadDocsCatMerged(clientId,category,containerId){
     el.innerHTML='<div style="font-size:11.5px;color:#b23b3b;padding:3px 0 4px">Nu am putut încărca lista de fișiere (eroare de conexiune). '
       +'<button type="button" onclick="loadDocsCatMerged(\''+clientId+'\',\''+category+'\',\''+containerId+'\')" style="background:none;border:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-size:11.5px;padding:0;font-family:inherit">Reîncearcă</button></div>';
   });
+}
+
+// Randare pură, FĂRĂ nicio cerere de rețea — primește metadatele deja
+// descărcate. Separată de loadDocsCatMerged tocmai ca să poată fi apelată
+// direct de refreshDocCategoriesUI (care descarcă o singură dată metadatele
+// pentru TOATE categoriile deodată), fără să mai declanșeze o cerere nouă,
+// redundantă, pentru fiecare categorie vizibilă în parte.
+function renderDocsListFromMeta(clientId,category,containerId,catMeta){
+  var el=document.getElementById(containerId);
+  if(!el)return;
+  if(!catMeta.length){el.innerHTML='<div style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:3px 0 4px">Niciun fișier</div>';return;}
+  var eyeSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+  var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+  var html=catMeta.map(function(m,idx){
+    var nameE=(m.name||'').replace(/'/g,"\\'");
+    var pathE=(m.path||'').replace(/'/g,"\\'");
+    var typeE=(m.type||'').replace(/'/g,"\\'");
+    var ascunsInitial=idx>=PRAG_AFISARE_DOCS;
+    return '<div class="doc-row" data-doc-idx="'+idx+'"'+(ascunsInitial?' style="display:none"':'')+'><div class="doc-row-info"><div class="doc-row-name">'+esc(m.name)+'</div><div class="doc-row-date">'+esc(m.date||'')+'</div></div>'
+      +'<div class="doc-row-actions">'
+      +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\',this)" title="Vizualizează">'+eyeSvg+'</button>'
+      +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
+      +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
+      +'</div></div>';
+  }).join('');
+  if(catMeta.length>PRAG_AFISARE_DOCS){
+    html+='<button type="button" id="'+containerId+'-toggle" data-expanded="0" onclick="toggleDocsExtra(\''+containerId+'\')" style="width:100%;text-align:center;font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;padding:7px 0;border-top:1px dashed rgba(7,33,68,0.15);margin-top:2px">Arată toate ('+catMeta.length+')</button>';
+  }
+  el.innerHTML=html;
+  // Pre-încărcăm silențios, în fundal, documentele acestei categorii —
+  // până apeși pe „ochi", sunt deja gata în cache, deschidere aproape instantă.
+  prefetchDocsInBackground(catMeta);
 }
 
 // Extinde/restrânge lista de documente dintr-o categorie, dacă sunt mai
@@ -8146,7 +8178,7 @@ function reconciliazaCategoriiDinMetadata(clientId,c){
       cats.push({key:cat,label:labelGasit,folderName:labelGasit});
       adaugat=true;
     });
-    if(adaugat){save();refreshDocCategoriesUI(clientId);}
+    if(adaugat){save();delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);}
   }).catch(function(){});
 }
 
@@ -8159,16 +8191,18 @@ function renderDocCategoriesBlock(cid,c){
   return '<div id="doc-cats-inner-'+cid+'" style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:6px 0">Se încarcă...</div>';
 }
 
+// Cache în memorie, per sesiune — la a doua deschidere a aceleiași fișe,
+// categoriile apar INSTANT din cache, iar în fundal se verifică discret dacă
+// mai e ceva nou (și se re-randează doar dacă chiar s-a schimbat ceva).
+var docMetaSessionCache={};
+
 function refreshDocCategoriesUI(clientId){
   var c=clients.find(function(x){return x.id===clientId;});
   var wrap=document.getElementById('doc-custom-cats-'+clientId);
   if(!wrap||!c)return;
-  wrap.innerHTML='<div id="doc-cats-inner-'+clientId+'" style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:6px 0">Se încarcă...</div>';
-  var inner=document.getElementById('doc-cats-inner-'+clientId);
   var toate=ensureDocCategories(c);
 
-  gdriveGetChecked('doc_meta_'+clientId).then(function(meta){
-    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+  function randeazaDin(allMeta){
     var countByCat={};
     allMeta.forEach(function(m){
       if(!m.category||m.category==='du')return;
@@ -8198,18 +8232,34 @@ function refreshDocCategoriesUI(clientId){
         +'</div>';
     });
     html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="openUploadDocModal(\''+clientId+'\')"><i class="ti ti-upload"></i> Încarcă documente</button>';
-    inner.outerHTML=html;
-
+    wrap.innerHTML=html;
     cuFisiere.forEach(function(cat){
-      loadDocsCatMerged(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key);
+      var catMeta=allMeta.filter(function(m){return m.category===cat.key;});
+      renderDocsListFromMeta(clientId,cat.key,'docs-cat-'+clientId+'-'+cat.key,catMeta);
     });
+    injectIcons();
+  }
+
+  var cached=docMetaSessionCache[clientId];
+  if(cached){
+    // Afișăm INSTANT din cache — fără "Se încarcă...".
+    randeazaDin(cached);
+  }else{
+    wrap.innerHTML='<div id="doc-cats-inner-'+clientId+'" style="font-size:11.5px;color:rgba(7,33,68,0.35);font-style:italic;padding:6px 0">Se încarcă...</div>';
+  }
+
+  gdriveGetChecked('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    var schimbat=!cached||JSON.stringify(cached)!==JSON.stringify(allMeta);
+    docMetaSessionCache[clientId]=allMeta;
+    if(schimbat)randeazaDin(allMeta);
   }).catch(function(err){
+    if(cached)return; // aveam deja ceva afișat din cache — nu suprascriem cu un mesaj de eroare
     console.error('Eroare la încărcarea categoriilor de documente:',err);
-    inner.outerHTML='<div style="font-size:11.5px;color:#b23b3b;padding:4px 0 8px">Nu am putut încărca documentele (eroare de conexiune). '
+    wrap.innerHTML='<div style="font-size:11.5px;color:#b23b3b;padding:4px 0 8px">Nu am putut încărca documentele (eroare de conexiune). '
       +'<button type="button" onclick="refreshDocCategoriesUI(\''+clientId+'\')" style="background:none;border:none;color:var(--navy);text-decoration:underline;cursor:pointer;font-size:11.5px;padding:0;font-family:inherit">Reîncearcă</button></div>'
       +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin:4px 0 10px" onclick="openUploadDocModal(\''+clientId+'\')"><i class="ti ti-upload"></i> Încarcă documente</button>';
   });
-  injectIcons();
 }
 
 // ── Modalul universal de încărcare: alegi o categorie existentă (chiar dacă
@@ -8285,7 +8335,7 @@ function adaugaCategorieNoua(clientId){
   var folderName=nume.replace(/[\/\\:*?"<>|]/g,'_').trim()||key;
   c.docCategories.push({key:key,label:nume,folderName:folderName});
   save();
-  refreshDocCategoriesUI(clientId);
+  delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);
 }
 
 function redenumesteCategorie(clientId,key){
@@ -8298,7 +8348,7 @@ function redenumesteCategorie(clientId,key){
   if(!nume||!nume.trim())return;
   cat.label=nume.trim();
   save();
-  refreshDocCategoriesUI(clientId);
+  delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);
 }
 
 function stergeCategorie(clientId,key){
@@ -8336,7 +8386,7 @@ function confirmaStergereCategorie(clientId,key,actiune,targetKey){
   function finalizeaza(){
     c.docCategories=(c.docCategories||[]).filter(function(x){return x.key!==key;});
     save();
-    refreshDocCategoriesUI(clientId);
+    delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);
   }
 
   gdriveGet('doc_meta_'+clientId).then(function(meta){
@@ -8353,7 +8403,7 @@ function confirmaStergereCategorie(clientId,key,actiune,targetKey){
       allMeta.forEach(function(m){if(m.category===key)m.category=targetKey;});
       return gdriveSet('doc_meta_'+clientId,allMeta);
     }
-  }).then(finalizeaza).catch(function(){alert('A apărut o eroare. Verifică internetul și încearcă din nou.');refreshDocCategoriesUI(clientId);});
+  }).then(finalizeaza).catch(function(){alert('A apărut o eroare. Verifică internetul și încearcă din nou.');delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);});
 }
 
 
@@ -10266,6 +10316,12 @@ function initApp(){
     console.warn('Backup automat NU a pornit: clients.length === 0 la acest moment.');
   }
   setTimeout(function(){ checkAutoBackupAge(); }, 2000);
+  // Preîncărcare silențioasă a documentelor tuturor clienților, în fundal —
+  // pornește puțin mai târziu, ca să nu concureze cu sincronizarea inițială
+  // și cu backup-ul automat de mai sus. Nu afectează nimic vizibil.
+  if(clients.length>0){
+    setTimeout(function(){ prefetchAllClientDocsInBackground(); }, 9000);
+  }
   // iOS install banner
   (function(){
     var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
