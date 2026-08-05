@@ -9060,8 +9060,8 @@ function generateClientServicePDF(c,rec){
   var total=0,anyLine=false;
   var descColWidthSvc=90; // lățimea disponibilă înainte de coloana CANT. (margin+96)
   // Servicii firmă (PJ)
-  var hasPJsvc=Object.keys(rec.services||{}).some(function(k){return rec.services[k]&&rec.services[k].qty;});
-  var hasPFsvc=Object.keys(rec.services_pf||{}).some(function(k){return rec.services_pf[k]&&rec.services_pf[k].qty;});
+  var hasPJsvc=Object.keys(rec.services||{}).some(function(k){return rec.services[k]&&rec.services[k].qty;})||(rec.diverse||[]).some(function(d){return d.qty||d.price||d.desc;});
+  var hasPFsvc=Object.keys(rec.services_pf||{}).some(function(k){return rec.services_pf[k]&&rec.services_pf[k].qty;})||(rec.services_pf_diverse||[]).some(function(d){return d.qty||d.price||d.desc;});
   if(hasPJsvc&&hasPFsvc){
     checkPage();
     doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(navy[0],navy[1],navy[2]);
@@ -9110,6 +9110,19 @@ function generateClientServicePDF(c,rec){
       doc.text(descLines,margin,y);
       doc.text(String(it.qty||0),margin+96,y,{align:'right'});
       doc.text(money(it.price),margin+130,y,{align:'right'});
+      doc.text(money(sub),pageW-margin,y,{align:'right'});
+      y+=6.5*descLines.length;
+    });
+    (rec.services_pf_diverse||[]).forEach(function(d){
+      if(!d.qty&&!d.price&&!d.desc)return;
+      checkPageSvc();
+      anyLine=true;
+      var sub=(d.qty||0)*(d.price||0);total+=sub;
+      doc.setTextColor(34,100,60);
+      var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidthSvc);
+      doc.text(descLines,margin,y);
+      doc.text(String(d.qty||0),margin+96,y,{align:'right'});
+      doc.text(money(d.price),margin+130,y,{align:'right'});
       doc.text(money(sub),pageW-margin,y,{align:'right'});
       y+=6.5*descLines.length;
     });
@@ -9518,7 +9531,7 @@ function generateRaportRestante(clientId){
     });
     // Servicii PF
     var pfKeys=Object.keys(rec.services_pf||{});
-    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;});
+    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;})||(rec.services_pf_diverse||[]).some(function(d){return d.qty||d.price||d.desc;});
     if(hasPfServices){
       checkP();
       doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
@@ -9686,7 +9699,7 @@ function generateFisaIstoric(){
     });
     // PF services
     var pfKeys=Object.keys(rec.services_pf||{});
-    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;});
+    var hasPfServices=pfKeys.some(function(k){var it=rec.services_pf[k];return it&&it.qty;})||(rec.services_pf_diverse||[]).some(function(d){return d.qty||d.price||d.desc;});
     if(hasPfServices){
       checkP();
       doc.setFont('CrimsonPro','bold');doc.setFontSize(10);doc.setTextColor(34,120,80);
@@ -9701,6 +9714,18 @@ function generateFisaIstoric(){
         doc.text(descLines,margin+2,y);
         doc.text(String(it.qty||0),margin+100,y,{align:'right'});
         doc.text(money(it.price),margin+130,y,{align:'right'});
+        doc.text(money(sub),pageW-margin,y,{align:'right'});
+        y+=5.8*descLines.length;
+      });
+      (rec.services_pf_diverse||[]).forEach(function(d){
+        if(!d.qty&&!d.price&&!d.desc)return;
+        checkP();hasLines=true;
+        var sub=(d.qty||0)*(d.price||0);
+        doc.setTextColor(34,100,60);
+        var descLines=doc.splitTextToSize(d.desc||'Divers',descColWidth);
+        doc.text(descLines,margin+2,y);
+        doc.text(String(d.qty||0),margin+100,y,{align:'right'});
+        doc.text(money(d.price),margin+130,y,{align:'right'});
         doc.text(money(sub),pageW-margin,y,{align:'right'});
         y+=5.8*descLines.length;
       });
