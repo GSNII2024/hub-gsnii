@@ -4945,6 +4945,19 @@ function nextBirthdayInfo(b){
   return {days:days,turningAge:next.getFullYear()-b.year};
 }
 
+// Vârsta ACTUALĂ (câți ani are persoana chiar acum) — distinctă de
+// nextBirthdayInfo().turningAge, care e vârsta pe care o va împlini la
+// URMĂTOAREA aniversare (folosită la lista de zile de naștere apropiate).
+// Confuzia dintre cele două a produs un bug real: afișa vârsta viitoare în
+// loc de cea curentă în fișa clientului.
+function varstaActuala(b){
+  var today=new Date();today.setHours(0,0,0,0);
+  var varsta=today.getFullYear()-b.year;
+  var aAvutZiuaAnulAsta=(today.getMonth()+1>b.month)||(today.getMonth()+1===b.month&&today.getDate()>=b.day);
+  if(!aAvutZiuaAnulAsta)varsta--;
+  return varsta;
+}
+
 function expStatus(dateStr,label){
   if(!dateStr)return null;
   var parts=dateStr.split('.');
@@ -8085,7 +8098,7 @@ function buildForm(c){
     }
     if(s.title==='Date personale'){
       var b=c?cnpToBirthdate(c.cnp):null;
-      var bVal=b?(fmtBirth(b)+' \u00b7 '+nextBirthdayInfo(b).turningAge+' ani'):'';
+      var bVal=b?(fmtBirth(b)+' \u00b7 '+varstaActuala(b)+' ani'):'';
       html+='<div class="field"><label>Ziua de na\u0219tere (calculat\u0103 din CNP)</label><input id="f-ziua-nastere" type="text" readonly style="background:rgba(7,33,68,0.05);color:rgba(7,33,68,0.7)" value="'+esc(bVal)+'"></div>';
     }
     if(s.title==='SPV'){
@@ -8446,7 +8459,7 @@ function bindCnpBirthday(){
   if(!cnpEl||!out)return;
   cnpEl.addEventListener('input',function(){
     var b=cnpToBirthdate(cnpEl.value);
-    out.value=b?(fmtBirth(b)+' \u00b7 '+nextBirthdayInfo(b).turningAge+' ani'):'';
+    out.value=b?(fmtBirth(b)+' \u00b7 '+varstaActuala(b)+' ani'):'';
   });
 }
 
