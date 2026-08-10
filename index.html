@@ -10895,8 +10895,9 @@ function salveazaSemnareNoua(){
 function renderSemnariListaIncurs(list){
   var container=document.getElementById('semnari-content');
   if(!container)return;
-  if(!list.length){container.innerHTML='<div class="empty">Niciun document în curs de semnare.</div>';return;}
-  var html='';
+  var bulkBtn='<button type="button" onclick="openTrimiteMultiplu()" style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">📎 Trimite mai multe documente într-un mesaj</button>';
+  if(!list.length){container.innerHTML=bulkBtn+'<div class="empty">Niciun document în curs de semnare.</div>';return;}
+  var html=bulkBtn;
   list.forEach(function(d){
     var semnati=d.signers.filter(function(s){return s.status==='semnat';}).length;
     html+='<div class="card" style="cursor:default">'
@@ -11269,6 +11270,170 @@ function trimiteEmailSemnare(docId,signerId){
   var subiect=buildSubiectSemnare(doc,semnMesajLimba);
   var emailDest=gasesteEmailSemnatar(signer);
   window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
+}
+
+// ── Trimite mai multe documente într-un singur mesaj (comoditate) ─────────
+// Nu schimbă nimic din fluxul de semnare propriu-zis — fiecare document
+// rămâne complet independent (folder, status, certificat proprii). Doar
+// compune, pentru aceeași persoană, un singur mesaj cu toate link-urile.
+var semnMultiSelectatCheie=null;
+var semnMultiDocIds=[];
+var semnMultiLimba='ro';
+var semnMultiTon='formal';
+
+function getSemnatariCuDocumentePendinte(){
+  var docs=getSemnari();
+  var grupuri={};
+  docs.forEach(function(d){
+    (d.signers||[]).forEach(function(s){
+      if(s.status==='semnat')return;
+      var email=gasesteEmailSemnatar(s);
+      var cheie=email?('email:'+email.toLowerCase()):('nume:'+norm(s.nume));
+      if(!grupuri[cheie])grupuri[cheie]={nume:s.nume,email:email,items:[]};
+      grupuri[cheie].items.push({docId:d.id,docTitlu:d.titlu,signerId:s.id,signer:s});
+    });
+  });
+  return grupuri;
+}
+
+function openTrimiteMultiplu(){
+  semnMultiSelectatCheie=null;
+  semnMultiDocIds=[];
+  renderTrimiteMultiplModal();
+}
+
+function renderTrimiteMultiplModal(){
+  var grupuri=getSemnatariCuDocumentePendinte();
+  var html='<div style="padding:1rem">';
+  if(!semnMultiSelectatCheie){
+    html+='<div class="section-title" style="margin-bottom:4px">Trimite mai multe documente</div>';
+    var chei=Object.keys(grupuri).filter(function(k){return grupuri[k].items.length>1;});
+    if(!chei.length){
+      html+='<div style="font-size:13.5px;color:rgba(7,33,68,0.5);margin-top:10px">Nicio persoană nu are în acest moment mai multe documente nesemnate — funcția e utilă doar când cineva are 2 sau mai multe documente în așteptare simultan.</div>';
+    }else{
+      html+='<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:12px">Alege persoana pentru care vrei să trimiți mai multe documente într-un singur mesaj:</div>';
+      chei.sort(function(a,b){return grupuri[b].items.length-grupuri[a].items.length;}).forEach(function(k){
+        var g=grupuri[k];
+        html+='<div onclick="selecteazaPersoanaMultiplu(\''+k.replace(/'/g,"\\'")+'\')" style="padding:12px;border:1px solid rgba(7,33,68,0.15);border-radius:8px;margin-bottom:8px;cursor:pointer">'
+          +'<div style="font-weight:700;color:var(--navy);font-size:14px">'+esc(g.nume)+'</div>'
+          +'<div style="font-size:12px;color:rgba(7,33,68,0.5)">'+g.items.length+' documente nesemnate'+(g.email?' &middot; '+esc(g.email):'')+'</div>'
+          +'</div>';
+      });
+    }
+  }else{
+    var g=grupuri[semnMultiSelectatCheie];
+    if(!g){document.getElementById('restanta-picker').style.display='none';return;}
+    if(!semnMultiDocIds.length)semnMultiDocIds=g.items.map(function(it){return it.docId+'|'+it.signerId;});
+    html+='<button type="button" onclick="semnMultiSelectatCheie=null;renderTrimiteMultiplModal()" style="background:none;border:none;color:var(--navy);cursor:pointer;font-size:12.5px;padding:0;margin-bottom:10px;font-family:inherit">&larr; Alege altă persoană</button>';
+    html+='<div class="section-title" style="margin-bottom:4px">'+esc(g.nume)+'</div>';
+    html+='<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:10px">Bifează documentele de inclus în mesaj:</div>';
+    g.items.forEach(function(it){
+      var cheieItem=it.docId+'|'+it.signerId;
+      var bifat=semnMultiDocIds.indexOf(cheieItem)>=0;
+      html+='<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid rgba(7,33,68,0.12);border-radius:8px;margin-bottom:6px;cursor:pointer">'
+        +'<input type="checkbox" '+(bifat?'checked':'')+' onchange="toggleSemnMultiDoc(\''+cheieItem+'\')" style="width:17px;height:17px;accent-color:var(--navy)">'
+        +'<span style="font-size:13.5px;color:var(--navy)">'+esc(it.docTitlu)+'</span>'
+        +'</label>';
+    });
+    html+='<div style="display:flex;gap:6px;margin:12px 0 6px">'
+      +'<button type="button" onclick="setSemnMultiLimba(\'ro\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMultiLimba==='ro'?'var(--navy)':'#fff')+';color:'+(semnMultiLimba==='ro'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇷🇴 Română</button>'
+      +'<button type="button" onclick="setSemnMultiLimba(\'hu\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:'+(semnMultiLimba==='hu'?'var(--navy)':'#fff')+';color:'+(semnMultiLimba==='hu'?'#fff':'var(--navy)')+';font-family:inherit;font-size:13px;cursor:pointer">🇭🇺 Magyar</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+      +'<button type="button" onclick="setSemnMultiTon(\'formal\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(7,33,68,0.15);background:'+(semnMultiTon==='formal'?'rgba(7,33,68,0.08)':'#fff')+';color:var(--navy);font-family:inherit;font-size:12px;cursor:pointer">'+(semnMultiLimba==='hu'?'Ön (formal)':'Dumneavoastră (formal)')+'</button>'
+      +'<button type="button" onclick="setSemnMultiTon(\'informal\')" style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(7,33,68,0.15);background:'+(semnMultiTon==='informal'?'rgba(7,33,68,0.08)':'#fff')+';color:var(--navy);font-family:inherit;font-size:12px;cursor:pointer">'+(semnMultiLimba==='hu'?'Te (informal)':'Tu (informal)')+'</button>'
+      +'</div>';
+    var itemiSelectati=g.items.filter(function(it){return semnMultiDocIds.indexOf(it.docId+'|'+it.signerId)>=0;});
+    var mesaj=itemiSelectati.length?buildMesajSemnareMultiplu(g,itemiSelectati,semnMultiLimba,semnMultiTon):'';
+    html+='<textarea readonly style="width:100%;min-height:170px;font-size:12.5px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px;font-family:inherit;color:var(--navy);background:rgba(7,33,68,0.02);resize:vertical">'+esc(mesaj)+'</textarea>';
+    if(itemiSelectati.length){
+      if(typeof navigator.share==='function'){
+        html+='<button type="button" onclick="distribuieMesajSemnareMultiplu()" style="width:100%;margin-top:12px;padding:12px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">📤 Distribuie (WhatsApp, SMS, Mail...)</button>';
+      }
+      html+='<div style="display:flex;gap:8px;margin-top:10px">'
+        +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px" onclick="copiazaMesajSemnareMultiplu()"><i class="ti ti-file-text"></i> Copiază mesaj</button>'
+        +'<button type="button" class="btn-add-service" style="flex:1;justify-content:center;font-size:13px" onclick="trimiteEmailSemnareMultiplu()"><i class="ti ti-mail"></i> Email</button>'
+        +'</div>';
+    }
+  }
+  html+='</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Trimite mai multe documente';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+
+function selecteazaPersoanaMultiplu(cheie){
+  semnMultiSelectatCheie=cheie;
+  semnMultiDocIds=[];
+  renderTrimiteMultiplModal();
+}
+function toggleSemnMultiDoc(cheieItem){
+  var idx=semnMultiDocIds.indexOf(cheieItem);
+  if(idx>=0)semnMultiDocIds.splice(idx,1);
+  else semnMultiDocIds.push(cheieItem);
+  renderTrimiteMultiplModal();
+}
+function setSemnMultiLimba(l){semnMultiLimba=l;renderTrimiteMultiplModal();}
+function setSemnMultiTon(t){semnMultiTon=t;renderTrimiteMultiplModal();}
+
+function buildMesajSemnareMultiplu(g,itemiSelectati,limba,ton){
+  var linkuri=itemiSelectati.map(function(it){
+    var link=location.origin+location.pathname+'?semneaza='+it.signer.token;
+    return '👉 '+it.docTitlu+': '+link;
+  }).join('\n');
+  var n=itemiSelectati.length,nume=g.nume;
+  if(limba==='hu'&&ton==='informal'){
+    return 'Szia '+nume+'!\n\nElküldök neked '+n+' dokumentumot aláírásra.\n\nKérlek, nyisd meg egyenként az alábbi linkeket, ellenőrizd az adatok helyességét, és amennyiben egyetértesz a tartalommal, írd alá közvetlenül a telefonodról:\n\n'+linkuri+'\n\nKöszönöm a gyors ügyintézést!';
+  }
+  if(limba==='hu'){
+    return 'Tisztelt '+nume+'!\n\nElküldök Önnek '+n+' dokumentumot aláírásra.\n\nKérem, nyissa meg egyenként az alábbi linkeket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'+linkuri+'\n\nKöszönöm a gyors ügyintézést!';
+  }
+  if(ton==='informal'){
+    return 'Bună, '+nume+'!\n\nÎți trimit '+n+' documente pentru semnare.\n\nTe rog să deschizi pe rând link-urile de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul, să semnezi direct de pe telefon:\n\n'+linkuri+'\n\nMulțumesc pentru promptitudine!';
+  }
+  return 'Bună ziua, '+nume+',\n\nVă trimit '+n+' documente pentru semnare.\n\nVă rog să accesați pe rând link-urile de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'+linkuri+'\n\nVă mulțumesc pentru promptitudine!';
+}
+
+// Salvează limba/tonul alese pe FIECARE semnatar inclus (nu doar în mesaj) —
+// astfel, pagina de semnare a fiecăruia pornește automat în aceeași limbă.
+function pregatesteTrimitereaMultipla(){
+  var grupuri=getSemnatariCuDocumentePendinte();
+  var g=grupuri[semnMultiSelectatCheie];
+  if(!g)return null;
+  var itemiSelectati=g.items.filter(function(it){return semnMultiDocIds.indexOf(it.docId+'|'+it.signerId)>=0;});
+  if(!itemiSelectati.length)return null;
+  itemiSelectati.forEach(function(it){
+    salveazaPreferintaSemnatar(it.docId,it.signerId,{limba:semnMultiLimba,ton:semnMultiTon});
+  });
+  return {g:g,mesaj:buildMesajSemnareMultiplu(g,itemiSelectati,semnMultiLimba,semnMultiTon)};
+}
+
+function copiazaMesajSemnareMultiplu(){
+  var d=pregatesteTrimitereaMultipla();
+  if(!d)return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(d.mesaj).then(function(){alert('Mesaj copiat! Îl poți lipi direct în WhatsApp, SMS sau email.');}).catch(function(){prompt('Copiază acest mesaj:',d.mesaj);});
+  }else{
+    prompt('Copiază acest mesaj:',d.mesaj);
+  }
+}
+function distribuieMesajSemnareMultiplu(){
+  var d=pregatesteTrimitereaMultipla();
+  if(!d)return;
+  var subiect=semnMultiLimba==='hu'?'Aláírásra váró dokumentumok':'Documente pentru semnare';
+  if(navigator.share){
+    navigator.share({title:subiect,text:d.mesaj}).catch(function(){});
+  }else{
+    alert('Distribuirea nu este suportată de acest browser. Folosește "Copiază mesaj" în schimb.');
+  }
+}
+function trimiteEmailSemnareMultiplu(){
+  var d=pregatesteTrimitereaMultipla();
+  if(!d)return;
+  var subiect=semnMultiLimba==='hu'?'Aláírásra váró dokumentumok':'Documente pentru semnare';
+  var emailDest=d.g.email||'';
+  window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(d.mesaj);
 }
 
 function blobToDataURL(blob){
