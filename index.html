@@ -11359,6 +11359,11 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
     linie('Adresă IP',doc.creatorIP||'—');
 
     semnatari.forEach(function(s,idx){
+      // Rezervăm dinainte spațiul pentru TOT blocul semnatarului (titlu +
+      // toate câmpurile + eticheta + chenarul semnăturii) — altfel fiecare
+      // rând își verifica separat locul, iar chenarul putea "scăpa" singur
+      // pe pagina următoare, fără datele semnatarului lângă el.
+      checkP(80);
       sectiune('Semnatar '+(idx+1));
       linie('Nume',s.nume);
       linie('Email',s.email||'—');
@@ -11366,11 +11371,10 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
       linie('Semnat la',s.semnatAt?new Date(s.semnatAt).toLocaleString('ro-RO'):'—');
       linie('Adresă IP',s.semnatIP||'—');
 
-      checkP(34);
       pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(10.5);pdfDoc.setTextColor(90,90,90);
       pdfDoc.text('Semnătură:',margin,y);
       y+=5;
-      var sigBoxX=margin,sigBoxY=y,sigBoxW=65,sigBoxH=22;
+      var sigBoxX=margin,sigBoxY=y,sigBoxW=62,sigBoxH=20;
       pdfDoc.setDrawColor(navy[0],navy[1],navy[2]);pdfDoc.setLineWidth(0.35);
       pdfDoc.rect(sigBoxX,sigBoxY,sigBoxW,sigBoxH);
       if(imgs[idx]){
@@ -11383,7 +11387,7 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
           pdfDoc.addImage(imgs[idx],'PNG',drawX,drawY,drawW,drawH,undefined,'FAST');
         }catch(e){}
       }
-      y+=sigBoxH+6;
+      y+=sigBoxH+5;
     });
 
     drawFooter(pdfDoc,margin,pageW);
@@ -11811,7 +11815,7 @@ function drawStrokeAsInkRibbon(ctx,stroke){
     var d=Math.hypot(next.x-prev.x,next.y-prev.y);
     var dt=Math.max(next.t-prev.t,1);
     var speed=d/dt;
-    return Math.max(1.0,Math.min(3.4,2.8-speed*7));
+    return Math.max(1.8,Math.min(4.6,3.7-speed*7));
   });
   // netezire (medie mobilă pe 5 puncte), tranziții line
   var w=widths.map(function(_,i){
@@ -11823,7 +11827,7 @@ function drawStrokeAsInkRibbon(ctx,stroke){
   // subțiere naturală la început și sfârșit (ca la ridicarea/apăsarea pixului)
   var taperLen=Math.min(4,Math.floor(stroke.length/3));
   for(var t=0;t<taperLen;t++){
-    var f=0.35+0.65*(t+1)/(taperLen+1);
+    var f=0.55+0.45*(t+1)/(taperLen+1);
     w[t]*=f;
     w[w.length-1-t]*=f;
   }
@@ -11833,7 +11837,7 @@ function drawStrokeAsInkRibbon(ctx,stroke){
   // natural, fără „ciupituri" pe curbe strânse (spre deosebire de o formă
   // poligonală cu contur stânga/dreapta, care se poate auto-intersecta).
   ctx.lineCap='round';ctx.lineJoin='round';
-  ctx.strokeStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.9)';
+  ctx.strokeStyle='rgba('+INK_COLOR[0]+','+INK_COLOR[1]+','+INK_COLOR[2]+',0.98)';
   for(var i=0;i<stroke.length-1;i++){
     var p0=stroke[i],p1=stroke[i+1];
     var w0=w[i],w1=w[i+1];
@@ -11851,10 +11855,11 @@ function drawStrokeAsInkRibbon(ctx,stroke){
     }
   }
 
-  // 3) al doilea strat, mai larg și mai transparent, pentru textură ușoară de cerneală
-  ctx.globalAlpha=0.16;
+  // 3) al doilea strat, mai larg, pentru textură ușoară de cerneală (contur
+  // mai plin, nu doar linia centrală subțire)
+  ctx.globalAlpha=0.28;
   for(var i2=0;i2<stroke.length-1;i2++){
-    ctx.lineWidth=(w[i2]+w[i2+1])/2*1.2;
+    ctx.lineWidth=(w[i2]+w[i2+1])/2*1.3;
     ctx.beginPath();
     ctx.moveTo(stroke[i2].x,stroke[i2].y);
     ctx.lineTo(stroke[i2+1].x,stroke[i2+1].y);
