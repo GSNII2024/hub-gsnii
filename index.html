@@ -9684,10 +9684,13 @@ function generateRaportRestante(clientId){
       doc.setTextColor(navy[0],navy[1],navy[2]);
     }
 
-    // Rezumat lună — strict ce nu este încasat (nu afișăm încasările făcute)
+    // Rezumat lună — restul PROPRIU al lunii (servicii minus încasat în acea
+    // lună), nu soldul cumulativ — cumulativul apare doar la TOTAL RESTANT,
+    // jos, la finalul raportului.
     checkP();
+    var restantLuna=t.serviceTotal-t.sumaIncasata;
     doc.setFont('CrimsonPro','bold');doc.setFontSize(13);doc.setTextColor(red[0],red[1],red[2]);
-    doc.text('RESTANT: '+money(t.soldNou),pageW-margin,y,{align:'right'});
+    doc.text('Restant lună: '+money(restantLuna),pageW-margin,y,{align:'right'});
     doc.setTextColor(navy[0],navy[1],navy[2]);
     y+=8;
 
