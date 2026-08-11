@@ -11756,9 +11756,10 @@ function confirmaStergereSemnare(docId,siDinDrive){
 function renderSemnariListaSemnate(list){
   var container=document.getElementById('semnari-content');
   if(!container)return;
+  var repairBtn=list.length?'<button type="button" onclick="repareazaSemnaturileLipsa()" id="repara-semn-btn" style="width:100%;margin-bottom:8px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🖋️ Salvează semnăturile permanent (o singură dată)</button>':'';
   var regenBtn=list.length?'<button type="button" onclick="regenereazaToateCertificatele()" id="regen-cert-btn" style="width:100%;margin-bottom:12px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🔄 Regenerează toate certificatele (format compact nou)</button>':'';
   if(!list.length){container.innerHTML='<div class="empty">Niciun document semnat complet încă.</div>';return;}
-  var html=regenBtn;
+  var html=repairBtn+regenBtn;
   list.forEach(function(d){
     var clientiLegati=d.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
     var deImportat=clientiLegati.filter(function(s){return !(d.clientiImportati||[]).includes(s.clientId);});
@@ -11790,6 +11791,56 @@ function renderSemnariListaSemnate(list){
 // Drive (le suprascrie la aceeași locație) — util o singură dată, ca să
 // aducă la zi certificatele generate înainte de acest format. Rulează un
 // document pe rând (nu în paralel), ca să nu suprasolicite scriptul.
+// Salvează permanent, în datele documentului, semnătura oricărui semnatar
+// care nu o are încă salvată astfel (documente semnate ÎNAINTE de reparația
+// care face asta automat la fiecare semnare nouă) — cât timp poza mai există
+// încă fizic în Drive. Odată salvată, o regenerare ulterioară a
+// certificatului nu mai poate "pierde" semnătura, indiferent ce se întâmplă
+// cu fișierul din Drive.
+var semnRepararaInCurs=false;
+function repareazaSemnaturileLipsa(){
+  if(semnRepararaInCurs)return;
+  var list=getSemnari();
+  var deReparat=[];
+  list.forEach(function(d){
+    (d.signers||[]).forEach(function(s){
+      if(s.status==='semnat'&&!s.semnaturaDataUrl&&s.semnaturaPath){
+        deReparat.push({doc:d,signer:s});
+      }
+    });
+  });
+  if(!deReparat.length){alert('Toate semnăturile sunt deja salvate corect — nimic de reparat.');return;}
+  if(!confirm('Verific '+deReparat.length+' semnătur'+(deReparat.length===1?'ă':'i')+' și le salvez permanent, cât încă există fișierul original în Drive. Poate dura câteva momente. Continui?'))return;
+  semnRepararaInCurs=true;
+  var btn=document.getElementById('repara-semn-btn');
+  if(btn)btn.disabled=true;
+  var i=0,reparate=0,pierdute=[];
+  function next(){
+    if(btn)btn.textContent='Se verifică... ('+i+'/'+deReparat.length+')';
+    if(i>=deReparat.length){
+      saveSemnari(list);
+      semnRepararaInCurs=false;
+      var msg='Am salvat permanent '+reparate+' din '+deReparat.length+' semnătur'+(deReparat.length===1?'ă':'i')+'.';
+      if(pierdute.length)msg+='\n\nNu am găsit fișierul original (probabil deja șters din Drive) pentru:\n'+pierdute.join('\n')+'\n\nPentru acestea, verifică Coșul de gunoi din Drive și, dacă le găsești, restaurează-le, apoi rulează din nou această reparație.';
+      alert(msg);
+      renderSemnariTab();
+      return;
+    }
+    var it=deReparat[i++];
+    gdriveFetchFileBlob(it.signer.semnaturaPath).then(function(res){
+      return blobToDataURL(res.blob);
+    }).then(function(dataUrl){
+      it.signer.semnaturaDataUrl=dataUrl;
+      reparate++;
+      setTimeout(next,150);
+    }).catch(function(){
+      pierdute.push(it.doc.titlu+' — '+it.signer.nume);
+      setTimeout(next,150);
+    });
+  }
+  next();
+}
+
 var semnRegenerareInCurs=false;
 function regenereazaToateCertificatele(){
   if(semnRegenerareInCurs)return;
