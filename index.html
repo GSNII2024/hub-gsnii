@@ -11185,14 +11185,10 @@ function t(key,vars){
 function renderSemnLangBar(){
   var el=document.getElementById('sign-lang-toggle');
   if(!el)return;
-  el.innerHTML='<div style="display:flex;justify-content:center;gap:8px;margin-bottom:6px">'
-    +'<button type="button" onclick="setSemnPageLimba(\'ro\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='ro'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='ro'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">🇷🇴 Română</button>'
-    +'<button type="button" onclick="setSemnPageLimba(\'hu\')" style="padding:5px 14px;border-radius:20px;border:1px solid rgba(225,195,64,0.5);background:'+(semnPageLimba==='hu'?'var(--gold)':'transparent')+';color:'+(semnPageLimba==='hu'?'var(--navy)':'rgba(225,195,64,0.85)')+';font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">🇭🇺 Magyar</button>'
-    +'</div>'
-    +'<div style="display:flex;justify-content:center;gap:8px">'
-    +'<button type="button" onclick="setSemnPageTon(\'formal\')" style="padding:3px 12px;border-radius:20px;border:1px solid rgba(225,195,64,0.3);background:'+(semnPageTon==='formal'?'rgba(225,195,64,0.25)':'transparent')+';color:rgba(225,195,64,0.9);font-size:11px;cursor:pointer;font-family:inherit">'+(semnPageLimba==='hu'?'Ön':'Dvs.')+'</button>'
-    +'<button type="button" onclick="setSemnPageTon(\'informal\')" style="padding:3px 12px;border-radius:20px;border:1px solid rgba(225,195,64,0.3);background:'+(semnPageTon==='informal'?'rgba(225,195,64,0.25)':'transparent')+';color:rgba(225,195,64,0.9);font-size:11px;cursor:pointer;font-family:inherit">'+(semnPageLimba==='hu'?'Te':'Tu')+'</button>'
-    +'</div>';
+  // Ascuns pentru client — limba și tonul sunt deja alese de expeditor la
+  // trimitere (din "Trimite spre semnare"); textul folosește oricum acea
+  // alegere, doar butoanele de comutare nu se mai afișează.
+  el.style.display='none';
 }
 function setSemnPageLimba(lang){
   semnPageLimba=lang;
@@ -11224,27 +11220,27 @@ function buildMesajSemnare(doc,signer,limba,ton){
       +'Elküldöm neked a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
       +'Kérlek, nyisd meg az alábbi linket, ellenőrizd az adatok helyességét, és amennyiben egyetértesz a tartalommal, írd alá közvetlenül a telefonodról:\n\n'
       +'👉 Aláírás itt: '+link+'\n\n'
-      +'Köszönöm a gyors ügyintézést!';
+      +'Köszi szépen! Ha bármi kérdésed van, keress bátran.';
   }
   if(limba==='hu'){
     return 'Tisztelt '+signer.nume+'!\n\n'
       +'Elküldöm Önnek a(z) „'+doc.titlu+'” elnevezésű dokumentumot aláírásra.\n\n'
       +'Kérem, nyissa meg az alábbi linket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'
       +'👉 Aláírás itt: '+link+'\n\n'
-      +'Köszönöm a gyors ügyintézést!';
+      +'Köszönöm szépen! Kérdés esetén keressen bizalommal.';
   }
   if(ton==='informal'){
     return 'Bună, '+signer.nume+'!\n\n'
       +'Îți trimit documentul „'+doc.titlu+'” pentru semnare.\n\n'
       +'Te rog să deschizi link-ul de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul, să semnezi direct de pe telefon:\n\n'
       +'👉 Semnează aici: '+link+'\n\n'
-      +'Mulțumesc pentru promptitudine!';
+      +'Mersi frumos! Dacă ai vreo întrebare, nu ezita să mă cauți.';
   }
   return 'Bună ziua, '+signer.nume+',\n\n'
     +'Vă trimit documentul „'+doc.titlu+'” pentru semnare.\n\n'
     +'Vă rog să accesați link-ul de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'
     +'👉 Semnează aici: '+link+'\n\n'
-    +'Vă mulțumesc pentru promptitudine!';
+    +'Vă mulțumesc frumos! Pentru întrebări, mă puteți contacta cu încredere.';
 }
 
 function openTrimiteSemnare(docId,signerId){
@@ -11375,6 +11371,10 @@ function trimiteEmailSemnare(docId,signerId){
   var mesaj=buildMesajSemnare(doc,signer,semnMesajLimba,semnMesajTon);
   var subiect=buildSubiectSemnare(doc,semnMesajLimba);
   var emailDest=gasesteEmailSemnatar(signer);
+  // Copiem mesajul în clipboard ÎNAINTE de a deschide email-ul — unele
+  // browsere restrânse (ex. cel din WhatsApp) nu duc corect corpul mailului
+  // prin linkul mailto:, așa că îl poți lipi manual dacă nu apare singur.
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(mesaj).catch(function(){});
   window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(mesaj);
 }
 
@@ -11490,15 +11490,15 @@ function buildMesajSemnareMultiplu(g,itemiSelectati,limba,ton){
   }).join('\n');
   var n=itemiSelectati.length,nume=g.nume;
   if(limba==='hu'&&ton==='informal'){
-    return 'Szia '+nume+'!\n\nElküldök neked '+n+' dokumentumot aláírásra.\n\nKérlek, nyisd meg egyenként az alábbi linkeket, ellenőrizd az adatok helyességét, és amennyiben egyetértesz a tartalommal, írd alá közvetlenül a telefonodról:\n\n'+linkuri+'\n\nKöszönöm a gyors ügyintézést!';
+    return 'Szia '+nume+'!\n\nElküldök neked '+n+' dokumentumot aláírásra.\n\nKérlek, nyisd meg egyenként az alábbi linkeket, ellenőrizd az adatok helyességét, és amennyiben egyetértesz a tartalommal, írd alá közvetlenül a telefonodról:\n\n'+linkuri+'\n\nKöszi szépen! Ha bármi kérdésed van, keress bátran.';
   }
   if(limba==='hu'){
-    return 'Tisztelt '+nume+'!\n\nElküldök Önnek '+n+' dokumentumot aláírásra.\n\nKérem, nyissa meg egyenként az alábbi linkeket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'+linkuri+'\n\nKöszönöm a gyors ügyintézést!';
+    return 'Tisztelt '+nume+'!\n\nElküldök Önnek '+n+' dokumentumot aláírásra.\n\nKérem, nyissa meg egyenként az alábbi linkeket, ellenőrizze az adatok helyességét, és amennyiben egyetért a tartalommal, írja alá közvetlenül a telefonjáról:\n\n'+linkuri+'\n\nKöszönöm szépen! Kérdés esetén keressen bizalommal.';
   }
   if(ton==='informal'){
-    return 'Bună, '+nume+'!\n\nÎți trimit '+n+' documente pentru semnare.\n\nTe rog să deschizi pe rând link-urile de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul, să semnezi direct de pe telefon:\n\n'+linkuri+'\n\nMulțumesc pentru promptitudine!';
+    return 'Bună, '+nume+'!\n\nÎți trimit '+n+' documente pentru semnare.\n\nTe rog să deschizi pe rând link-urile de mai jos, să verifici corectitudinea datelor și, dacă ești de acord cu conținutul, să semnezi direct de pe telefon:\n\n'+linkuri+'\n\nMersi frumos! Dacă ai vreo întrebare, nu ezita să mă cauți.';
   }
-  return 'Bună ziua, '+nume+',\n\nVă trimit '+n+' documente pentru semnare.\n\nVă rog să accesați pe rând link-urile de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'+linkuri+'\n\nVă mulțumesc pentru promptitudine!';
+  return 'Bună ziua, '+nume+',\n\nVă trimit '+n+' documente pentru semnare.\n\nVă rog să accesați pe rând link-urile de mai jos, să verificați corectitudinea datelor și, dacă sunteți de acord cu conținutul, să semnați direct de pe telefon:\n\n'+linkuri+'\n\nVă mulțumesc frumos! Pentru întrebări, mă puteți contacta cu încredere.';
 }
 
 // Salvează limba/tonul alese pe FIECARE semnatar inclus (nu doar în mesaj) —
@@ -11586,6 +11586,7 @@ function trimiteEmailSemnareMultiplu(){
   if(!d)return;
   var subiect=semnMultiLimba==='hu'?'Aláírásra váró dokumentumok':'Documente pentru semnare';
   var emailDest=d.g.email||'';
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(d.mesaj).catch(function(){});
   window.location.href='mailto:'+emailDest+'?subject='+encodeURIComponent(subiect)+'&body='+encodeURIComponent(d.mesaj);
 }
 
@@ -12034,7 +12035,7 @@ function renderSignUI(doc,signer){
     +'<div id="semn-poza-placeholder" style="color:rgba(7,33,68,0.35);font-size:12.5px;text-align:center;padding:14px">'+t('photoPlaceholder')+'</div>'
     +'<img id="semn-poza-preview-img" style="display:none;max-width:100%;max-height:220px;object-fit:contain">'
     +'</div>'
-    +'<input type="file" id="semn-poza-input" accept="image/*" capture="environment" style="display:none" onchange="handleSemnPozaSelect(this)">'
+    +'<input type="file" id="semn-poza-input" accept="image/*" style="display:none" onchange="handleSemnPozaSelect(this)">'
     +'<button type="button" onclick="document.getElementById(\'semn-poza-input\').click()" style="width:100%;margin-top:10px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer">📷 '+t('choosePhotoBtn')+'</button>'
     +'<div id="semn-poza-status" style="font-size:12px;color:rgba(7,33,68,0.5);margin-top:6px;text-align:center;min-height:15px"></div>'
     +'</div>';
