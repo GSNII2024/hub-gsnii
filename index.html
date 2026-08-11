@@ -11776,9 +11776,9 @@ function renderSemnariListaSemnate(list){
       +'</div>'
       +'<div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">'
       +'<button type="button" onclick="deschideSauGenereazaRaportSemnare(\''+d.id+'\',this)" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
-      +(clientiLegati.length?(deImportat.length
-        ?'<button type="button" id="import-fisa-'+d.id+'" onclick="'+(deImportat.length>1?'openAlegeClientImportModal(\''+d.id+'\')':'confirmaImportSelectivDirect(\''+d.id+'\',\''+deImportat[0].clientId+'\',this)')+'" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length>1?' (alege — '+deImportat.length+')':'')+'</button>'
-        :'<span style="font-size:12px;color:rgba(34,120,80,0.6);display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:13px"></i> Deja în fișa clientului</span>')
+      +(clientiLegati.length?(clientiLegati.length>1
+        ?'<button type="button" id="import-fisa-'+d.id+'" onclick="openAlegeClientImportModal(\''+d.id+'\')" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length?' (alege — '+deImportat.length+')':' (reimportă)')+'</button>'
+        :'<button type="button" id="import-fisa-'+d.id+'" onclick="confirmaImportSelectivDirect(\''+d.id+'\',\''+clientiLegati[0].clientId+'\',this)" style="font-size:12px;color:'+(deImportat.length?'#1a6a40':'rgba(7,33,68,0.5)')+';background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> '+(deImportat.length?'Importă în fișa clientului':'Reimportă în fișa clientului')+'</button>')
         :'')
       +'<button type="button" onclick="stergeDocumentSemnare(\''+d.id+'\')" style="font-size:12px;color:rgba(178,59,59,0.6);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge documentul</button>'
       +'</div>'
@@ -11866,15 +11866,15 @@ function openAlegeClientImportModal(docId){
   var doc=getSemnari().find(function(d){return d.id===docId;});
   if(!doc)return;
   var clientiLegati=doc.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
-  var deImportat=clientiLegati.filter(function(s){return !(doc.clientiImportati||[]).includes(s.clientId);});
-  if(!deImportat.length)return;
+  if(!clientiLegati.length)return;
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:4px">Importă în fișa clientului</div>'
-    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:12px">Alege la care fișă/fișe se copiază documentul semnat + certificatul:</div>';
-  deImportat.forEach(function(s){
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:12px">Alege la care fișă/fișe se copiază documentul semnat + certificatul. Cei deja importați apar debifați — bifează-i manual dacă vrei să reimporți (util dacă ai șters copia anterioară din fișa lor).</div>';
+  clientiLegati.forEach(function(s){
+    var dejaImportat=(doc.clientiImportati||[]).includes(s.clientId);
     html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(7,33,68,0.15);border-radius:8px;margin-bottom:8px;cursor:pointer">'
-      +'<input type="checkbox" class="import-client-check" value="'+s.clientId+'" checked style="width:18px;height:18px;accent-color:var(--navy)">'
-      +'<span style="font-size:14px;color:var(--navy)">'+esc(s.nume)+'</span>'
+      +'<input type="checkbox" class="import-client-check" value="'+s.clientId+'"'+(dejaImportat?'':' checked')+' style="width:18px;height:18px;accent-color:var(--navy)">'
+      +'<span style="font-size:14px;color:var(--navy)">'+esc(s.nume)+(dejaImportat?' <span style="font-size:11px;color:rgba(34,120,80,0.7)">(deja importat)</span>':'')+'</span>'
       +'</label>';
   });
   html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:6px" onclick="confirmaImportSelectiv(\''+docId+'\')"><i class="ti ti-upload"></i> Importă la cele bifate</button>'
@@ -11894,7 +11894,7 @@ function confirmaImportSelectivDirect(docId,clientId,btnEl){
   semnImportInCurs[docId]=true;
   if(btnEl){btnEl.disabled=true;btnEl.innerHTML='<div class="doc-btn-spinner" style="display:inline-block"></div> Se importă...';}
   copiazaDocSemnatLaClient(doc,clientId).then(function(){
-    doc.clientiImportati=(doc.clientiImportati||[]).concat([clientId]);
+    doc.clientiImportati=(doc.clientiImportati||[]).filter(function(id){return id!==clientId;}).concat([clientId]);
     saveSemnari(list);
     delete semnImportInCurs[docId];
     renderSemnariTab();
@@ -11917,7 +11917,8 @@ function confirmaImportSelectiv(docId){
   Promise.all(clientiIds.map(function(cid){
     return copiazaDocSemnatLaClient(doc,cid).then(function(){return cid;});
   })).then(function(clientiIdsImportati){
-    doc.clientiImportati=(doc.clientiImportati||[]).concat(clientiIdsImportati);
+    var existente=(doc.clientiImportati||[]).filter(function(id){return clientiIdsImportati.indexOf(id)<0;});
+    doc.clientiImportati=existente.concat(clientiIdsImportati);
     saveSemnari(list);
     delete semnImportInCurs[docId];
     alert('Importat cu succes!');
