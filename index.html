@@ -6023,6 +6023,7 @@ function renderDocsListFromMeta(clientId,category,containerId,catMeta){
   var eyeSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
   var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
   var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+  var moveSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8l-4 4 4 4"/><path d="M5 12h11a4 4 0 0 0 0 -8h-1"/></svg>';
   var html=catMeta.map(function(m,idx){
     var nameE=(m.name||'').replace(/'/g,"\\'");
     var pathE=(m.path||'').replace(/'/g,"\\'");
@@ -6032,6 +6033,7 @@ function renderDocsListFromMeta(clientId,category,containerId,catMeta){
       +'<div class="doc-row-actions">'
       +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\',this)" title="Vizualizează">'+eyeSvg+'</button>'
       +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
+      +'<button type="button" class="doc-btn" onclick="openMutaDocumentModal(\''+clientId+'\',\''+pathE+'\')" title="Mută în altă categorie">'+moveSvg+'</button>'
       +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
       +'</div></div>';
   }).join('');
@@ -6072,6 +6074,86 @@ function deleteCloudDoc(clientId,path,containerId){
     var cat=containerId.replace('docs-cat-'+clientId+'-','');
     loadDocsCatMerged(clientId,cat,containerId);
   }).catch(function(){alert('Eroare la ștergere.');});
+}
+
+// Mută un document dintr-o categorie în alta — atât în metadate, cât și
+// fizic în Drive (fișierul chiar se relocă în noul folder, nu doar se
+// schimbă eticheta), ca structura din Drive să rămână coerentă cu ce arată
+// aplicația.
+function openMutaDocumentModal(clientId,path){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  var pathE=path.replace(/'/g,"\\'");
+  var cats=ensureDocCategories(c);
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:10px">Mută documentul</div>'
+    +'<div style="font-size:12.5px;color:rgba(7,33,68,0.5);margin-bottom:10px">Alege categoria în care vrei să muți acest document:</div>'
+    +'<div style="max-height:220px;overflow-y:auto;margin-bottom:14px">'
+    +cats.map(function(cat){
+      return '<div onclick="confirmaMutaDocument(\''+clientId+'\',\''+pathE+'\',\''+cat.key+'\')" style="padding:10px 12px;border:1px solid rgba(7,33,68,0.15);background:#fff;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px;color:var(--navy)">'+esc(cat.label)+'</div>';
+    }).join('')
+    +'</div>'
+    +'<label style="font-size:12.5px;color:rgba(7,33,68,0.5);display:block;margin-bottom:6px">...sau categorie nouă:</label>'
+    +'<div style="display:flex;gap:6px">'
+    +'<input type="text" id="muta-doc-cat-noua" placeholder="ex: Facturi, Poze, Diverse..." style="flex:1;font-size:14px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:9px 12px;font-family:inherit">'
+    +'<button type="button" onclick="confirmaMutaDocumentCategorieNoua(\''+clientId+'\',\''+pathE+'\')" style="padding:0 16px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:13px;cursor:pointer">Mută</button>'
+    +'</div>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Mută documentul';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+function confirmaMutaDocument(clientId,path,categorieCheie){
+  document.getElementById('restanta-picker').style.display='none';
+  mutaDocumentCategorie(clientId,path,categorieCheie);
+}
+function confirmaMutaDocumentCategorieNoua(clientId,path){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  var numeNou=(document.getElementById('muta-doc-cat-noua').value||'').trim();
+  if(!numeNou){alert('Scrie o denumire pentru noua categorie.');return;}
+  var cats=ensureDocCategories(c);
+  var catKey='cat_'+Date.now();
+  var folderName=numeNou.replace(/[\/\\:*?"<>|]/g,'_').trim()||catKey;
+  cats.push({key:catKey,label:numeNou,folderName:folderName});
+  save();
+  document.getElementById('restanta-picker').style.display='none';
+  mutaDocumentCategorie(clientId,path,catKey);
+}
+function mutaDocumentCategorie(clientId,path,categorieNouaCheie){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  var cats=ensureDocCategories(c);
+  var catNoua=cats.find(function(x){return x.key===categorieNouaCheie;});
+  if(!catNoua){alert('Categorie negăsită.');return;}
+  gdriveGet('doc_meta_'+clientId).then(function(meta){
+    var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+    var entry=allMeta.find(function(m){return m.path===path;});
+    if(!entry){alert('Documentul nu a fost găsit.');return;}
+    if(entry.category===categorieNouaCheie)return; // deja e acolo
+    var numeClient=clientDocFolderName(clientId);
+    var folderNou='Clienți/'+numeClient+'/'+catNoua.folderName;
+    var filename=path.split('/').pop();
+    return gdriveFetchFileBlob(path).then(function(res){
+      return gdriveUploadBlob(folderNou,filename,res.blob,entry.type||res.blob.type).then(function(uploadRes){
+        if(!uploadRes||!uploadRes.success)throw new Error('upload_failed');
+        var caleVeche=entry.path;
+        entry.path=folderNou+'/'+filename;
+        entry.category=categorieNouaCheie;
+        entry.viewUrl=uploadRes.viewUrl;
+        entry.downloadUrl=uploadRes.downloadUrl;
+        return gdriveSet('doc_meta_'+clientId,allMeta).then(function(){
+          return gdriveDelete(caleVeche).catch(function(){});
+        });
+      });
+    });
+  }).then(function(){
+    refreshDocCategoriesUI(clientId);
+  }).catch(function(e){
+    console.error('Eroare la mutarea documentului:',e);
+    alert('Nu am putut muta documentul. Verifică internetul și încearcă din nou.');
+  });
 }
 
 // Distribuie DEODATĂ toate documentele dintr-o categorie a fișei clientului
@@ -11397,6 +11479,53 @@ function buildMesajSemnareMultiplu(g,itemiSelectati,limba,ton){
 
 // Salvează limba/tonul alese pe FIECARE semnatar inclus (nu doar în mesaj) —
 // astfel, pagina de semnare a fiecăruia pornește automat în aceeași limbă.
+// Când un semnatar e un client existent (ales din listă, nu introdus manual),
+// copiem documentul semnat + certificatul direct în fișa lui, ca un dosar
+// obișnuit — apar în „Documente scanate", alături de restul actelor lui.
+// Nu afectează fluxul de semnare (fire-and-forget, best-effort).
+function copiazaDocSemnatLaClient(doc,clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return Promise.resolve();
+  var cats=ensureDocCategories(c);
+  var CHEIE_CAT='documente_semnate';
+  var cat=cats.find(function(x){return x.key===CHEIE_CAT;});
+  if(!cat){
+    cat={key:CHEIE_CAT,label:'Documente semnate',folderName:'Documente semnate'};
+    cats.push(cat);
+    save();
+  }
+  var numeClient=clientDocFolderName(clientId);
+  var folderPath='Clienți/'+numeClient+'/'+cat.folderName;
+  var safeTitlu=(doc.titlu||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+  var pdfPathSemnat=doc.semnatPdfPath||doc.lucruPdfPath;
+
+  var pas1=gdriveFetchFileBlob(pdfPathSemnat).then(function(res){
+    var filename=Date.now()+'_'+safeTitlu+'.pdf';
+    return gdriveUploadBlob(folderPath,filename,res.blob,'application/pdf').then(function(uploadRes){
+      if(!uploadRes||!uploadRes.success)return null;
+      return {path:folderPath+'/'+filename,name:doc.titlu+' (semnat)',type:'application/pdf',category:CHEIE_CAT,date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+    });
+  }).catch(function(){return null;});
+
+  var pas2=doc.certificatPath?gdriveFetchFileBlob(doc.certificatPath).then(function(res){
+    var filename=Date.now()+'_Certificat_'+safeTitlu+'.pdf';
+    return gdriveUploadBlob(folderPath,filename,res.blob,'application/pdf').then(function(uploadRes){
+      if(!uploadRes||!uploadRes.success)return null;
+      return {path:folderPath+'/'+filename,name:'Certificat semnare — '+doc.titlu,type:'application/pdf',category:CHEIE_CAT,date:todayRo(),viewUrl:uploadRes.viewUrl,downloadUrl:uploadRes.downloadUrl};
+    });
+  }).catch(function(){return null;}):Promise.resolve(null);
+
+  return Promise.all([pas1,pas2]).then(function(rez){
+    var noi=rez.filter(function(x){return x;});
+    if(!noi.length)return;
+    return gdriveGet('doc_meta_'+clientId).then(function(meta){
+      var allMeta=meta?(typeof meta==='string'?JSON.parse(meta):meta):[];
+      noi.forEach(function(m){allMeta.push(m);});
+      return gdriveSet('doc_meta_'+clientId,allMeta);
+    });
+  });
+}
+
 function pregatesteTrimitereaMultipla(){
   var grupuri=getSemnatariCuDocumentePendinte();
   var g=grupuri[semnMultiSelectatCheie];
@@ -11472,7 +11601,7 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
 
   function checkP(nevoie){if(y+nevoie>272){pdfDoc.addPage();registerPdfFont(pdfDoc);y=20;}}
   function linie(label,valoare,dim){
-    checkP(6);
+    checkP(5.5);
     pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(dim||10.5);pdfDoc.setTextColor(90,90,90);
     pdfDoc.text(label+':',margin,y);
     pdfDoc.setFont('CrimsonPro','normal');pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
@@ -11480,21 +11609,21 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
     var maxW=pageW-margin-margin-labelW;
     var linii=pdfDoc.splitTextToSize(String(valoare||'—'),maxW);
     pdfDoc.text(linii,margin+labelW,y);
-    y+=5*linii.length+0.5;
+    y+=4.3*linii.length+0.3;
   }
   function sectiune(titlu){
-    checkP(12);
-    y+=3;
+    checkP(10.5);
+    y+=2;
     pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(12.5);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
-    pdfDoc.text(titlu,margin,y);y+=2.5;
+    pdfDoc.text(titlu,margin,y);y+=2.2;
     pdfDoc.setDrawColor(gold[0],gold[1],gold[2]);pdfDoc.setLineWidth(0.5);
-    pdfDoc.line(margin,y,pageW-margin,y);y+=6.5;
+    pdfDoc.line(margin,y,pageW-margin,y);y+=5.5;
   }
 
   pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(19);pdfDoc.setTextColor(navy[0],navy[1],navy[2]);
-  pdfDoc.text('Certificat de finalizare',margin,y);y+=6;
+  pdfDoc.text('Certificat de finalizare',margin,y);y+=5.5;
   pdfDoc.setFont('CrimsonPro','italic');pdfDoc.setFontSize(10);pdfDoc.setTextColor(150,150,150);
-  pdfDoc.text('Generat la: '+new Date().toLocaleString('ro-RO'),margin,y);y+=10;
+  pdfDoc.text('Generat la: '+new Date().toLocaleString('ro-RO'),margin,y);y+=8.5;
 
   // pregătim datele care necesită acces la fișierul semnat (hash) + semnăturile desenate
   var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
@@ -11528,7 +11657,7 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
       // toate câmpurile + eticheta + chenarul semnăturii) — altfel fiecare
       // rând își verifica separat locul, iar chenarul putea "scăpa" singur
       // pe pagina următoare, fără datele semnatarului lângă el.
-      checkP(80);
+      checkP(58);
       sectiune('Semnatar '+(idx+1));
       linie('Nume',s.nume);
       linie('Email',s.email||'—');
@@ -11538,8 +11667,8 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
 
       pdfDoc.setFont('CrimsonPro','bold');pdfDoc.setFontSize(10.5);pdfDoc.setTextColor(90,90,90);
       pdfDoc.text('Semnătură:',margin,y);
-      y+=5;
-      var sigBoxX=margin,sigBoxY=y,sigBoxW=62,sigBoxH=20;
+      y+=4.3;
+      var sigBoxX=margin,sigBoxY=y,sigBoxW=60,sigBoxH=17;
       pdfDoc.setDrawColor(navy[0],navy[1],navy[2]);pdfDoc.setLineWidth(0.35);
       pdfDoc.rect(sigBoxX,sigBoxY,sigBoxW,sigBoxH);
       if(imgs[idx]){
@@ -11552,7 +11681,7 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
           pdfDoc.addImage(imgs[idx],'PNG',drawX,drawY,drawW,drawH,undefined,'FAST');
         }catch(e){}
       }
-      y+=sigBoxH+5;
+      y+=sigBoxH+4;
     });
 
     drawFooter(pdfDoc,margin,pageW);
@@ -11629,20 +11758,51 @@ function renderSemnariListaSemnate(list){
   if(!list.length){container.innerHTML='<div class="empty">Niciun document semnat complet încă.</div>';return;}
   var html='';
   list.forEach(function(d){
+    var clientiLegati=d.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
+    var deImportat=clientiLegati.filter(function(s){return !(d.clientiImportati||[]).includes(s.clientId);});
     html+='<div class="card" style="cursor:default">'
       +'<div class="card-top"><div class="avatar" style="background:rgba(34,120,80,0.15);color:#1a6a40"><i class="ti ti-check"></i></div>'
       +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(d.titlu)+'</div>'
       +'<div class="card-firma">Semnat de: '+d.signers.map(function(s){return esc(s.nume);}).join(', ')+'</div></div>'
       +'<button type="button" onclick="viewDocDirect(\''+(d.semnatPdfPath||d.lucruPdfPath).replace(/'/g,"\\'")+'\',this)" class="doc-btn" style="border:none"><i class="ti ti-file-type-pdf"></i></button>'
       +'</div>'
-      +'<div style="margin-top:10px;display:flex;gap:14px">'
+      +'<div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">'
       +'<button type="button" onclick="deschideSauGenereazaRaportSemnare(\''+d.id+'\',this)" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
+      +(clientiLegati.length?(deImportat.length
+        ?'<button type="button" id="import-fisa-'+d.id+'" onclick="importaDocSemnatLaClienti(\''+d.id+'\',this)" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length>1?' ('+deImportat.length+')':'')+'</button>'
+        :'<span style="font-size:12px;color:rgba(34,120,80,0.6);display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:13px"></i> Deja în fișa clientului</span>')
+        :'')
       +'<button type="button" onclick="stergeDocumentSemnare(\''+d.id+'\')" style="font-size:12px;color:rgba(178,59,59,0.6);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge documentul</button>'
       +'</div>'
       +'</div>';
   });
   container.innerHTML=html;
   injectIcons();
+}
+
+// Import manual, pentru documente semnate ÎNAINTE să existe copierea automată
+// în fișa clientului — sau pentru orice caz în care vrei să repeți/completezi
+// copierea. Ține minte (pe document) în ce fișe a copiat deja, ca să nu
+// creeze fișiere duplicate dacă apeși de mai multe ori.
+function importaDocSemnatLaClienti(docId,btnEl){
+  var list=getSemnari();
+  var doc=list.find(function(d){return d.id===docId;});
+  if(!doc)return;
+  var clientiLegati=doc.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
+  var deImportat=clientiLegati.filter(function(s){return !(doc.clientiImportati||[]).includes(s.clientId);});
+  if(!deImportat.length)return;
+  if(btnEl){btnEl.disabled=true;btnEl.innerHTML='<div class="doc-btn-spinner" style="display:inline-block"></div> Se importă...';}
+  Promise.all(deImportat.map(function(s){
+    return copiazaDocSemnatLaClient(doc,s.clientId).then(function(){return s.clientId;});
+  })).then(function(clientiIdsImportati){
+    doc.clientiImportati=(doc.clientiImportati||[]).concat(clientiIdsImportati);
+    saveSemnari(list);
+    renderSemnariTab();
+  }).catch(function(e){
+    console.error('Eroare la importarea documentului în fișa clientului:',e);
+    alert('Nu am putut importa documentul în fișa clientului. Verifică internetul și încearcă din nou.');
+    if(btnEl){btnEl.disabled=false;btnEl.innerHTML='<i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului';injectIcons();}
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -12183,6 +12343,17 @@ function submitSemnatura(docId,signerId){
             // s-a salvat cu succes — altfel păstrăm totul, pentru o reîncercare.
             return genereazaRaportSemnare(docId,doc,true).then(function(certPath){
               doc.certificatPath=certPath;
+              // Pentru fiecare semnatar care e un client existent (ales din
+              // listă, nu introdus manual), copiem documentul semnat +
+              // certificatul direct în fișa lui — best-effort, nu blochează
+              // finalizarea semnării dacă eșuează.
+              doc.signers.forEach(function(s){
+                if(s.tip==='client'&&s.clientId){
+                  copiazaDocSemnatLaClient(doc,s.clientId).catch(function(e){
+                    console.error('Nu am putut copia documentul semnat în fișa clientului '+s.clientId+':',e);
+                  });
+                }
+              });
               var curatari=[];
               if(doc.pdfPath)curatari.push(gdriveDelete(doc.pdfPath).catch(function(){}));
               doc.signers.forEach(function(s){
