@@ -11630,6 +11630,7 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
   var pdfPath=doc.semnatPdfPath||doc.lucruPdfPath;
   var hashPromise=gdriveFetchArrayBuffer(pdfPath).then(sha256Hex).catch(function(){return null;});
   var imgPromises=semnatari.map(function(s){
+    if(s.semnaturaDataUrl)return Promise.resolve(s.semnaturaDataUrl);
     if(!s.semnaturaPath)return Promise.resolve(null);
     return gdriveFetchFileBlob(s.semnaturaPath).then(function(res){return blobToDataURL(res.blob);}).catch(function(){return null;});
   });
@@ -12376,6 +12377,11 @@ function submitSemnatura(docId,signerId){
             signer.semnatAt=Date.now();
             signer.semnatIP=ip;
             signer.semnaturaPath=sigPath;
+            // Salvăm și direct în date (nu doar ca fișier separat în Drive) —
+            // altfel, o regenerare ulterioară a certificatului nu mai avea de
+            // unde să ia poza semnăturii, odată ce fișierul PNG e șters din
+            // Drive (curățat intenționat, ca folderul să rămână curat).
+            signer.semnaturaDataUrl=signatureDataUrl;
             var toateSemnate=doc.signers.every(function(s){return s.status==='semnat';});
             if(!toateSemnate){
               localStorage.setItem('crm_semnari_v1',JSON.stringify(list));
