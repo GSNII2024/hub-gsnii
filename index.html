@@ -10818,15 +10818,25 @@ function renderSemnSignersList(){
   }
   var html='';
   semnareDraft.signers.forEach(function(s){
+    if(s.permitePoza===undefined)s.permitePoza=true;
     html+='<div class="card" style="margin-bottom:6px;cursor:default">'
       +'<div class="card-top"><div class="avatar">'+initials(s.nume)+'</div>'
       +'<div style="min-width:0;flex:1"><div class="card-name">'+esc(s.nume)+'</div>'
       +'<div class="card-firma">'+(s.email?'Email: '+esc(s.email):(s.tip==='client'?'Client existent':'Adăugat manual'))+'</div></div>'
       +'<button type="button" onclick="event.stopPropagation();stergeSemnatarDraft(\''+s.id+'\')" style="background:none;border:none;color:rgba(178,59,59,0.5);cursor:pointer;padding:4px"><i class="ti ti-trash" style="font-size:15px"></i></button>'
-      +'</div></div>';
+      +'</div>'
+      +'<label style="display:flex;align-items:center;gap:8px;padding:8px 2px 2px;cursor:pointer;font-size:12.5px;color:rgba(7,33,68,0.6)">'
+      +'<input type="checkbox" onchange="toggleSemnatarPermitePoza(\''+s.id+'\',this.checked)"'+(s.permitePoza?' checked':'')+' style="width:16px;height:16px;accent-color:var(--navy)">'
+      +'Poate semna și cu poză/fotografie (nu doar desenat pe ecran)'
+      +'</label>'
+      +'</div>';
   });
   el.innerHTML=html;
   injectIcons();
+}
+function toggleSemnatarPermitePoza(signerId,valoare){
+  var s=semnareDraft.signers.find(function(x){return x.id===signerId;});
+  if(s)s.permitePoza=valoare;
 }
 
 function stergeSemnatarDraft(signerId){
@@ -10886,7 +10896,7 @@ function semnSearchClients(q){
 function selectSemnatarExistent(clientId){
   var c=(clients||[]).find(function(x){return x.id===clientId;});
   if(!c)return;
-  semnareDraft.signers.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,6),tip:'client',clientId:c.id,nume:c.nume,email:c.email||'',token:genSemnToken(),status:'pending',semnatAt:null});
+  semnareDraft.signers.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,6),tip:'client',clientId:c.id,nume:c.nume,email:c.email||'',token:genSemnToken(),status:'pending',semnatAt:null,permitePoza:true});
   document.getElementById('restanta-picker').style.display='none';
   renderSemnSignersList();
   renderSemnActiveSignerPicker();
@@ -10910,7 +10920,7 @@ function salveazaSemnatarManual(){
   var email=(document.getElementById('semn-manual-email').value||'').trim();
   if(!nume){alert('Introdu numele semnatarului.');return;}
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('Adresa de email nu pare validă. Las-o goală dacă nu o ai.');return;}
-  semnareDraft.signers.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,6),tip:'manual',clientId:null,nume:nume,email:email,token:genSemnToken(),status:'pending',semnatAt:null});
+  semnareDraft.signers.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,6),tip:'manual',clientId:null,nume:nume,email:email,token:genSemnToken(),status:'pending',semnatAt:null,permitePoza:true});
   document.getElementById('restanta-picker').style.display='none';
   renderSemnSignersList();
   renderSemnActiveSignerPicker();
@@ -11022,7 +11032,7 @@ var SEMN_I18N={
       loadingDoc:'Se încarcă documentul...',
       invalidLink:'Acest link nu este valid sau documentul a fost șters.',
       alreadySignedTitle:'Ați semnat deja acest document.',
-      alreadySignedThanks:'Vă mulțumim!',
+      alreadySignedThanks:'Vă mulțumesc!',
       connectionError:'Nu am putut stabili conexiunea. Vă rog verificați internetul și reîncercați.',
       greeting:'Bună ziua, {nume}. Vă rog să citiți documentul de mai jos și să verificați corectitudinea datelor. Dacă sunteți de acord cu conținutul, vă rog să semnați mai jos.',
       openingDoc:'Se deschide documentul...',
@@ -11059,7 +11069,7 @@ var SEMN_I18N={
       loadingDoc:'Se încarcă documentul...',
       invalidLink:'Acest link nu este valid sau documentul a fost șters.',
       alreadySignedTitle:'Ai semnat deja acest document.',
-      alreadySignedThanks:'Mulțumim!',
+      alreadySignedThanks:'Mulțumesc!',
       connectionError:'Nu am putut stabili conexiunea. Te rog verifică internetul și reîncearcă.',
       greeting:'Bună, {nume}! Te rog să citești documentul de mai jos și să verifici corectitudinea datelor. Dacă ești de acord cu conținutul, te rog să semnezi mai jos.',
       openingDoc:'Se deschide documentul...',
@@ -11098,7 +11108,7 @@ var SEMN_I18N={
       loadingDoc:'A dokumentum betöltése folyamatban...',
       invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
       alreadySignedTitle:'Ön már aláírta ezt a dokumentumot.',
-      alreadySignedThanks:'Köszönjük!',
+      alreadySignedThanks:'Köszönöm!',
       connectionError:'Nem sikerült kapcsolódni. Kérem, ellenőrizze az internetkapcsolatot, és próbálja újra.',
       greeting:'Tisztelt {nume}! Kérem, olvassa el az alábbi dokumentumot, és ellenőrizze az adatok helyességét. Amennyiben egyetért a tartalommal, kérem, írja alá alul.',
       openingDoc:'A dokumentum megnyitása...',
@@ -11135,7 +11145,7 @@ var SEMN_I18N={
       loadingDoc:'A dokumentum betöltése folyamatban...',
       invalidLink:'Ez a link érvénytelen, vagy a dokumentumot törölték.',
       alreadySignedTitle:'Már aláírtad ezt a dokumentumot.',
-      alreadySignedThanks:'Köszönjük!',
+      alreadySignedThanks:'Köszönöm!',
       connectionError:'Nem sikerült kapcsolódni. Kérlek, ellenőrizd az internetkapcsolatot, és próbáld újra.',
       greeting:'Szia {nume}! Kérlek, olvasd el az alábbi dokumentumot, és ellenőrizd az adatok helyességét. Ha egyetértesz a tartalommal, kérlek, írd alá alul.',
       openingDoc:'A dokumentum megnyitása...',
@@ -12017,10 +12027,14 @@ function renderSignUI(doc,signer){
     +'</div>'
     +'</div>';
   html+='<div class="section-title" style="margin-top:16px">'+t('signatureTitle')+'</div>';
-  html+='<div style="display:flex;gap:6px;margin-bottom:8px">'
-    +'<button type="button" id="semn-tab-desen" onclick="setSemnMetoda(\'deseneaza\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;font-family:inherit;font-size:13px;cursor:pointer">✍️ '+t('drawTab')+'</button>'
-    +'<button type="button" id="semn-tab-poza" onclick="setSemnMetoda(\'poza\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:transparent;color:var(--navy);font-family:inherit;font-size:13px;cursor:pointer">'+t('photoTab')+'</button>'
-    +'</div>';
+  var permitePozaSemnatar=signer.permitePoza!==false;
+  if(!permitePozaSemnatar&&semnMetodaSemnatura==='poza')semnMetodaSemnatura='deseneaza';
+  if(permitePozaSemnatar){
+    html+='<div style="display:flex;gap:6px;margin-bottom:8px">'
+      +'<button type="button" id="semn-tab-desen" onclick="setSemnMetoda(\'deseneaza\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;font-family:inherit;font-size:13px;cursor:pointer">✍️ '+t('drawTab')+'</button>'
+      +'<button type="button" id="semn-tab-poza" onclick="setSemnMetoda(\'poza\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:transparent;color:var(--navy);font-family:inherit;font-size:13px;cursor:pointer">'+t('photoTab')+'</button>'
+      +'</div>';
+  }
   html+='<div id="semn-panel-deseneaza">'
     +'<div style="border:1px solid rgba(7,33,68,0.2);border-radius:10px;background:#fff">'
     +'<canvas id="sign-pad-canvas" style="width:100%;height:180px;display:block;touch-action:none"></canvas>'
@@ -12030,15 +12044,17 @@ function renderSignUI(doc,signer){
     +'<button type="button" onclick="imbunatatesteSemnatura()" style="flex:1.3;padding:12px;border-radius:8px;border:1px solid rgba(26,58,143,0.35);background:#fff;color:rgb(26,58,143);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">'+t('enhanceBtn')+'</button>'
     +'</div>'
     +'</div>';
-  html+='<div id="semn-panel-poza" style="display:none">'
-    +'<div id="semn-poza-preview-wrap" style="border:1px solid rgba(7,33,68,0.2);border-radius:10px;background-color:#fdfdfd;background-image:linear-gradient(45deg,#f0f0f0 25%,transparent 25%),linear-gradient(-45deg,#f0f0f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f0f0f0 75%),linear-gradient(-45deg,transparent 75%,#f0f0f0 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;min-height:150px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px">'
-    +'<div id="semn-poza-placeholder" style="color:rgba(7,33,68,0.35);font-size:12.5px;text-align:center;padding:14px">'+t('photoPlaceholder')+'</div>'
-    +'<img id="semn-poza-preview-img" style="display:none;max-width:100%;max-height:220px;object-fit:contain">'
-    +'</div>'
-    +'<input type="file" id="semn-poza-input" accept="image/*" style="display:none" onchange="handleSemnPozaSelect(this)">'
-    +'<button type="button" onclick="document.getElementById(\'semn-poza-input\').click()" style="width:100%;margin-top:10px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer">📷 '+t('choosePhotoBtn')+'</button>'
-    +'<div id="semn-poza-status" style="font-size:12px;color:rgba(7,33,68,0.5);margin-top:6px;text-align:center;min-height:15px"></div>'
-    +'</div>';
+  if(permitePozaSemnatar){
+    html+='<div id="semn-panel-poza" style="display:none">'
+      +'<div id="semn-poza-preview-wrap" style="border:1px solid rgba(7,33,68,0.2);border-radius:10px;background-color:#fdfdfd;background-image:linear-gradient(45deg,#f0f0f0 25%,transparent 25%),linear-gradient(-45deg,#f0f0f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f0f0f0 75%),linear-gradient(-45deg,transparent 75%,#f0f0f0 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;min-height:150px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px">'
+      +'<div id="semn-poza-placeholder" style="color:rgba(7,33,68,0.35);font-size:12.5px;text-align:center;padding:14px">'+t('photoPlaceholder')+'</div>'
+      +'<img id="semn-poza-preview-img" style="display:none;max-width:100%;max-height:220px;object-fit:contain">'
+      +'</div>'
+      +'<input type="file" id="semn-poza-input" accept="image/*" style="display:none" onchange="handleSemnPozaSelect(this)">'
+      +'<button type="button" onclick="document.getElementById(\'semn-poza-input\').click()" style="width:100%;margin-top:10px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer">📷 '+t('choosePhotoBtn')+'</button>'
+      +'<div id="semn-poza-status" style="font-size:12px;color:rgba(7,33,68,0.5);margin-top:6px;text-align:center;min-height:15px"></div>'
+      +'</div>';
+  }
   html+='<button type="button" id="sign-submit-btn" onclick="submitSemnatura(\''+doc.id+'\',\''+signer.id+'\')" style="width:100%;margin-top:8px;padding:13px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">'+t('submitBtn')+'</button>';
   html+='<div id="submit-progress-wrap" style="display:none;margin-top:10px;text-align:center">'
     +'<div style="font-size:12.5px;color:rgba(7,33,68,0.55);margin-bottom:6px" id="submit-progress-label">'+t('preparingSubmit')+'</div>'
