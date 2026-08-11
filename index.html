@@ -11763,10 +11763,8 @@ function confirmaStergereSemnare(docId,siDinDrive){
 function renderSemnariListaSemnate(list){
   var container=document.getElementById('semnari-content');
   if(!container)return;
-  var repairBtn=list.length?'<button type="button" onclick="repareazaSemnaturileLipsa()" id="repara-semn-btn" style="width:100%;margin-bottom:8px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🖋️ Recuperează și salvează semnăturile permanent</button>':'';
-  var regenBtn=list.length?'<button type="button" onclick="regenereazaToateCertificatele()" id="regen-cert-btn" style="width:100%;margin-bottom:12px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🔄 Regenerează toate certificatele (format compact nou)</button>':'';
   if(!list.length){container.innerHTML='<div class="empty">Niciun document semnat complet încă.</div>';return;}
-  var html=repairBtn+regenBtn;
+  var html='';
   list.forEach(function(d){
     var clientiLegati=d.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
     var deImportat=clientiLegati.filter(function(s){return !(d.clientiImportati||[]).includes(s.clientId);});
@@ -11778,9 +11776,8 @@ function renderSemnariListaSemnate(list){
       +'</div>'
       +'<div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">'
       +'<button type="button" onclick="deschideSauGenereazaRaportSemnare(\''+d.id+'\',this)" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
-      +'<button type="button" id="reextrag-'+d.id+'" onclick="reextrageSemnaturiDocument(\''+d.id+'\',this)" style="font-size:12px;color:rgb(26,58,143);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Refă semnăturile acestui document direct din pagina semnată, indiferent ce e salvat acum">🖋️ Reextrage semnăturile</button>'
       +(clientiLegati.length?(deImportat.length
-        ?'<button type="button" id="import-fisa-'+d.id+'" onclick="importaDocSemnatLaClienti(\''+d.id+'\',this)" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length>1?' ('+deImportat.length+')':'')+'</button>'
+        ?'<button type="button" id="import-fisa-'+d.id+'" onclick="'+(deImportat.length>1?'openAlegeClientImportModal(\''+d.id+'\')':'confirmaImportSelectivDirect(\''+d.id+'\',\''+deImportat[0].clientId+'\',this)')+'" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length>1?' (alege — '+deImportat.length+')':'')+'</button>'
         :'<span style="font-size:12px;color:rgba(34,120,80,0.6);display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:13px"></i> Deja în fișa clientului</span>')
         :'')
       +'<button type="button" onclick="stergeDocumentSemnare(\''+d.id+'\')" style="font-size:12px;color:rgba(178,59,59,0.6);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-trash" style="font-size:13px"></i> Șterge documentul</button>'
@@ -11805,12 +11802,12 @@ function renderSemnariListaSemnate(list){
 // încă fizic în Drive. Odată salvată, o regenerare ulterioară a
 // certificatului nu mai poate "pierde" semnătura, indiferent ce se întâmplă
 // cu fișierul din Drive.
-var semnRepararaInCurs=false;
 // Extrage semnătura direct din documentul deja semnat — se randează pagina
 // exactă unde a fost pusă (avem coordonatele salvate în doc.zones) și se
 // decupează exact acea zonă. Funcționează chiar dacă poza brută originală
 // (fișier separat în Drive) a fost deja ștearsă, fiindcă semnătura rămâne
-// desenată direct pe pagina documentului, indiferent de asta.
+// desenată direct pe pagina documentului, indiferent de asta. (Utilitar de
+// bază, păstrat pentru eventuale reparații punctuale pe viitor.)
 function extrageSemnaturaDinDocument(doc,signerId){
   var zone=(doc.zones||[]).find(function(z){return z.signerId===signerId;});
   if(!zone)return Promise.reject(new Error('nicio zonă de semnătură salvată pentru acest semnatar'));
@@ -11859,152 +11856,45 @@ function izoleazaCernealaSemnaturii(canvas){
   ctx.putImageData(img,0,0);
 }
 
-// Reextrage FORȚAT semnăturile unui singur document, direct din pagina
-// semnată, indiferent dacă are deja ceva salvat — util pentru documente care
-// au fost "reparate" prima dată cu un filtru mai vechi/mai puțin precis și au
-// rămas cu rezultatul acela, fiindcă reparația generală le sare (le crede
-// deja rezolvate).
-function reextrageSemnaturiDocument(docId,btnEl){
-  var list=getSemnari();
-  var doc=list.find(function(d){return d.id===docId;});
-  if(!doc)return;
-  var semnatari=doc.signers.filter(function(s){return s.status==='semnat';});
-  if(!semnatari.length)return;
-  if(!confirm('Reextrag semnăturile documentului „'+doc.titlu+'" direct din pagina semnată, suprascriind ce e salvat acum. Continui?'))return;
-  if(btnEl){btnEl.disabled=true;btnEl.textContent='Se reextrage...';}
-  var i=0,esuate=[];
-  function next(){
-    if(i>=semnatari.length){
-      saveSemnari(list);
-      var msg=esuate.length?('Am reextras '+(semnatari.length-esuate.length)+' din '+semnatari.length+'. Nu au mers: '+esuate.join(', ')):'Gata! Am reextras toate semnăturile documentului.';
-      alert(msg+'\n\nDacă documentul are certificat salvat, regenerează-l acum (butonul de mai sus) ca să vezi rezultatul.');
-      renderSemnariTab();
-      return;
-    }
-    var s=semnatari[i++];
-    extrageSemnaturaDinDocument(doc,s.id).then(function(dataUrl){
-      s.semnaturaDataUrl=dataUrl;
-      s.semnaturaDinDocument=true;
-      setTimeout(next,150);
-    }).catch(function(e){
-      console.error('Nu am putut reextrage semnătura pentru '+s.nume+':',e);
-      esuate.push(s.nume);
-      setTimeout(next,150);
-    });
-  }
-  next();
-}
-
-function repareazaSemnaturileLipsa(){
-  if(semnRepararaInCurs)return;
-  var list=getSemnari();
-  var deReparat=[];
-  list.forEach(function(d){
-    (d.signers||[]).forEach(function(s){
-      // Reîncercăm și cele deja "reparate" prin decupare din document —
-      // algoritmul de izolare a cernelii se poate îmbunătăți între timp, iar
-      // fără asta, o rulare veche rămânea "blocată" (nu se mai reîncerca
-      // niciodată, chiar dacă filtrul devenea între timp mai bun).
-      if(s.status==='semnat'&&(!s.semnaturaDataUrl||s.semnaturaDinDocument)){
-        deReparat.push({doc:d,signer:s});
-      }
-    });
-  });
-  if(!deReparat.length){alert('Toate semnăturile sunt deja salvate corect — nimic de reparat.');return;}
-  if(!confirm('Verific '+deReparat.length+' semnătur'+(deReparat.length===1?'ă':'i')+' și le salvez permanent — întâi din poza originală, dacă mai există, altfel decupată direct din documentul semnat. Poate dura câteva momente. Continui?'))return;
-  semnRepararaInCurs=true;
-  var btn=document.getElementById('repara-semn-btn');
-  if(btn)btn.disabled=true;
-  var i=0,reparate=0,dinDocument=0,pierdute=[];
-  function next(){
-    if(btn)btn.textContent='Se verifică... ('+i+'/'+deReparat.length+')';
-    if(i>=deReparat.length){
-      saveSemnari(list);
-      semnRepararaInCurs=false;
-      var msg='Am salvat permanent '+reparate+' din '+deReparat.length+' semnătur'+(deReparat.length===1?'ă':'i')+(dinDocument?' ('+dinDocument+' recuperate direct din documentul semnat)':'')+'.';
-      if(pierdute.length)msg+='\n\nNu am putut recupera niciunde semnătura pentru:\n'+pierdute.join('\n')+'\n\nPentru acestea, verifică Coșul de gunoi din Drive.';
-      alert(msg);
-      renderSemnariTab();
-      return;
-    }
-    var it=deReparat[i++];
-    var incearcaDinPozaOriginala=(it.signer.semnaturaPath&&!it.signer.semnaturaDinDocument)
-      ?gdriveFetchFileBlob(it.signer.semnaturaPath).then(function(res){return blobToDataURL(res.blob);})
-      :Promise.reject(new Error('fără poză originală salvată'));
-    incearcaDinPozaOriginala.then(function(dataUrl){
-      it.signer.semnaturaDataUrl=dataUrl;
-      delete it.signer.semnaturaDinDocument;
-      reparate++;
-      setTimeout(next,150);
-    }).catch(function(){
-      // Poza brută nu mai există — încercăm să extragem semnătura direct
-      // din documentul deja semnat, la zona unde a fost desenată.
-      extrageSemnaturaDinDocument(it.doc,it.signer.id).then(function(dataUrl){
-        it.signer.semnaturaDataUrl=dataUrl;
-        it.signer.semnaturaDinDocument=true;
-        reparate++;dinDocument++;
-        setTimeout(next,150);
-      }).catch(function(){
-        pierdute.push(it.doc.titlu+' — '+it.signer.nume);
-        setTimeout(next,150);
-      });
-    });
-  }
-  next();
-}
-
-var semnRegenerareInCurs=false;
-function regenereazaToateCertificatele(){
-  if(semnRegenerareInCurs)return;
-  var list=getSemnari();
-  var docs=list.filter(function(d){return d.status==='semnat'&&d.certificatPath;});
-  if(!docs.length){alert('Niciun certificat de regenerat — nu există documente semnate complet cu certificat salvat.');return;}
-  if(!confirm('Se vor regenera '+docs.length+' certificat'+(docs.length===1?'':'e')+', cu noul format compact. Poate dura câteva momente. Continui?'))return;
-  semnRegenerareInCurs=true;
-  var btn=document.getElementById('regen-cert-btn');
-  if(btn)btn.disabled=true;
-  var i=0,reusite=0,esuate=[];
-  function next(){
-    if(btn)btn.textContent='Se regenerează... ('+i+'/'+docs.length+')';
-    if(i>=docs.length){
-      saveSemnari(list);
-      semnRegenerareInCurs=false;
-      alert('Gata! Am regenerat '+reusite+' din '+docs.length+' certificat'+(docs.length===1?'':'e')+'.'+(esuate.length?'\n\nNu au mers: '+esuate.join(', '):''));
-      renderSemnariTab();
-      return;
-    }
-    var d=docs[i++];
-    genereazaRaportSemnare(d.id,d,true).then(function(certPath){
-      d.certificatPath=certPath;
-      reusite++;
-      setTimeout(next,250);
-    }).catch(function(e){
-      console.error('Eroare regenerare certificat pentru „'+d.titlu+'":',e);
-      esuate.push(d.titlu);
-      setTimeout(next,250);
-    });
-  }
-  next();
-}
-
-// Blochează importuri concurente pentru ACELAȘI document — protecție în plus
-// față de dezactivarea butonului, pentru cazul în care se apasă de mai multe
-// ori foarte rapid, înainte ca butonul să apuce să se dezactiveze vizual.
+// ── Import în fișa clientului, cu ALEGERE — pentru documentele cu mai mulți
+// semnatari legați de câte un client, alegi punctual la care fișă/fișe se
+// copiază documentul semnat + certificatul, în loc să se copieze automat la
+// toți. Protecție împotriva apăsărilor repetate/concurente, ca să nu creeze
+// fișiere duplicate.
 var semnImportInCurs={};
-function importaDocSemnatLaClienti(docId,btnEl){
-  if(semnImportInCurs[docId])return;
-  var list=getSemnari();
-  var doc=list.find(function(d){return d.id===docId;});
+function openAlegeClientImportModal(docId){
+  var doc=getSemnari().find(function(d){return d.id===docId;});
   if(!doc)return;
   var clientiLegati=doc.signers.filter(function(s){return s.tip==='client'&&s.clientId;});
   var deImportat=clientiLegati.filter(function(s){return !(doc.clientiImportati||[]).includes(s.clientId);});
   if(!deImportat.length)return;
+  var html='<div style="padding:1rem">'
+    +'<div class="section-title" style="margin-bottom:4px">Importă în fișa clientului</div>'
+    +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:12px">Alege la care fișă/fișe se copiază documentul semnat + certificatul:</div>';
+  deImportat.forEach(function(s){
+    html+='<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(7,33,68,0.15);border-radius:8px;margin-bottom:8px;cursor:pointer">'
+      +'<input type="checkbox" class="import-client-check" value="'+s.clientId+'" checked style="width:18px;height:18px;accent-color:var(--navy)">'
+      +'<span style="font-size:14px;color:var(--navy)">'+esc(s.nume)+'</span>'
+      +'</label>';
+  });
+  html+='<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-top:6px" onclick="confirmaImportSelectiv(\''+docId+'\')"><i class="ti ti-upload"></i> Importă la cele bifate</button>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Importă în fișa clientului';
+  document.getElementById('restanta-picker').style.display='flex';
+  injectIcons();
+}
+// Când e un singur client eligibil, importăm direct, fără să mai deschidem
+// selectorul (n-are sens să alegi dintr-o listă cu o singură opțiune).
+function confirmaImportSelectivDirect(docId,clientId,btnEl){
+  if(semnImportInCurs[docId])return;
+  var list=getSemnari();
+  var doc=list.find(function(d){return d.id===docId;});
+  if(!doc)return;
   semnImportInCurs[docId]=true;
   if(btnEl){btnEl.disabled=true;btnEl.innerHTML='<div class="doc-btn-spinner" style="display:inline-block"></div> Se importă...';}
-  Promise.all(deImportat.map(function(s){
-    return copiazaDocSemnatLaClient(doc,s.clientId).then(function(){return s.clientId;});
-  })).then(function(clientiIdsImportati){
-    doc.clientiImportati=(doc.clientiImportati||[]).concat(clientiIdsImportati);
+  copiazaDocSemnatLaClient(doc,clientId).then(function(){
+    doc.clientiImportati=(doc.clientiImportati||[]).concat([clientId]);
     saveSemnari(list);
     delete semnImportInCurs[docId];
     renderSemnariTab();
@@ -12013,6 +11903,29 @@ function importaDocSemnatLaClienti(docId,btnEl){
     delete semnImportInCurs[docId];
     alert('Nu am putut importa documentul în fișa clientului. Verifică internetul și încearcă din nou.');
     if(btnEl){btnEl.disabled=false;btnEl.innerHTML='<i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului';injectIcons();}
+  });
+}
+function confirmaImportSelectiv(docId){
+  if(semnImportInCurs[docId])return;
+  var clientiIds=Array.from(document.querySelectorAll('.import-client-check:checked')).map(function(el){return el.value;});
+  if(!clientiIds.length){alert('Bifează cel puțin un client.');return;}
+  document.getElementById('restanta-picker').style.display='none';
+  var list=getSemnari();
+  var doc=list.find(function(d){return d.id===docId;});
+  if(!doc)return;
+  semnImportInCurs[docId]=true;
+  Promise.all(clientiIds.map(function(cid){
+    return copiazaDocSemnatLaClient(doc,cid).then(function(){return cid;});
+  })).then(function(clientiIdsImportati){
+    doc.clientiImportati=(doc.clientiImportati||[]).concat(clientiIdsImportati);
+    saveSemnari(list);
+    delete semnImportInCurs[docId];
+    alert('Importat cu succes!');
+    renderSemnariTab();
+  }).catch(function(e){
+    console.error('Eroare la importarea documentului în fișa clientului:',e);
+    delete semnImportInCurs[docId];
+    alert('Nu am putut importa documentul în fișa clientului. Verifică internetul și încearcă din nou.');
   });
 }
 
