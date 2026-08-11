@@ -12268,23 +12268,33 @@ function proceseazaPozaSemnatura(file,callback){
       try{imgData=ctx.getImageData(0,0,w,h);}catch(err){callback(null,'Nu am putut procesa imaginea.');return;}
       var d=imgData.data;
 
-      // Estimăm luminanța fundalului (hârtiei) ca fiind cea mai deschisă zonă,
-      // apoi considerăm "cerneală" orice e semnificativ mai închis decât ea.
-      var maxLum=0;
-      for(var i=0;i<d.length;i+=4){
-        var lum=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-        if(lum>maxLum)maxLum=lum;
-      }
-      if(maxLum<20){callback(null,'Poza e prea închisă la culoare — încearcă una cu lumină mai bună.');return;}
-      var prag=maxLum*0.78;
+      // Estimăm fundalul LOCAL (nu un singur prag global) — construim o
+      // variantă foarte neclară a pozei (micșorată mult, apoi mărită înapoi
+      // cu interpolare) care prinde variațiile de iluminare/umbre de pe
+      // hârtie, dar nu și cerneala (prea subțire ca să supraviețuiască
+      // micșorării). Comparăm fiecare pixel cu fundalul lui local, nu cu cel
+      // mai luminos punct din toată poza — altfel o umbră (mai închisă decât
+      // punctul cel mai luminos, dar tot fundal) e confundată cu cerneala.
+      var bgSmallCanvas=document.createElement('canvas');
+      var bgW=Math.max(8,Math.round(w/24)),bgH=Math.max(8,Math.round(h/24));
+      bgSmallCanvas.width=bgW;bgSmallCanvas.height=bgH;
+      bgSmallCanvas.getContext('2d').drawImage(canvas,0,0,bgW,bgH);
+      var bgCanvas=document.createElement('canvas');
+      bgCanvas.width=w;bgCanvas.height=h;
+      var bgCtx=bgCanvas.getContext('2d');
+      bgCtx.imageSmoothingEnabled=true;
+      bgCtx.drawImage(bgSmallCanvas,0,0,w,h);
+      var bgData=bgCtx.getImageData(0,0,w,h).data;
 
       var minX=w,minY=h,maxX=-1,maxY=-1;
       for(var py=0;py<h;py++){
         for(var px=0;px<w;px++){
           var idx=(py*w+px)*4;
-          var lum2=0.299*d[idx]+0.587*d[idx+1]+0.114*d[idx+2];
-          if(lum2<prag){
-            var intensitate=Math.min(1,(prag-lum2)/prag*1.6);
+          var lum=0.299*d[idx]+0.587*d[idx+1]+0.114*d[idx+2];
+          var bgLum=0.299*bgData[idx]+0.587*bgData[idx+1]+0.114*bgData[idx+2];
+          var prag=bgLum*0.82;
+          if(bgLum>35&&lum<prag){
+            var intensitate=Math.min(1,(prag-lum)/prag*1.8);
             d[idx]=INK_COLOR[0];d[idx+1]=INK_COLOR[1];d[idx+2]=INK_COLOR[2];
             d[idx+3]=Math.round(255*intensitate);
             if(px<minX)minX=px;if(px>maxX)maxX=px;
@@ -12304,9 +12314,14 @@ function proceseazaPozaSemnatura(file,callback){
       var pad=Math.round(Math.max(w,h)*0.02)+2;
       var cropX=Math.max(0,minX-pad),cropY=Math.max(0,minY-pad);
       var cropW=Math.min(w,maxX+pad)-cropX,cropH=Math.min(h,maxY+pad)-cropY;
+      // Limităm și dimensiunea finală — o semnătură nu are nevoie de rezoluție
+      // foarte mare, iar un fișier mai mic încarcă/inserează mai rapid.
+      var finalMaxW=700;
+      var finalScale=Math.min(1,finalMaxW/cropW);
+      var outW=Math.max(1,Math.round(cropW*finalScale)),outH=Math.max(1,Math.round(cropH*finalScale));
       var cropCanvas=document.createElement('canvas');
-      cropCanvas.width=cropW;cropCanvas.height=cropH;
-      cropCanvas.getContext('2d').drawImage(canvas,cropX,cropY,cropW,cropH,0,0,cropW,cropH);
+      cropCanvas.width=outW;cropCanvas.height=outH;
+      cropCanvas.getContext('2d').drawImage(canvas,cropX,cropY,cropW,cropH,0,0,outW,outH);
       callback(cropCanvas.toDataURL('image/png'),null);
     };
     img.onerror=function(){callback(null,'Nu am putut încărca imaginea.');};
@@ -12550,7 +12565,7 @@ function submitSemnatura(docId,signerId){
   var ipPromise=fetchPublicIP();
   var doc; // declarat aici, ca să rămână accesibil și în callback-ul final (după trimitere)
 
-  sbGet('semnari').then(function(raw){
+  var semnOperatiuneSubmit=sbGet('semnari').then(function(raw){
     var list=raw?(typeof raw==='string'?JSON.parse(raw):raw):[];
     doc=list.find(function(d){return d.id===docId;});
     if(!doc)throw new Error('Document negăsit');
@@ -12669,7 +12684,14 @@ function submitSemnatura(docId,signerId){
         });
       });
     });
-  }).then(function(result){
+  });
+  // Plasă de siguranță: dacă operațiunea nu se termină în timp rezonabil
+  // (rețea foarte lentă/blocată), nu rămânem agățați la infinit — arătăm o
+  // eroare clară, ca utilizatorul să poată reîncerca.
+  var semnTimeoutSubmit=new Promise(function(resolve,reject){
+    setTimeout(function(){reject(new Error('timeout'));},35000);
+  });
+  Promise.race([semnOperatiuneSubmit,semnTimeoutSubmit]).then(function(result){
     if(result.alreadySigned){
       document.getElementById('sign-page-content').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:44px;margin-bottom:12px">✓</div><div style="font-size:18px;font-weight:700;color:#1a6a40">'+t('alreadySignedTitle')+'</div></div>';
       return;
