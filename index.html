@@ -11778,6 +11778,7 @@ function renderSemnariListaSemnate(list){
       +'</div>'
       +'<div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">'
       +'<button type="button" onclick="deschideSauGenereazaRaportSemnare(\''+d.id+'\',this)" style="font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Raport de semnare</button>'
+      +'<button type="button" id="reextrag-'+d.id+'" onclick="reextrageSemnaturiDocument(\''+d.id+'\',this)" style="font-size:12px;color:rgb(26,58,143);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Refă semnăturile acestui document direct din pagina semnată, indiferent ce e salvat acum">🖋️ Reextrage semnăturile</button>'
       +(clientiLegati.length?(deImportat.length
         ?'<button type="button" id="import-fisa-'+d.id+'" onclick="importaDocSemnatLaClienti(\''+d.id+'\',this)" style="font-size:12px;color:#1a6a40;background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-upload" style="font-size:13px"></i> Importă în fișa clientului'+(deImportat.length>1?' ('+deImportat.length+')':'')+'</button>'
         :'<span style="font-size:12px;color:rgba(34,120,80,0.6);display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:13px"></i> Deja în fișa clientului</span>')
@@ -11856,6 +11857,42 @@ function izoleazaCernealaSemnaturii(canvas){
     }
   }
   ctx.putImageData(img,0,0);
+}
+
+// Reextrage FORȚAT semnăturile unui singur document, direct din pagina
+// semnată, indiferent dacă are deja ceva salvat — util pentru documente care
+// au fost "reparate" prima dată cu un filtru mai vechi/mai puțin precis și au
+// rămas cu rezultatul acela, fiindcă reparația generală le sare (le crede
+// deja rezolvate).
+function reextrageSemnaturiDocument(docId,btnEl){
+  var list=getSemnari();
+  var doc=list.find(function(d){return d.id===docId;});
+  if(!doc)return;
+  var semnatari=doc.signers.filter(function(s){return s.status==='semnat';});
+  if(!semnatari.length)return;
+  if(!confirm('Reextrag semnăturile documentului „'+doc.titlu+'" direct din pagina semnată, suprascriind ce e salvat acum. Continui?'))return;
+  if(btnEl){btnEl.disabled=true;btnEl.textContent='Se reextrage...';}
+  var i=0,esuate=[];
+  function next(){
+    if(i>=semnatari.length){
+      saveSemnari(list);
+      var msg=esuate.length?('Am reextras '+(semnatari.length-esuate.length)+' din '+semnatari.length+'. Nu au mers: '+esuate.join(', ')):'Gata! Am reextras toate semnăturile documentului.';
+      alert(msg+'\n\nDacă documentul are certificat salvat, regenerează-l acum (butonul de mai sus) ca să vezi rezultatul.');
+      renderSemnariTab();
+      return;
+    }
+    var s=semnatari[i++];
+    extrageSemnaturaDinDocument(doc,s.id).then(function(dataUrl){
+      s.semnaturaDataUrl=dataUrl;
+      s.semnaturaDinDocument=true;
+      setTimeout(next,150);
+    }).catch(function(e){
+      console.error('Nu am putut reextrage semnătura pentru '+s.nume+':',e);
+      esuate.push(s.nume);
+      setTimeout(next,150);
+    });
+  }
+  next();
 }
 
 function repareazaSemnaturileLipsa(){
