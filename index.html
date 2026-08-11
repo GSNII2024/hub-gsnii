@@ -11836,21 +11836,23 @@ function extrageSemnaturaDinDocument(doc,signerId){
 
 // Din zona decupată, păstrăm STRICT cerneala albastră a semnăturii — orice
 // altceva (fundalul alb al paginii, o linie tipărită de subliniere, text din
-// document aflat lângă/pe sub semnătură) devine transparent. Cerneala e
-// albastru saturat (canalul albastru clar mai mare decât roșu/verde); textul
-// tipărit e negru/gri (roșu≈verde≈albastru) — diferența asta separă clar
-// semnătura de orice altceva prins accidental în chenar.
+// document aflat lângă/pe sub semnătură) devine transparent. Comparăm fiecare
+// pixel cu culoarea EXACTĂ a cernelii (nu doar "e cumva albăstrui"), ca să nu
+// păstrăm din greșeală o linie tipărită care ar putea fi și ea albăstruie,
+// dar de altă nuanță decât cerneala reală.
 function izoleazaCernealaSemnaturii(canvas){
   var ctx=canvas.getContext('2d');
   var img=ctx.getImageData(0,0,canvas.width,canvas.height);
   var d=img.data;
+  var inkR=INK_COLOR[0],inkG=INK_COLOR[1],inkB=INK_COLOR[2];
+  var prag=95;
   for(var i=0;i<d.length;i+=4){
     var r=d[i],g=d[i+1],b=d[i+2];
-    var albastruExtra=b-Math.max(r,g);
-    if(albastruExtra<18||b<50){
+    var dist=Math.sqrt((r-inkR)*(r-inkR)+(g-inkG)*(g-inkG)+(b-inkB)*(b-inkB));
+    if(dist>prag){
       d[i+3]=0;
     }else{
-      d[i+3]=Math.min(d[i+3],Math.min(255,albastruExtra*4));
+      d[i+3]=Math.min(d[i+3],Math.round(255*(1-dist/prag)));
     }
   }
   ctx.putImageData(img,0,0);
@@ -11862,7 +11864,11 @@ function repareazaSemnaturileLipsa(){
   var deReparat=[];
   list.forEach(function(d){
     (d.signers||[]).forEach(function(s){
-      if(s.status==='semnat'&&!s.semnaturaDataUrl){
+      // Reîncercăm și cele deja "reparate" prin decupare din document —
+      // algoritmul de izolare a cernelii se poate îmbunătăți între timp, iar
+      // fără asta, o rulare veche rămânea "blocată" (nu se mai reîncerca
+      // niciodată, chiar dacă filtrul devenea între timp mai bun).
+      if(s.status==='semnat'&&(!s.semnaturaDataUrl||s.semnaturaDinDocument)){
         deReparat.push({doc:d,signer:s});
       }
     });
@@ -11885,11 +11891,12 @@ function repareazaSemnaturileLipsa(){
       return;
     }
     var it=deReparat[i++];
-    var incearcaDinPozaOriginala=it.signer.semnaturaPath
+    var incearcaDinPozaOriginala=(it.signer.semnaturaPath&&!it.signer.semnaturaDinDocument)
       ?gdriveFetchFileBlob(it.signer.semnaturaPath).then(function(res){return blobToDataURL(res.blob);})
       :Promise.reject(new Error('fără poză originală salvată'));
     incearcaDinPozaOriginala.then(function(dataUrl){
       it.signer.semnaturaDataUrl=dataUrl;
+      delete it.signer.semnaturaDinDocument;
       reparate++;
       setTimeout(next,150);
     }).catch(function(){
@@ -11897,6 +11904,7 @@ function repareazaSemnaturileLipsa(){
       // din documentul deja semnat, la zona unde a fost desenată.
       extrageSemnaturaDinDocument(it.doc,it.signer.id).then(function(dataUrl){
         it.signer.semnaturaDataUrl=dataUrl;
+        it.signer.semnaturaDinDocument=true;
         reparate++;dinDocument++;
         setTimeout(next,150);
       }).catch(function(){
