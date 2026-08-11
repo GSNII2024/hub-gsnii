@@ -11693,7 +11693,14 @@ function genereazaRaportSemnare(docId,docOverride,uploadMode){
       // fără să mai fie nevoie de pozele brute ale semnăturilor.
       var certPath='Semnări/'+(doc.folderName||docId)+'/'+fileName;
       var pdfBlob=pdfDoc.output('blob');
-      return gdriveUploadBlobPath(certPath,pdfBlob,'application/pdf').then(function(){return certPath;});
+      return gdriveUploadBlobPath(certPath,pdfBlob,'application/pdf').then(function(){
+        // Dacă acest certificat mai fusese generat o dată, versiunea veche
+        // putea rămâne în cache (memorie/telefon) sub aceeași cale — o
+        // ștergem, altfel deschiderea din Hub arată în continuare varianta
+        // veche, deși în Drive e deja cea nouă.
+        invalidateDocCache(certPath);
+        return certPath;
+      });
     }
     outputPdf(pdfDoc,fileName,__pdfTab);
   }).catch(function(e){
@@ -11821,9 +11828,32 @@ function extrageSemnaturaDinDocument(doc,signerId){
       var cropCanvas=document.createElement('canvas');
       cropCanvas.width=cropW;cropCanvas.height=cropH;
       cropCanvas.getContext('2d').drawImage(canvas,cropX,cropY,cropW,cropH,0,0,cropW,cropH);
+      izoleazaCernealaSemnaturii(cropCanvas);
       return cropCanvas.toDataURL('image/png');
     });
   });
+}
+
+// Din zona decupată, păstrăm STRICT cerneala albastră a semnăturii — orice
+// altceva (fundalul alb al paginii, o linie tipărită de subliniere, text din
+// document aflat lângă/pe sub semnătură) devine transparent. Cerneala e
+// albastru saturat (canalul albastru clar mai mare decât roșu/verde); textul
+// tipărit e negru/gri (roșu≈verde≈albastru) — diferența asta separă clar
+// semnătura de orice altceva prins accidental în chenar.
+function izoleazaCernealaSemnaturii(canvas){
+  var ctx=canvas.getContext('2d');
+  var img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  var d=img.data;
+  for(var i=0;i<d.length;i+=4){
+    var r=d[i],g=d[i+1],b=d[i+2];
+    var albastruExtra=b-Math.max(r,g);
+    if(albastruExtra<18||b<50){
+      d[i+3]=0;
+    }else{
+      d[i+3]=Math.min(d[i+3],Math.min(255,albastruExtra*4));
+    }
+  }
+  ctx.putImageData(img,0,0);
 }
 
 function repareazaSemnaturileLipsa(){
