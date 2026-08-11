@@ -7698,7 +7698,6 @@ function renderServiciiTab(){
     var t=computeRecordTotal(rec);
     totalServiciiLuna+=t.serviceTotal;
     totalIncasatLuna+=t.sumaIncasata;
-    if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
   });
   getServiciiDiverse().forEach(function(d){
     if(d.month!==currentServiceMonth)return;
@@ -7706,6 +7705,26 @@ function renderServiciiTab(){
     var incasat=parseFloat(d.sumaIncasata)||0;
     totalServiciiLuna+=total;
     totalIncasatLuna+=incasat;
+  });
+  // RESTANȚE: soldul curent al fiecărui client, valabil până la finalul
+  // lunii selectate — nu doar cei cu fișă completată exact în acea lună.
+  // Altfel, un client fără nicio activitate în luna curentă "dispărea" din
+  // total, deși tot are o restanță reală, reportată din luna anterioară.
+  var clientiPanaLaLunaSel={};
+  Object.keys(svcStore).forEach(function(key){
+    var rec=svcStore[key];
+    if(!rec||!rec.clientId)return;
+    if(rec.month>currentServiceMonth)return;
+    if(!clientiPanaLaLunaSel[rec.clientId]||rec.month>clientiPanaLaLunaSel[rec.clientId].month)clientiPanaLaLunaSel[rec.clientId]=rec;
+  });
+  Object.keys(clientiPanaLaLunaSel).forEach(function(cid){
+    var t=computeRecordTotal(clientiPanaLaLunaSel[cid]);
+    if(t.soldNou>0.01)totalRestanteLuna+=t.soldNou;
+  });
+  getServiciiDiverse().forEach(function(d){
+    if(d.month>currentServiceMonth)return;
+    var total=(parseFloat(d.cantitate)||0)*(parseFloat(d.pret)||0);
+    var incasat=parseFloat(d.sumaIncasata)||0;
     if(total-incasat>0.01)totalRestanteLuna+=(total-incasat);
   });
 
