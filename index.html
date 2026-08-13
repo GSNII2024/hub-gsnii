@@ -7174,7 +7174,9 @@ function renderDosareOnrcTab(){
           +'<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:'+st.color+'22;color:'+st.color+';font-weight:700;margin-bottom:6px">'+st.label+'</span>'
           +(r.clientNume?'<div class="reg-card-row"><span class="reg-card-label">Client</span>'+esc(r.clientNume)+'</div>':'')
           +(r.orc?'<div class="reg-card-row"><span class="reg-card-label">ORC</span>'+esc(r.orc)+'</div>':'')
+          +(r.termen?'<div class="reg-card-row"><span class="reg-card-label">Termen soluționare</span>'+esc(r.termen)+'</div>':'')
           +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'
+          +(r.termen&&r.status!=='eliberat'?(function(){var exp=expStatus(r.termen,'Termen');return exp?'<span class="exp-badge '+exp.cls+'">'+exp.label+'</span>':'';})():'')
           +'<span class="exp-badge" style="'+(r.trimisMail?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:#eee;color:rgba(7,33,68,0.4)')+'"><i class="ti ti-mail" style="font-size:14px"></i> '+(r.trimisMail?'Trimis pe mail':'Netrimis pe mail')+'</span>'
           +'<span class="exp-badge" style="'+(r.inmanat?'background:rgba(34,120,80,0.15);color:#1a6a40':'background:#eee;color:rgba(7,33,68,0.4)')+'"><i class="ti ti-'+(r.inmanat?'check':'x')+'" style="font-size:14px"></i> '+(r.inmanat?('Înmânat ('+(r.modInmanare==='posta'?'poștă':'personal')+')'):'Neînmânat')+'</span>'
           +'</div>'
@@ -7377,6 +7379,7 @@ function editRegistruEntry(tip,nr){
       +'<div class="field"><label>Număr dosar</label><input type="text" id="dos-nr-dosar" value="'+esc(r.nrDosar||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
       +'<div class="field"><label>ORC competent</label><input type="text" id="dos-orc" list="dos-orc-list" value="'+esc(r.orc||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"><datalist id="dos-orc-list">'+orcJudetOptions()+'</datalist></div>'
       +'<div class="field"><label>Dată depunere</label><input type="text" id="dos-data" value="'+esc(r.data||'')+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+      +'<div class="field"><label>Termen de soluționare</label><input type="text" id="dos-termen" value="'+esc(r.termen||'')+'" placeholder="zz.ll.aaaa (opțional)" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
       +'<div class="field"><label>Status dosar</label><div style="display:flex;gap:4px;flex-wrap:wrap">'
       +stBtn('inregistrat','Înregistrat')+stBtn('solutionat','Soluționat')+stBtn('eliberat','Documente eliberate')
       +'</div></div>'
@@ -7441,6 +7444,7 @@ function updateDosarOnrc(nr){
     nrDosar:nrDosarVal,
     orc:(document.getElementById('dos-orc').value||'').trim(),
     data:(document.getElementById('dos-data').value||'').trim(),
+    termen:(document.getElementById('dos-termen').value||'').trim(),
     status:dosarStatus||'inregistrat',
     trimisMail:!!dosarTrimisMail,
     inmanat:!!dosarInmanat,
@@ -7496,6 +7500,8 @@ function openAddDosarOnrc(){
     +'</div>'
     +'<div class="field"><label>Dată depunere</label>'
     +'<input type="text" id="dos-data" value="'+todayRo()+'" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
+    +'<div class="field"><label>Termen de soluționare</label>'
+    +'<input type="text" id="dos-termen" placeholder="zz.ll.aaaa (opțional)" style="width:100%;font-size:15px;border:1px solid rgba(7,33,68,0.2);border-radius:8px;padding:10px 12px;font-family:inherit"></div>'
     +'<div class="field"><label>Status dosar</label>'
     +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
     +'<button type="button" id="dos-st-inregistrat" onclick="setDosarStatus(&quot;inregistrat&quot;)" style="flex:1;min-width:90px;font-size:12px;padding:8px 6px;border-radius:6px;border:1px solid rgba(7,33,68,0.2);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit">Înregistrat</button>'
@@ -7617,6 +7623,7 @@ function saveDosarOnrc(){
     nrDosar:nrDosar,
     orc:(document.getElementById('dos-orc').value||'').trim(),
     data:(document.getElementById('dos-data').value||'').trim()||todayRo(),
+    termen:(document.getElementById('dos-termen').value||'').trim(),
     status:dosarStatus||'inregistrat',
     trimisMail:!!dosarTrimisMail,
     inmanat:!!dosarInmanat,
