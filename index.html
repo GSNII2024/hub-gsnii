@@ -8272,8 +8272,9 @@ function render(){
     var avClass=worst==='exp-red'?'avatar exp':worst==='exp-orange'?'avatar soon':'avatar';
     html+='<div class="card" onclick="openEdit(\''+c.id+'\')">';
     html+='<div class="card-top"><div class="'+avClass+'">'+initials(c.nume)+'</div>';
-    var codeBadges=(clean(c.firma)&&codClientPJ(c)?'<span style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);margin-right:4px">'+esc(codClientPJ(c))+'</span>':'')+(clean(c.cnp)&&codClientPF(c)?'<span style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);margin-right:5px">'+esc(codClientPF(c))+'</span>':'');
-    html+='<div style="min-width:0;flex:1"><div class="card-name">'+codeBadges+esc(c.nume||'\u2014')+(isActive(c)?'':'<span class="tag-inactive">Inactiv</span>')+(isRadiat(c)?'<span class="tag-radiat">Radiată</span>':'')+'</div>';
+    var codeBadges=(clean(c.firma)&&codClientPJ(c)?'<span style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4);margin-right:4px">'+esc(codClientPJ(c))+'</span>':'')+(clean(c.cnp)&&codClientPF(c)?'<span style="font-size:11px;font-weight:700;color:rgba(7,33,68,0.4)">'+esc(codClientPF(c))+'</span>':'');
+    html+='<div style="min-width:0;flex:1"><div class="card-name">'+esc(c.nume||'\u2014')+(isRadiat(c)?'<span class="tag-radiat">Radiată</span>':'')+'</div>';
+    if(codeBadges)html+='<div style="margin-bottom:1px">'+codeBadges+'</div>';
     if(firma)html+='<div class="card-firma">'+esc(firma)+'</div>';
     if(firma&&clean(c.cui))html+='<div class="card-firma" style="font-size:11px;opacity:0.75">CUI: '+esc(c.cui)+'</div>';
     html+='</div></div>';
@@ -9458,10 +9459,10 @@ function generateClientServicePDF(c,rec){
   doc.text(clean(c.firma)?c.firma:(c.nume||'Client'),margin,y);y+=6.5;
   doc.setFontSize(13.5);doc.setTextColor(110,110,110);doc.setFont('CrimsonPro','italic');
   if(clean(c.firma)){
-    if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod: '+codClientPJ(c):''),margin,y);y+=5.5;}
-    doc.text((c.nume||'\u2014')+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod: '+codClientPF(c):''),margin,y);y+=7;
+    if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod client: '+codClientPJ(c):''),margin,y);y+=5.5;}
+    doc.text((c.nume||'\u2014')+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod client: '+codClientPF(c):''),margin,y);y+=7;
   }else{
-    doc.text('Persoan\u0103 fizic\u0103'+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod: '+codClientPF(c):''),margin,y);y+=7;
+    doc.text('Persoan\u0103 fizic\u0103'+(clean(c.cnp)?' \u00b7 CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod client: '+codClientPF(c):''),margin,y);y+=7;
   }
   doc.setFont('CrimsonPro','normal');
   y+=2;doc.setDrawColor(gold[0],gold[1],gold[2]);doc.setLineWidth(0.6);doc.line(margin,y,pageW-margin,y);y+=7;
@@ -9926,7 +9927,7 @@ function savePDF(){
   if(c.firma&&c.firma!=='-'){
     doc.setFontSize(14);doc.setTextColor(110,110,110);doc.setFont('CrimsonPro','italic');
     doc.text(c.firma,margin,y);y+=6;
-    if(c.cui&&c.cui!=='-'){doc.setFontSize(12);doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod: '+codClientPJ(c):''),margin,y);y+=6;}
+    if(c.cui&&c.cui!=='-'){doc.setFontSize(12);doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod client: '+codClientPJ(c):''),margin,y);y+=6;}
     doc.setFont('CrimsonPro','normal');
   }
   addSection('Date personale');
@@ -10021,9 +10022,9 @@ function generateRaportRestante(clientId){
   doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);
   doc.text(clean(c.firma)?c.firma:(c.nume||'—'),margin,y);y+=6;
   doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(80,80,80);
-  if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod: '+codClientPJ(c):''),margin,y);y+=5;}
-  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod: '+codClientPF(c):''),margin,y);y+=5;}
-  else if(clean(c.cnp)){doc.text('CNP: '+c.cnp+(codClientPF(c)?' \u00b7 Cod: '+codClientPF(c):''),margin,y);y+=5;}
+  if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod client: '+codClientPJ(c):''),margin,y);y+=5;}
+  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod client: '+codClientPF(c):''),margin,y);y+=5;}
+  else if(clean(c.cnp)){doc.text('CNP: '+c.cnp+(codClientPF(c)?' \u00b7 Cod client: '+codClientPF(c):''),margin,y);y+=5;}
   y+=4;
 
   // Antet coloane
@@ -10193,8 +10194,8 @@ function generateFisaIstoric(){
   doc.setFont('CrimsonPro','bold');doc.setFontSize(16);doc.setTextColor(navy[0],navy[1],navy[2]);
   doc.text(clean(c.firma)?c.firma:(c.nume||'—'),margin,y);y+=6;
   doc.setFont('CrimsonPro','normal');doc.setFontSize(13);doc.setTextColor(80,80,80);
-  if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod: '+codClientPJ(c):''),margin,y);y+=5;}
-  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod: '+codClientPF(c):''),margin,y);y+=5;}
+  if(clean(c.cui)){doc.text('CUI: '+c.cui+(codClientPJ(c)?' \u00b7 Cod client: '+codClientPJ(c):''),margin,y);y+=5;}
+  if(clean(c.firma)){doc.text(c.nume+(clean(c.cnp)?' · CNP: '+c.cnp:'')+(codClientPF(c)?' \u00b7 Cod client: '+codClientPF(c):''),margin,y);y+=5;}
   y+=4;
 
   if(!recs.length){
