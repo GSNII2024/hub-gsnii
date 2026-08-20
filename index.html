@@ -8250,12 +8250,7 @@ function render(){
     document.getElementById('list').innerHTML='<div class="empty"><i class="ti ti-users" aria-hidden="true"></i>'+(clients.length?'Niciun rezultat':'Lista goal\u0103')+'</div>';
     return;
   }
-  var faraCod=clients.filter(function(c){return !c.codClient;});
-  var html=faraCod.length?('<button type="button" onclick="atribuieCoduriClientiExistenti()" style="width:100%;margin-bottom:10px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">🔢 Atribuie coduri client ('+faraCod.length+' fără cod)</button>'):'';
-  var clientiCuCod=clients.filter(function(c){return c.codClient;});
-  if(clientiCuCod.length){
-    html+='<button type="button" id="redenumire-fisiere-btn" onclick="redenumesteFisiereleDinDriveTot()" style="width:100%;margin-bottom:10px;padding:9px;border-radius:8px;border:1px dashed rgba(7,33,68,0.25);background:rgba(7,33,68,0.02);color:var(--navy);font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">📁 Redenumește fișierele existente din Drive</button>';
-  }
+  var html='';
   filtered.forEach(function(c){
     var tel=clean(c.telefon),em=clean(c.email),firma=clean(c.firma);
     var obsPrev=obsPreview(c);
@@ -9739,116 +9734,15 @@ function getNextClientCode(){
       }
     }
   });
-  var urmator=maxNum+1;
+  // Nu ne bazăm doar pe clienții existenți ACUM — dacă cel cu numărul cel mai
+  // mare a fost șters între timp, am risca să reatribuim codul lui unui alt
+  // client. Ținem separat cel mai mare număr folosit VREODATĂ, care nu scade
+  // niciodată, indiferent câte ștergeri se fac.
+  var maxIstoric=parseInt(localStorage.getItem('crm_cod_client_max_v1')||'0',10)||0;
+  var urmator=Math.max(maxNum,maxIstoric)+1;
+  localStorage.setItem('crm_cod_client_max_v1',String(urmator));
   return 'GSNII'+(urmator<100?(urmator<10?'00':'0'):'')+urmator;
 }
-function atribuieCoduriClientiExistenti(){
-  var faraCod=clients.filter(function(c){return !c.codClient;});
-  if(!faraCod.length){alert('Toți clienții au deja cod.');return;}
-  if(!confirm('Se vor atribui coduri (GSNII001, GSNII002...) celor '+faraCod.length+' clienți fără cod, în ordine alfabetică. Continui?'))return;
-  faraCod.sort(function(a,b){return norm(a.nume||'').localeCompare(norm(b.nume||''));});
-  faraCod.forEach(function(c){c.codClient=getNextClientCode();});
-  save();
-  render();
-  alert('Am atribuit coduri la '+faraCod.length+' clienți.');
-}
-
-// Redenumește fișierele DEJA EXISTENTE în Drive (încărcate înainte de sistemul
-// de coduri), ca să înceapă cu codul clientului, nu cu numărul aleatoriu de
-// dinainte. Salvează progresul după FIECARE fișier (nu doar la final), ca să
-// fie sigur — dacă se întrerupe la mijloc, ce s-a apucat deja rămâne corect,
-// iar la reluare continuă doar cu ce a rămas nefăcut.
-var redenumireFisiereInCurs=false;
-function redenumesteFisiereleClient(clientId){
-  var c=clients.find(function(x){return x.id===clientId;});
-  if(!c||!c.codClient)return Promise.resolve({redenumite:0,esuate:0});
-  return gdriveGet('doc_meta_'+clientId).then(function(existing){
-    var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
-    if(!meta.length)return {redenumite:0,esuate:0};
-    var deProcesat=meta.filter(function(m){
-      var prefixAsteptat=c.codClient+(m.category==='du'?'-PF':'')+'_';
-      return (m.name||'').indexOf(prefixAsteptat)!==0;
-    });
-    if(!deProcesat.length)return {redenumite:0,esuate:0};
-
-    return new Promise(function(resolveAll){
-      var i=0,redenumite=0,esuate=0;
-      function next(){
-        if(i>=deProcesat.length){resolveAll({redenumite:redenumite,esuate:esuate});return;}
-        var m=deProcesat[i++];
-        var extMatch=/\.([a-zA-Z0-9]+)$/.exec(m.name||'');
-        var ext=extMatch?extMatch[1]:'';
-        var baseName=(ext?m.name.slice(0,m.name.length-ext.length-1):m.name)||'document';
-        var cod=c.codClient+(m.category==='du'?'-PF':'');
-        var existenteInCategorie=meta.filter(function(x){return x.category===m.category&&x!==m;}).map(function(x){return x.name;});
-        var numeDorit=cod+'_'+baseName;
-        var numeFinal=numeDorit,k=2;
-        while(existenteInCategorie.indexOf(numeFinal+(ext?'.'+ext:''))>=0){
-          numeFinal=numeDorit+' ('+k+')';
-          k++;
-        }
-        var numeCuExtensie=numeFinal+(ext?'.'+ext:'');
-        var safeFilename=numeCuExtensie.replace(/[\/\\:*?"<>|]/g,'_');
-        var caleVeche=m.path;
-        var folderVechi=caleVeche.split('/').slice(0,-1).join('/');
-        var caleNoua=folderVechi+'/'+safeFilename;
-        if(caleNoua===caleVeche){m.name=numeCuExtensie;setTimeout(next,10);return;}
-        gdriveFetchFileBlob(caleVeche).then(function(res){
-          return gdriveUploadBlob(folderVechi,safeFilename,res.blob,m.type||res.blob.type);
-        }).then(function(uploadRes){
-          if(!uploadRes||!uploadRes.success)throw new Error('upload_failed');
-          m.path=caleNoua;
-          m.name=numeCuExtensie;
-          m.viewUrl=uploadRes.viewUrl;
-          m.downloadUrl=uploadRes.downloadUrl;
-          return gdriveDelete(caleVeche).catch(function(){});
-        }).then(function(){
-          // salvăm imediat, per fișier — dacă se întrerupe undeva, ce s-a
-          // făcut deja rămâne consistent (nu se pierde și nu se dublează)
-          return gdriveSet('doc_meta_'+clientId,meta);
-        }).then(function(){
-          redenumite++;
-          setTimeout(next,150);
-        }).catch(function(e){
-          console.error('Nu am putut redenumi „'+caleVeche+'":',e);
-          esuate++;
-          setTimeout(next,150);
-        });
-      }
-      next();
-    });
-  });
-}
-function redenumesteFisiereleDinDriveTot(){
-  if(redenumireFisiereInCurs)return;
-  var clientiEligibili=clients.filter(function(c){return c.codClient;});
-  if(!clientiEligibili.length){alert('Niciun client cu cod atribuit — atribuie mai întâi codurile clienților.');return;}
-  if(!confirm('Se vor redenumi fișierele deja existente în Drive, pentru clienții cu cod atribuit, ca să înceapă cu codul lor în loc de numărul vechi. Poate dura câteva minute, în funcție de câte fișiere sunt. Poți întrerupe oricând — ce s-a apucat deja rămâne corect, iar la reluare continuă doar cu restul. Continui?'))return;
-  redenumireFisiereInCurs=true;
-  var btn=document.getElementById('redenumire-fisiere-btn');
-  if(btn)btn.disabled=true;
-  var iC=0,totalRedenumite=0,totalEsuate=0;
-  function nextClient(){
-    if(btn)btn.textContent='Se redenumesc fișierele... (client '+iC+'/'+clientiEligibili.length+')';
-    if(iC>=clientiEligibili.length){
-      redenumireFisiereInCurs=false;
-      alert('Gata! Am redenumit '+totalRedenumite+' fișier'+(totalRedenumite===1?'':'e')+'.'+(totalEsuate?(' Nu au mers '+totalEsuate+' — verifică consola pentru detalii.'):''));
-      render();
-      return;
-    }
-    var c=clientiEligibili[iC++];
-    redenumesteFisiereleClient(c.id).then(function(rez){
-      totalRedenumite+=rez.redenumite;
-      totalEsuate+=rez.esuate;
-      nextClient();
-    }).catch(function(e){
-      console.error('Eroare la redenumirea fișierelor clientului '+c.nume+':',e);
-      nextClient();
-    });
-  }
-  nextClient();
-}
-
 function saveClient(){
   var nume=document.getElementById('f-nume').value.trim();
   if(!nume){alert('Numele este obligatoriu!');return;}
