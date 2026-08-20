@@ -9877,35 +9877,169 @@ function gasesteFisiereFantomaClient(clientId){
   });
 }
 
-var reparareFantomeInCurs=false;
-function reparaFisiereleFantomaToti(){
-  if(reparareFantomeInCurs)return;
-  if(!confirm('Se verifică toți clienții, pe rând, pentru fișiere existente în Drive dar invizibile în Hub — se pot adăuga automat la lista fiecăruia. Poate dura câteva minute. Continui?'))return;
-  reparareFantomeInCurs=true;
+
+// Renumerotare COMPLETĂ — reatribuie coduri strict secvențiale (GSNII001,
+// GSNII002...) TUTUROR clienților, în ordine alfabetică, indiferent de
+// codurile avute înainte. Necesar după asta: redenumirea fișierelor din
+// Drive, ca numele lor să reflecte noile coduri (unealta de mai jos).
+function renumeroteazaCompletCoduriClienti(){
+  if(!confirm('Se vor REATRIBUI codurile TUTUROR clienților, de la GSNII001, în ordine alfabetică — codurile actuale se pierd definitiv. După aceea va trebui să redenumești și fișierele din Drive, ca să se potrivească (unealta de mai jos). Continui?'))return;
+  var sortati=clients.slice().sort(function(a,b){return norm(a.nume||'').localeCompare(norm(b.nume||''));});
+  sortati.forEach(function(c,idx){
+    var n=idx+1;
+    c.codClient='GSNII'+(n<100?(n<10?'00':'0'):'')+n;
+  });
+  localStorage.setItem('crm_cod_client_max_v1',String(sortati.length));
+  save();
   document.getElementById('restanta-picker').style.display='none';
-  var btn=document.getElementById('repara-fantome-btn');
-  if(btn)btn.disabled=true;
-  var i=0,totalGasite=0,clientiAfectati=0;
-  function next(){
-    if(btn)btn.textContent='Se verifică... (client '+i+'/'+clients.length+')';
-    if(i>=clients.length){
-      reparareFantomeInCurs=false;
-      alert(totalGasite
-        ?('Am găsit și adăugat '+totalGasite+' fișier'+(totalGasite===1?'':'e')+' „fantomă", la '+clientiAfectati+' client'+(clientiAfectati===1?'':'i')+'.')
-        :'Nu am găsit niciun fișier „fantomă" — totul e deja consistent.');
+  render();
+  alert('Am renumerotat complet '+sortati.length+' clienți, de la GSNII001 la GSNII'+(sortati.length<100?(sortati.length<10?'00':'0'):'')+sortati.length+'.\n\nAcum apasă „Redenumește fișierele existente din Drive" ca să actualizezi și fișierele.');
+}
+
+// Redenumește fișierele deja existente în Drive, ca să înceapă cu codul
+// ACTUAL al fiecărui client (util mai ales după o renumerotare completă,
+// unde codurile s-au schimbat pentru majoritatea clienților). Salvează
+// progresul după FIECARE fișier, ca la o întrerupere să nu se piardă nimic.
+var redenumireFisiereInCurs=false;
+function redenumesteFisiereleClient(clientId){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c||!c.codClient)return Promise.resolve({redenumite:0,esuate:0});
+  return gdriveGet('doc_meta_'+clientId).then(function(existing){
+    var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+    if(!meta.length)return {redenumite:0,esuate:0};
+    var deProcesat=meta.filter(function(m){
+      var prefixAsteptat=c.codClient+(m.category==='du'?'-PF':'')+'_';
+      return (m.name||'').indexOf(prefixAsteptat)!==0;
+    });
+    if(!deProcesat.length)return {redenumite:0,esuate:0};
+
+    return new Promise(function(resolveAll){
+      var i=0,redenumite=0,esuate=0;
+      function next(){
+        if(i>=deProcesat.length){resolveAll({redenumite:redenumite,esuate:esuate});return;}
+        var m=deProcesat[i++];
+        var extMatch=/\.([a-zA-Z0-9]+)$/.exec(m.name||'');
+        var ext=extMatch?extMatch[1]:'';
+        var baseName=(ext?m.name.slice(0,m.name.length-ext.length-1):m.name)||'document';
+        // Dacă numele avea deja UN cod client (posibil altul, vechi), îl
+        // scoatem înainte de a pune codul cel nou, ca să nu se acumuleze.
+        var oldPrefMatch=/^GSNII\d+(-PF)?_/.exec(baseName);
+        if(oldPrefMatch)baseName=baseName.slice(oldPrefMatch[0].length);
+        var cod=c.codClient+(m.category==='du'?'-PF':'');
+        var existenteInCategorie=meta.filter(function(x){return x.category===m.category&&x!==m;}).map(function(x){return x.name;});
+        var numeDorit=cod+'_'+baseName;
+        var numeFinal=numeDorit,k=2;
+        while(existenteInCategorie.indexOf(numeFinal+(ext?'.'+ext:''))>=0){
+          numeFinal=numeDorit+' ('+k+')';
+          k++;
+        }
+        var numeCuExtensie=numeFinal+(ext?'.'+ext:'');
+        var safeFilename=numeCuExtensie.replace(/[\/\\:*?"<>|]/g,'_');
+        var caleVeche=m.path;
+        var folderVechi=caleVeche.split('/').slice(0,-1).join('/');
+        var caleNoua=folderVechi+'/'+safeFilename;
+        if(caleNoua===caleVeche){m.name=numeCuExtensie;setTimeout(next,10);return;}
+        gdriveFetchFileBlob(caleVeche).then(function(res){
+          return gdriveUploadBlob(folderVechi,safeFilename,res.blob,m.type||res.blob.type);
+        }).then(function(uploadRes){
+          if(!uploadRes||!uploadRes.success)throw new Error('upload_failed');
+          m.path=caleNoua;
+          m.name=numeCuExtensie;
+          m.viewUrl=uploadRes.viewUrl;
+          m.downloadUrl=uploadRes.downloadUrl;
+          return gdriveSet('doc_meta_'+clientId,meta);
+        }).then(function(setRes){
+          if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
+          return gdriveDelete(caleVeche).catch(function(){});
+        }).then(function(){
+          redenumite++;
+          setTimeout(next,150);
+        }).catch(function(e){
+          console.error('Nu am putut redenumi „'+caleVeche+'":',e);
+          esuate++;
+          setTimeout(next,150);
+        });
+      }
+      next();
+    });
+  });
+}
+
+// Unealtă unificată: pentru fiecare client, întâi caută și adaugă fișierele
+// „fantomă" (necunoscute Hub-ului), apoi redenumește tot ce nu are deja
+// prefixul corect cu codul curent — toate într-o singură trecere, cu progres
+// vizibil live (bară + procent + ce se întâmplă exact), ca să știi mereu că
+// se întâmplă ceva, nu doar un ecran static.
+var reparaTotulInCurs=false;
+function reparaTotulToti(){
+  if(reparaTotulInCurs)return;
+  var clientiEligibili=clients.filter(function(c){return c.codClient;});
+  if(!clientiEligibili.length){alert('Niciun client cu cod atribuit — atribuie mai întâi codurile clienților.');return;}
+  if(!confirm('Se verifică și se repară, pentru toți cei '+clientiEligibili.length+' clienți cu cod: fișierele „fantomă" (existente în Drive, dar necunoscute Hub-ului) și denumirile care nu au încă prefixul corect. Poate dura câteva minute. Poți întrerupe oricând, fără să pierzi ce s-a făcut deja. Continui?'))return;
+  reparaTotulInCurs=true;
+
+  var html='<div style="padding:1.2rem">'
+    +'<div class="section-title" style="margin-bottom:14px">Se repară documentele</div>'
+    +'<div id="repara-tot-label" style="font-size:13px;color:var(--navy);margin-bottom:8px;min-height:36px">Se pregătește...</div>'
+    +'<div style="height:9px;border-radius:5px;background:rgba(7,33,68,0.1);overflow:hidden">'
+    +'<div id="repara-tot-bar" style="height:100%;width:0%;background:var(--navy);border-radius:5px;transition:width 0.25s ease"></div>'
+    +'</div>'
+    +'<div id="repara-tot-pct" style="font-size:12px;color:rgba(7,33,68,0.45);margin-top:6px;text-align:center">0%</div>'
+    +'<div id="repara-tot-rezumat" style="font-size:12.5px;color:rgba(7,33,68,0.55);margin-top:14px;line-height:1.6"></div>'
+    +'</div>';
+  document.getElementById('restanta-picker-body').innerHTML=html;
+  document.getElementById('restanta-picker').querySelector('h2').textContent='Reparare documente';
+  document.getElementById('restanta-picker').style.display='flex';
+
+  var total=clientiEligibili.length;
+  var iC=0,totalFantome=0,totalRedenumite=0,totalEsuate=0,clientiCuFantome=0,clientiRedenumiti=0;
+
+  function actualizeazaProgres(fractiune,text){
+    var bar=document.getElementById('repara-tot-bar');
+    var pct=document.getElementById('repara-tot-pct');
+    var lbl=document.getElementById('repara-tot-label');
+    if(bar)bar.style.width=(fractiune*100).toFixed(0)+'%';
+    if(pct)pct.textContent=(fractiune*100).toFixed(0)+'%';
+    if(lbl&&text)lbl.textContent=text;
+  }
+  function actualizeazaRezumat(){
+    var el=document.getElementById('repara-tot-rezumat');
+    if(!el)return;
+    el.innerHTML='Fișiere fantomă găsite: <b>'+totalFantome+'</b> (la '+clientiCuFantome+' client'+(clientiCuFantome===1?'':'i')+')<br>'
+      +'Fișiere redenumite: <b>'+totalRedenumite+'</b> (la '+clientiRedenumiti+' client'+(clientiRedenumiti===1?'':'i')+')'
+      +(totalEsuate?'<br><span style="color:#b23b3b">Eșuate: '+totalEsuate+'</span>':'');
+  }
+
+  function nextClient(){
+    if(iC>=total){
+      reparaTotulInCurs=false;
+      actualizeazaProgres(1,'Gata!');
+      actualizeazaRezumat();
+      document.getElementById('repara-tot-label').innerHTML='<b style="color:#1a6a40">✓ Gata!</b> Am terminat verificarea și repararea pentru toți clienții.';
       render();
       return;
     }
-    var c=clients[i++];
-    gasesteFisiereFantomaClient(c.id).then(function(rez){
-      if(rez.gasite){totalGasite+=rez.gasite;clientiAfectati++;}
-      setTimeout(next,150);
+    var c=clientiEligibili[iC];
+    var bazaFractiune=iC/total;
+    actualizeazaProgres(bazaFractiune,'Client '+(iC+1)+'/'+total+': '+esc(c.nume)+' — verific fișiere fantomă...');
+    gasesteFisiereFantomaClient(c.id).then(function(rezF){
+      if(rezF.gasite){totalFantome+=rezF.gasite;clientiCuFantome++;}
+      actualizeazaProgres(bazaFractiune+(0.5/total),'Client '+(iC+1)+'/'+total+': '+esc(c.nume)+' — redenumesc fișierele...');
+      actualizeazaRezumat();
+      return redenumesteFisiereleClient(c.id);
+    }).then(function(rezR){
+      if(rezR.redenumite){totalRedenumite+=rezR.redenumite;clientiRedenumiti++;}
+      if(rezR.esuate)totalEsuate+=rezR.esuate;
+      actualizeazaRezumat();
+      iC++;
+      nextClient();
     }).catch(function(e){
-      console.error('Eroare la verificarea clientului '+c.nume+':',e);
-      setTimeout(next,150);
+      console.error('Eroare la repararea clientului '+c.nume+':',e);
+      iC++;
+      nextClient();
     });
   }
-  next();
+  nextClient();
 }
 
 function verificaCoduriClienti(){
@@ -9925,7 +10059,9 @@ function verificaCoduriClienti(){
       +'<button type="button" class="btn-add-service" style="width:100%;justify-content:center;margin-bottom:8px" onclick="atribuieCoduriClientiExistenti()"><i class="ti ti-plus"></i> Atribuie coduri celor '+faraCod.length+' clienți, alfabetic</button>';
   }
   html+='<button type="button" onclick="genereazaListaCoduriClienti()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:8px"><i class="ti ti-file-type-pdf"></i> Generează lista completă (PDF)</button>'
-    +'<button type="button" id="repara-fantome-btn" onclick="reparaFisiereleFantomaToti()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer"><i class="ti ti-search"></i> Găsește și repară fișiere „fantomă" (toți clienții)</button>'
+    +'<button type="button" onclick="reparaTotulToti()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px;padding:12px;border-radius:8px;border:1px solid rgba(7,33,68,0.2);background:#fff;color:var(--navy);font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:8px"><i class="ti ti-search"></i> Repară fișierele (fantomă + redenumire), toți clienții</button>'
+    +'<div style="border-top:1px dashed rgba(7,33,68,0.2);margin:12px 0 10px;padding-top:12px;font-size:11.5px;color:rgba(7,33,68,0.4)">Renumerotare completă (dacă au apărut goluri în numerotare):</div>'
+    +'<button type="button" onclick="renumeroteazaCompletCoduriClienti()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px;padding:10px;border-radius:8px;border:1px dashed rgba(178,59,59,0.3);background:rgba(178,59,59,0.04);color:#b23b3b;font-family:inherit;font-size:12.5px;cursor:pointer"><i class="ti ti-id-badge-2"></i> Renumerotează TOȚI clienții, de la GSNII001</button>'
     +'</div>';
   document.getElementById('restanta-picker-body').innerHTML=html;
   document.getElementById('restanta-picker').querySelector('h2').textContent='Coduri clienți';
