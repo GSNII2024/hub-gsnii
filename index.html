@@ -6187,6 +6187,7 @@ function renderDocsListFromMeta(clientId,category,containerId,catMeta){
   var shareSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
   var trashSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
   var moveSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8l-4 4 4 4"/><path d="M5 12h11a4 4 0 0 0 0 -8h-1"/></svg>';
+  var editSvg='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h-3a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-3"/><path d="M9 15h3l8.5 -8.5a1.5 1.5 0 0 0 -3 -3l-8.5 8.5v3"/></svg>';
   var html=catMeta.map(function(m,idx){
     var nameE=(m.name||'').replace(/'/g,"\\'");
     var pathE=(m.path||'').replace(/'/g,"\\'");
@@ -6196,6 +6197,7 @@ function renderDocsListFromMeta(clientId,category,containerId,catMeta){
       +'<div class="doc-row-actions">'
       +'<button type="button" class="doc-btn" onclick="viewDocDirect(\''+pathE+'\',this)" title="Vizualizează">'+eyeSvg+'</button>'
       +'<button type="button" class="doc-btn" onclick="shareDocFile(\''+pathE+'\',\''+nameE+'\',\''+typeE+'\')" title="Distribuie">'+shareSvg+'</button>'
+      +'<button type="button" class="doc-btn" onclick="openRedenumesteDocumentModal(\''+clientId+'\',\''+pathE+'\')" title="Redenumește">'+editSvg+'</button>'
       +'<button type="button" class="doc-btn" onclick="openMutaDocumentModal(\''+clientId+'\',\''+pathE+'\')" title="Mută în altă categorie">'+moveSvg+'</button>'
       +'<button type="button" class="doc-btn doc-btn-del" onclick="deleteCloudDoc(\''+clientId+'\',\''+pathE+'\',\''+containerId+'\')" title="Șterge">'+trashSvg+'</button>'
       +'</div></div>';
@@ -6284,6 +6286,77 @@ function confirmaMutaDocumentCategorieNoua(clientId,path){
   document.getElementById('restanta-picker').style.display='none';
   mutaDocumentCategorie(clientId,path,catKey);
 }
+// Redenumește un document deja existent — la fel ca la mutare, fișierul chiar
+// se reîncarcă în Drive sub noul nume (nu doar se schimbă o etichetă), ca
+// denumirea din Drive să rămână mereu identică cu ce vezi în aplicație.
+function openRedenumesteDocumentModal(clientId,path){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  gdriveGet('doc_meta_'+clientId).then(function(existing){
+    var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+    var entry=meta.find(function(m){return m.path===path;});
+    if(!entry){alert('Documentul nu a fost găsit.');return;}
+    var cod=c.codClient||'';
+    var extMatch=/\.([a-zA-Z0-9]+)$/.exec(entry.name||'');
+    var ext=extMatch?extMatch[1]:'';
+    var numeFaraExt=ext?entry.name.slice(0,entry.name.length-ext.length-1):entry.name;
+    var estePF=false;
+    if(cod&&numeFaraExt.indexOf(cod+'-PF_')===0){estePF=true;numeFaraExt=numeFaraExt.slice((cod+'-PF_').length);}
+    else if(cod&&numeFaraExt.indexOf(cod+'_')===0){numeFaraExt=numeFaraExt.slice((cod+'_').length);}
+    var numeNou=prompt('Denumire nouă'+(cod?' (fără codul „'+cod+(estePF?'-PF':'')+'_", se adaugă automat)':'')+':',numeFaraExt);
+    if(numeNou===null)return;
+    numeNou=numeNou.trim();
+    if(!numeNou){alert('Denumirea nu poate fi goală.');return;}
+    redenumesteDocument(clientId,path,numeNou,estePF);
+  }).catch(function(){alert('Nu am putut încărca datele documentului. Verifică internetul.');});
+}
+function redenumesteDocument(clientId,path,numeNou,estePF){
+  var c=clients.find(function(x){return x.id===clientId;});
+  if(!c)return;
+  gdriveGet('doc_meta_'+clientId).then(function(existing){
+    var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+    var entry=meta.find(function(m){return m.path===path;});
+    if(!entry)return;
+    var extMatch=/\.([a-zA-Z0-9]+)$/.exec(entry.name||'');
+    var ext=extMatch?extMatch[1]:'';
+    var cod=c.codClient?(c.codClient+(estePF?'-PF':'')):'';
+    var baseName=numeNou.replace(/[\/\\:*?"<>|]/g,'_').trim()||'document';
+    var numeDorit=(cod?cod+'_':'')+baseName;
+    var existenteInCategorie=meta.filter(function(m){return m.category===entry.category&&m!==entry;}).map(function(m){return m.name;});
+    var numeFinal=numeDorit,i=2;
+    while(existenteInCategorie.indexOf(numeFinal+(ext?'.'+ext:''))>=0){
+      numeFinal=numeDorit+' ('+i+')';
+      i++;
+    }
+    var numeCuExtensie=numeFinal+(ext?'.'+ext:'');
+    var safeFilename=numeCuExtensie.replace(/[\/\\:*?"<>|]/g,'_');
+    var folderVechi=path.split('/').slice(0,-1).join('/');
+    var caleNoua=folderVechi+'/'+safeFilename;
+    if(caleNoua===path){
+      if(entry.name!==numeCuExtensie){entry.name=numeCuExtensie;gdriveSet('doc_meta_'+clientId,meta);}
+      return;
+    }
+    gdriveFetchFileBlob(path).then(function(res){
+      return gdriveUploadBlob(folderVechi,safeFilename,res.blob,entry.type||res.blob.type);
+    }).then(function(uploadRes){
+      if(!uploadRes||!uploadRes.success)throw new Error('upload_failed');
+      entry.path=caleNoua;
+      entry.name=numeCuExtensie;
+      entry.viewUrl=uploadRes.viewUrl;
+      entry.downloadUrl=uploadRes.downloadUrl;
+      return gdriveSet('doc_meta_'+clientId,meta);
+    }).then(function(){
+      return gdriveDelete(path).catch(function(){});
+    }).then(function(){
+      delete docMetaSessionCache[clientId];
+      refreshDocCategoriesUI(clientId);
+    }).catch(function(e){
+      console.error('Eroare la redenumirea documentului:',e);
+      alert('Nu am putut redenumi documentul. Verifică internetul și încearcă din nou.');
+    });
+  });
+}
+
 function mutaDocumentCategorie(clientId,path,categorieNouaCheie){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return;
