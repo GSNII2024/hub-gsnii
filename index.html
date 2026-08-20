@@ -4172,6 +4172,7 @@ function saveDocToDrive(clientId,name,type,dataURL,category,folderLabel,duYear,e
   var subfolder=(folderLabel||category||'General');
   var folderPath='Clienți/'+numeClient+'/'+subfolder;
   var c=clients.find(function(x){return x.id===clientId;});
+  if(c&&!c.codClient){c.codClient=getNextClientCode();save();}
   var cod=c&&c.codClient?(c.codClient+(estePF?'-PF':'')):'';
   var extMatch=/\.([a-zA-Z0-9]+)$/.exec(name||'');
   var ext=extMatch?extMatch[1]:'';
@@ -4512,6 +4513,7 @@ function uploadDocsCat(input,clientId,category,categoryLabel,folderName,numeCust
   var numeFolder=(folderName||categoryLabel||category||'General');
   var folderPath='Clienți/'+numeClient+'/'+numeFolder;
   var c=clients.find(function(x){return x.id===clientId;});
+  if(c&&!c.codClient){c.codClient=getNextClientCode();save();}
   var codBaza=c&&c.codClient?c.codClient:'';
 
   // 1) ne asigurăm că folderul categoriei există DEJA, o singură dată — altfel,
@@ -6292,6 +6294,7 @@ function confirmaMutaDocumentCategorieNoua(clientId,path){
 function openRedenumesteDocumentModal(clientId,path){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return;
+  if(!c.codClient){c.codClient=getNextClientCode();save();}
   gdriveGet('doc_meta_'+clientId).then(function(existing){
     var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
     var entry=meta.find(function(m){return m.path===path;});
@@ -6313,6 +6316,7 @@ function openRedenumesteDocumentModal(clientId,path){
 function redenumesteDocument(clientId,path,numeNou,estePF){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return;
+  if(!c.codClient){c.codClient=getNextClientCode();save();}
   gdriveGet('doc_meta_'+clientId).then(function(existing){
     var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
     var entry=meta.find(function(m){return m.path===path;});
@@ -6345,7 +6349,11 @@ function redenumesteDocument(clientId,path,numeNou,estePF){
       entry.viewUrl=uploadRes.viewUrl;
       entry.downloadUrl=uploadRes.downloadUrl;
       return gdriveSet('doc_meta_'+clientId,meta);
-    }).then(function(){
+    }).then(function(setRes){
+      // gdriveSet înghite erorile de rețea și întoarce null în loc să arunce
+      // o excepție — dacă nu verificăm explicit, am continua să ștergem
+      // fișierul vechi chiar dacă noul nume nu s-a salvat de fapt niciodată.
+      if(!setRes||!setRes.success)throw new Error('nu am putut salva noua denumire');
       return gdriveDelete(path).catch(function(){});
     }).then(function(){
       delete docMetaSessionCache[clientId];
