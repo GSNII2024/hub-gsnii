@@ -2190,6 +2190,33 @@ if(!clients){
 
 var svcStore=JSON.parse(localStorage.getItem('crm_servicii_v1')||'{}');
 var duStore=JSON.parse(localStorage.getItem('crm_du_v1')||'{}');
+
+// ── Coduri de client — magazin SEPARAT, dedicat, aditiv ────────────────────
+// Ținute separat de array-ul de clienți, ca să nu poată fi PIERDUTE niciodată
+// printr-o suprascriere în bloc a listei de clienți (ex. o sincronizare care
+// aduce o versiune mai veche) — aici, sincronizarea doar ADAUGĂ intrări
+// lipsă, nu șterge/înlocuiește niciodată ce există deja local.
+var codClientMap=JSON.parse(localStorage.getItem('crm_cod_client_map_v1')||'{}');
+function getClientCode(clientId){return clientId?(codClientMap[clientId]||null):null;}
+function setClientCode(clientId,cod){
+  if(!clientId)return;
+  codClientMap[clientId]=cod;
+  localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+  sbSet('cod_client_map',codClientMap).catch(function(){});
+}
+// Migrare o singură dată: dacă vreun client mai are codul vechi direct pe
+// obiect (c.codClient), dar magazinul nou nu-l are încă, îl copiem acum.
+(function migreazaCoduriClientVechi(){
+  var completat=false;
+  (clients||[]).forEach(function(c){
+    if(c&&c.codClient&&!codClientMap[c.id]){codClientMap[c.id]=c.codClient;completat=true;}
+  });
+  if(completat){
+    localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+    sbSet('cod_client_map',codClientMap).catch(function(){});
+  }
+})();
+
 var registreStore=JSON.parse(localStorage.getItem('crm_registre_v1')||'{"corespondenta":[],"contracte":[],"dosare_onrc":[]}');
 function saveRegistre(){
   localStorage.setItem('crm_registre_v1',JSON.stringify(registreStore));
@@ -3123,10 +3150,27 @@ function syncFromCloud(){
     sbGet('semnari'),
     sbGet('servicii_diverse'),
     sbGet('registre'),
-    sbGet('programari')
+    sbGet('programari'),
+    sbGet('cod_client_map')
   ]).then(function(results){
     var changed=false;
     var avertismente=[];
+
+    // ── coduri client (obiect id->cod) — MERGE strict aditiv: preluăm din
+    // cloud DOAR intrările pe care nu le avem deja local; nu ștergem și nu
+    // înlocuim niciodată o intrare locală existentă. Astfel, un cod odată
+    // atribuit nu mai poate dispărea printr-o sincronizare, indiferent ce
+    // conține (sau nu mai conține) versiunea din cloud.
+    if(results[12]){
+      try{
+        var cloudCoduri=typeof results[12]==='string'?JSON.parse(results[12]):results[12];
+        var completatCoduri=false;
+        Object.keys(cloudCoduri||{}).forEach(function(id){
+          if(cloudCoduri[id]&&!codClientMap[id]){codClientMap[id]=cloudCoduri[id];completatCoduri=true;}
+        });
+        if(completatCoduri)localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+      }catch(e){}
+    }
 
     // ── clienți (array) ──
     if(results[0]){
@@ -3140,7 +3184,13 @@ function syncFromCloud(){
           // conținutul local e mai proaspăt (ex. coduri abia atribuite) decât
           // ce a apucat să ajungă în cloud. NU suprascriem starea locală.
         }
-        else{clients=c;localStorage.setItem('crm_bluemarin_v1',JSON.stringify(clients));changed=true;}
+        else{
+          clients=c;localStorage.setItem('crm_bluemarin_v1',JSON.stringify(clients));changed=true;
+          // Recuperăm orice cod vechi (câmp direct pe client) rămas neîncă în
+          // magazinul dedicat — pur aditiv, nu poate șterge nimic existent.
+          clients.forEach(function(cl){if(cl&&cl.codClient&&!codClientMap[cl.id])codClientMap[cl.id]=cl.codClient;});
+          localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+        }
       }
     }
     // ── servicii (obiect cheie-valoare, per client+lună) ──
@@ -4210,8 +4260,8 @@ function saveDocToDrive(clientId,name,type,dataURL,category,folderLabel,duYear,e
   var subfolder=(folderLabel||category||'General');
   var folderPath='Clienți/'+numeClient+'/'+subfolder;
   var c=clients.find(function(x){return x.id===clientId;});
-  if(c&&!c.codClient){c.codClient=getNextClientCode();save();}
-  var cod=c&&c.codClient?(c.codClient+(estePF?'-PF':'')):'';
+  if(c&&!getClientCode(c.id)){setClientCode(c.id,getNextClientCode());}
+  var cod=c&&getClientCode(c.id)?(getClientCode(c.id)+(estePF?'-PF':'')):'';
   var extMatch=/\.([a-zA-Z0-9]+)$/.exec(name||'');
   var ext=extMatch?extMatch[1]:'';
   var baseName=(ext?name.slice(0,name.length-ext.length-1):(name||'document')).replace(/[\/\\:*?"<>|]/g,'_').trim()||'document';
@@ -4556,8 +4606,8 @@ function uploadDocsCat(input,clientId,category,categoryLabel,folderName,numeCust
   var numeFolder=(folderName||categoryLabel||category||'General');
   var folderPath='Clienți/'+numeClient+'/'+numeFolder;
   var c=clients.find(function(x){return x.id===clientId;});
-  if(c&&!c.codClient){c.codClient=getNextClientCode();save();}
-  var codBaza=c&&c.codClient?c.codClient:'';
+  if(c&&!getClientCode(c.id)){setClientCode(c.id,getNextClientCode());}
+  var codBaza=c&&getClientCode(c.id)?getClientCode(c.id):'';
 
   // 1) ne asigurăm că folderul categoriei există DEJA, o singură dată — altfel,
   // la încărcare simultană a mai multor fișiere, fiecare ar crea propriul folder.
@@ -4635,7 +4685,7 @@ function uploadDocsCatDU(input,clientId,year){
   var numeClient=clientDocFolderName(clientId);
   var folderPath='Clienți/'+numeClient+'/Declarație Unică/'+year;
   var c=clients.find(function(x){return x.id===clientId;});
-  var cod=c&&c.codClient?(c.codClient+'-PF'):'';
+  var cod=c&&getClientCode(c.id)?(getClientCode(c.id)+'-PF'):'';
 
   gdriveEnsureFolder(folderPath).then(function(){
     return gdriveGet('doc_meta_'+clientId);
@@ -6346,12 +6396,12 @@ function confirmaMutaDocumentCategorieNoua(clientId,path){
 function openRedenumesteDocumentModal(clientId,path){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return;
-  if(!c.codClient){c.codClient=getNextClientCode();save();}
+  if(!getClientCode(c.id)){setClientCode(c.id,getNextClientCode());}
   gdriveGet('doc_meta_'+clientId).then(function(existing){
     var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
     var entry=meta.find(function(m){return m.path===path;});
     if(!entry){alert('Documentul nu a fost găsit.');return;}
-    var cod=c.codClient||'';
+    var cod=getClientCode(c.id)||'';
     var extMatch=/\.([a-zA-Z0-9]+)$/.exec(entry.name||'');
     var ext=extMatch?extMatch[1]:'';
     var numeFaraExt=ext?entry.name.slice(0,entry.name.length-ext.length-1):entry.name;
@@ -6368,14 +6418,14 @@ function openRedenumesteDocumentModal(clientId,path){
 function redenumesteDocument(clientId,path,numeNou,estePF){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return;
-  if(!c.codClient){c.codClient=getNextClientCode();save();}
+  if(!getClientCode(c.id)){setClientCode(c.id,getNextClientCode());}
   gdriveGet('doc_meta_'+clientId).then(function(existing){
     var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
     var entry=meta.find(function(m){return m.path===path;});
     if(!entry)return;
     var extMatch=/\.([a-zA-Z0-9]+)$/.exec(entry.name||'');
     var ext=extMatch?extMatch[1]:'';
-    var cod=c.codClient?(c.codClient+(estePF?'-PF':'')):'';
+    var cod=getClientCode(c.id)?(getClientCode(c.id)+(estePF?'-PF':'')):'';
     var baseName=numeNou.replace(/[\/\\:*?"<>|]/g,'_').trim()||'document';
     var numeDorit=(cod?cod+'_':'')+baseName;
     var existenteInCategorie=meta.filter(function(m){return m.category===entry.category&&m!==entry;}).map(function(m){return m.name;});
@@ -8459,7 +8509,7 @@ function buildForm(c){
     +'<input type="hidden" id="f-activ" value="'+activVal+'">'
     +'<label class="du-checkbox-label"><input type="checkbox" id="f-du-client" '+(duVal?'checked':'')+'> Depune Declara&#539;ie Unic&#259; (DU)</label>'
     +'</div>';
-  if(c&&c.codClient){
+  if(c&&getClientCode(c.id)){
     topHtml+='<div style="display:flex;gap:8px;margin:10px 0 4px;flex-wrap:wrap">'
       +(clean(c.firma)?'<div style="background:rgba(7,33,68,0.06);border-radius:8px;padding:6px 12px;font-size:12.5px;color:var(--navy)"><b>Cod firmă (PJ):</b> '+esc(codClientPJ(c))+'</div>':'')
       +(clean(c.cnp)?'<div style="background:rgba(7,33,68,0.06);border-radius:8px;padding:6px 12px;font-size:12.5px;color:var(--navy)"><b>Cod persoană fizică (PF):</b> '+esc(codClientPF(c))+'</div>':'')
@@ -8826,7 +8876,7 @@ function confirmaUploadDocModal(clientId){
 function renderPasRedenumireUpload(clientId,catKey,catLabel,folderName){
   var files=Array.from(uploadDocFilesTemp||[]);
   var c=clients.find(function(x){return x.id===clientId;});
-  var cod=c&&c.codClient?c.codClient:'';
+  var cod=c?(getClientCode(c.id)||''):'';
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:4px">Denumește documentele</div>'
     +'<div style="font-size:12px;color:rgba(7,33,68,0.45);margin-bottom:12px">Se vor salva ca „'+(cod?esc(cod)+'_':'')+'denumire.extensie" — poți edita denumirea fiecăruia. Dacă e un document de persoană fizică (nu de firmă), bifează, ca să se distingă clar în Drive.</div>';
@@ -9853,8 +9903,8 @@ function generateMonthlyTotalPDF(){
 // Cod client afișat separat pentru firmă (PJ) și persoană fizică (PF) — nu
 // sunt secvențe independente, ci același cod de bază, cu sufix distinctiv,
 // afișat peste tot unde raportul se referă la latura respectivă a fișei.
-function codClientPJ(c){return (c&&c.codClient)?c.codClient+'PJ':'';}
-function codClientPF(c){return (c&&c.codClient)?c.codClient+'PF':'';}
+function codClientPJ(c){var cod=c&&getClientCode(c.id);return cod?cod+'PJ':'';}
+function codClientPF(c){var cod=c&&getClientCode(c.id);return cod?cod+'PF':'';}
 
 // Verifică dacă toți clienții au cod atribuit — arată un raport clar, cu
 // opțiune de reparare rapidă pentru cei fără cod, plus generarea unei liste
@@ -9938,7 +9988,7 @@ function renumeroteazaCompletCoduriClienti(){
   var sortati=clients.slice().sort(function(a,b){return norm(a.nume||'').localeCompare(norm(b.nume||''));});
   sortati.forEach(function(c,idx){
     var n=idx+1;
-    c.codClient='GSNII'+(n<100?(n<10?'00':'0'):'')+n;
+    setClientCode(c.id,'GSNII'+(n<100?(n<10?'00':'0'):'')+n);
   });
   localStorage.setItem('crm_cod_client_max_v1',String(sortati.length));
   save();
@@ -9954,12 +10004,13 @@ function renumeroteazaCompletCoduriClienti(){
 var redenumireFisiereInCurs=false;
 function redenumesteFisiereleClient(clientId){
   var c=clients.find(function(x){return x.id===clientId;});
-  if(!c||!c.codClient)return Promise.resolve({redenumite:0,esuate:0});
+  if(!c||!getClientCode(c.id))return Promise.resolve({redenumite:0,esuate:0});
+  var codC=getClientCode(c.id);
   return gdriveGet('doc_meta_'+clientId).then(function(existing){
     var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
     if(!meta.length)return {redenumite:0,esuate:0};
     var deProcesat=meta.filter(function(m){
-      var prefixAsteptat=c.codClient+(m.category==='du'?'-PF':'')+'_';
+      var prefixAsteptat=codC+(m.category==='du'?'-PF':'')+'_';
       return (m.name||'').indexOf(prefixAsteptat)!==0;
     });
     if(!deProcesat.length)return {redenumite:0,esuate:0};
@@ -9976,7 +10027,7 @@ function redenumesteFisiereleClient(clientId){
         // scoatem înainte de a pune codul cel nou, ca să nu se acumuleze.
         var oldPrefMatch=/^GSNII\d+(-PF)?_/.exec(baseName);
         if(oldPrefMatch)baseName=baseName.slice(oldPrefMatch[0].length);
-        var cod=c.codClient+(m.category==='du'?'-PF':'');
+        var cod=codC+(m.category==='du'?'-PF':'');
         var existenteInCategorie=meta.filter(function(x){return x.category===m.category&&x!==m;}).map(function(x){return x.name;});
         var numeDorit=cod+'_'+baseName;
         var numeFinal=numeDorit,k=2;
@@ -10074,7 +10125,7 @@ function reparaTotulToti(){
     }
     var c=clientiEligibili[iC];
     var bazaFractiune=iC/total;
-    if(!c.codClient){c.codClient=getNextClientCode();save();clientiCarora++;}
+    if(!getClientCode(c.id)){setClientCode(c.id,getNextClientCode());clientiCarora++;}
     actualizeazaProgres(bazaFractiune,'Client '+(iC+1)+'/'+total+': '+esc(c.nume)+' — verific fișiere fantomă...');
     gasesteFisiereFantomaClient(c.id).then(function(rezF){
       if(rezF.gasite){totalFantome+=rezF.gasite;clientiCuFantome++;}
@@ -10097,7 +10148,7 @@ function reparaTotulToti(){
 }
 
 function verificaCoduriClienti(){
-  var faraCod=clients.filter(function(c){return !c.codClient;});
+  var faraCod=clients.filter(function(c){return !getClientCode(c.id);});
   var html='<div style="padding:1rem">'
     +'<div class="section-title" style="margin-bottom:10px">Verificare coduri clienți</div>'
     +'<div style="font-size:13.5px;color:var(--navy);margin-bottom:14px">'
@@ -10123,10 +10174,10 @@ function verificaCoduriClienti(){
   injectIcons();
 }
 function atribuieCoduriClientiExistenti(){
-  var faraCod=clients.filter(function(c){return !c.codClient;});
+  var faraCod=clients.filter(function(c){return !getClientCode(c.id);});
   if(!faraCod.length){alert('Toți clienții au deja cod.');return;}
   faraCod.sort(function(a,b){return norm(a.nume||'').localeCompare(norm(b.nume||''));});
-  faraCod.forEach(function(c){c.codClient=getNextClientCode();});
+  faraCod.forEach(function(c){setClientCode(c.id,getNextClientCode());});
   save();
   document.getElementById('restanta-picker').style.display='none';
   render();
@@ -10170,7 +10221,7 @@ function genereazaListaCoduriClienti(){
     var coduri=[];
     if(clean(c.firma)&&codClientPJ(c))coduri.push(codClientPJ(c));
     if(clean(c.cnp)&&codClientPF(c))coduri.push(codClientPF(c));
-    if(!coduri.length&&c.codClient)coduri.push(c.codClient);
+    if(!coduri.length&&getClientCode(c.id))coduri.push(getClientCode(c.id));
     var codText=coduri.length?coduri.join(' / '):'—';
     var numeLines=doc.splitTextToSize(c.nume||'—',63);
     var firmaLines=doc.splitTextToSize(clean(c.firma)||'—',pageW-margin-colFirma);
@@ -10187,9 +10238,10 @@ function genereazaListaCoduriClienti(){
 
 function getNextClientCode(){
   var maxNum=0;
-  clients.forEach(function(c){
-    if(c.codClient){
-      var m=/^GSNII(\d+)$/.exec(c.codClient);
+  Object.keys(codClientMap).forEach(function(id){
+    var cod=codClientMap[id];
+    if(cod){
+      var m=/^GSNII(\d+)$/.exec(cod);
       if(m){
         var n=parseInt(m[1],10);
         if(n>maxNum)maxNum=n;
@@ -10226,7 +10278,7 @@ function saveClient(){
   var obsEl=document.getElementById('obs-list');
   data.observatii=obsEl?JSON.stringify(collectObsList()):(existing?(existing.observatii||''):'');
   if(editId){var idx=clients.findIndex(function(x){return x.id===editId;});if(idx>-1)clients[idx]=data;}
-  else{data.codClient=getNextClientCode();clients.unshift(data);}
+  else{clients.unshift(data);setClientCode(data.id,getNextClientCode());}
   save();closeModal();render();
   // Dacă numele s-a schimbat, redenumim și folderul din Google Drive (silențios, în fundal)
   if(numeVechi&&nume&&numeVechi!==nume){
