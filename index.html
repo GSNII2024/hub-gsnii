@@ -9838,39 +9838,59 @@ function gasesteFisiereFantomaClient(clientId){
   if(!c)return Promise.resolve({gasite:0});
   var numeClient=clientDocFolderName(clientId);
   var categorii=ensureDocCategories(c);
-  return gdriveGet('doc_meta_'+clientId).then(function(existing){
-    var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
-    var caiCunoscute={};
-    meta.forEach(function(m){caiCunoscute[m.path]=true;});
+  // Foldere gestionate de sisteme SEPARATE, cu propriul lor afișaj — nu le
+  // înregistrăm ca "și categorie generică", altfel ar apărea de două ori.
+  var FOLDERE_EXCLUSE={'Declarație Unică':true};
 
-    var promisiuni=categorii.map(function(cat){
-      var folderPath='Clienți/'+numeClient+'/'+(cat.folderName||cat.label);
-      return gdriveList(folderPath).then(function(res){
-        var gasite=[];
-        (res.files||[]).forEach(function(f){
-          var caleCompleta=folderPath+'/'+f.name;
-          if(!caiCunoscute[caleCompleta])gasite.push({path:caleCompleta,name:f.name,type:f.mimeType,category:cat.key});
-        });
-        return gasite;
+  return gdriveList('Clienți/'+numeClient).then(function(radacina){
+    // Descoperim și foldere complet NECUNOSCUTE aplicației (create direct în
+    // Drive, sau printr-un flux vechi care n-a înregistrat categoria) — le
+    // adăugăm acum ca și categorii noi, ca fișierele din ele să devină vizibile.
+    var numeFoldereCunoscute={};
+    categorii.forEach(function(cat){numeFoldereCunoscute[(cat.folderName||cat.label)]=true;});
+    var foldereNoi=(radacina.folders||[]).filter(function(f){return !numeFoldereCunoscute[f]&&!FOLDERE_EXCLUSE[f];});
+    if(foldereNoi.length){
+      foldereNoi.forEach(function(numeFolder){
+        categorii.push({key:'cat_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),label:numeFolder,folderName:numeFolder});
       });
-    });
+      save();
+    }
+    return categorii;
+  }).then(function(categoriiActualizate){
+    return gdriveGet('doc_meta_'+clientId).then(function(existing){
+      var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
+      var caiCunoscute={};
+      meta.forEach(function(m){caiCunoscute[m.path]=true;});
 
-    return Promise.all(promisiuni).then(function(rezultate){
-      var toateFantomele=[].concat.apply([],rezultate);
-      if(!toateFantomele.length)return {gasite:0};
-      return Promise.all(toateFantomele.map(function(f){
-        return fetch(GDRIVE_SCRIPT_URL+'?action=geturl&path='+encodeURIComponent(f.path)+'&t='+Date.now())
-          .then(function(r){return r.json();}).catch(function(){return {};});
-      })).then(function(urlRes){
-        toateFantomele.forEach(function(f,idx){
-          meta.push({
-            path:f.path,name:f.name,type:f.type,category:f.category,duYear:'',date:todayRo(),
-            viewUrl:(urlRes[idx]&&urlRes[idx].viewUrl)||'',downloadUrl:(urlRes[idx]&&urlRes[idx].downloadUrl)||''
+      var promisiuni=categoriiActualizate.map(function(cat){
+        var folderPath='Clienți/'+numeClient+'/'+(cat.folderName||cat.label);
+        return gdriveList(folderPath).then(function(res){
+          var gasite=[];
+          (res.files||[]).forEach(function(f){
+            var caleCompleta=folderPath+'/'+f.name;
+            if(!caiCunoscute[caleCompleta])gasite.push({path:caleCompleta,name:f.name,type:f.mimeType,category:cat.key});
           });
+          return gasite;
         });
-        return gdriveSet('doc_meta_'+clientId,meta).then(function(setRes){
-          if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
-          return {gasite:toateFantomele.length};
+      });
+
+      return Promise.all(promisiuni).then(function(rezultate){
+        var toateFantomele=[].concat.apply([],rezultate);
+        if(!toateFantomele.length)return {gasite:0};
+        return Promise.all(toateFantomele.map(function(f){
+          return fetch(GDRIVE_SCRIPT_URL+'?action=geturl&path='+encodeURIComponent(f.path)+'&t='+Date.now())
+            .then(function(r){return r.json();}).catch(function(){return {};});
+        })).then(function(urlRes){
+          toateFantomele.forEach(function(f,idx){
+            meta.push({
+              path:f.path,name:f.name,type:f.type,category:f.category,duYear:'',date:todayRo(),
+              viewUrl:(urlRes[idx]&&urlRes[idx].viewUrl)||'',downloadUrl:(urlRes[idx]&&urlRes[idx].downloadUrl)||''
+            });
+          });
+          return gdriveSet('doc_meta_'+clientId,meta).then(function(setRes){
+            if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
+            return {gasite:toateFantomele.length};
+          });
         });
       });
     });
