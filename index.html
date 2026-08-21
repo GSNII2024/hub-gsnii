@@ -3067,10 +3067,33 @@ setInterval(verificaReminderProgramari,30000);
 
 var customServices=JSON.parse(localStorage.getItem('crm_custom_services_v1')||'[]');
 
+var salveazaClientiInCurs=false,salveazaClientiInAsteptare=false;
 function save(){
+  window.ultimaSalvareClientiLocal=Date.now();
   localStorage.setItem('crm_bluemarin_v1',JSON.stringify(clients));
   if(clients.length===0)console.warn('Atenție: se trimite o listă de clienți GOALĂ către Drive.');
-  sbSet('clienti',clients).then(function(){setSyncStatus(true,'Clienți sincronizați');}).catch(function(){setSyncStatus(false,'Eroare sync clienți');});
+  // Trimitem către cloud în serie, niciodată mai multe cereri simultan — dacă
+  // deja se trimite ceva, marcăm doar că mai e nevoie de o trimitere, cu
+  // starea cea mai nouă, imediat ce cea curentă se termină. Altfel, dacă mai
+  // multe salvări rapide se suprapun, una mai veche dar mai lentă putea sosi
+  // LA SERVER după una mai nouă și îi suprascria conținutul — exact ce anula
+  // codurile de client abia atribuite de uneltele în lot.
+  salveazaClientiInAsteptare=true;
+  if(salveazaClientiInCurs)return;
+  trimiteClientiiLaCloud();
+}
+function trimiteClientiiLaCloud(){
+  salveazaClientiInCurs=true;
+  salveazaClientiInAsteptare=false;
+  var instantaneu=JSON.parse(JSON.stringify(clients));
+  sbSet('clienti',instantaneu).then(function(){
+    setSyncStatus(true,'Clienți sincronizați');
+  }).catch(function(){
+    setSyncStatus(false,'Eroare sync clienți');
+  }).then(function(){
+    salveazaClientiInCurs=false;
+    if(salveazaClientiInAsteptare)trimiteClientiiLaCloud();
+  });
 }
 function saveSvcStore(){
   localStorage.setItem('crm_servicii_v1',JSON.stringify(svcStore));
@@ -3108,8 +3131,15 @@ function syncFromCloud(){
     // ── clienți (array) ──
     if(results[0]){
       var c=typeof results[0]==='string'?JSON.parse(results[0]):results[0];
+      var salvareLocalaRecenta=(Date.now()-(window.ultimaSalvareClientiLocal||0))<180000; // 3 minute
       if(c&&c.length){
         if(c.length<clients.length){avertismente.push('clienți ('+c.length+' vs '+clients.length+' locale)');}
+        else if(salvareLocalaRecenta){
+          // Am salvat local acum de curând (ex. o unealtă în lot) — numărul de
+          // clienți poate fi identic (nu s-a adăugat/șters niciunul), dar
+          // conținutul local e mai proaspăt (ex. coduri abia atribuite) decât
+          // ce a apucat să ajungă în cloud. NU suprascriem starea locală.
+        }
         else{clients=c;localStorage.setItem('crm_bluemarin_v1',JSON.stringify(clients));changed=true;}
       }
     }
