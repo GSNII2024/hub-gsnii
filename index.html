@@ -10025,9 +10025,9 @@ function redenumesteFisiereleClient(clientId){
 var reparaTotulInCurs=false;
 function reparaTotulToti(){
   if(reparaTotulInCurs)return;
-  var clientiEligibili=clients.filter(function(c){return c.codClient;});
-  if(!clientiEligibili.length){alert('Niciun client cu cod atribuit — atribuie mai întâi codurile clienților.');return;}
-  if(!confirm('Se verifică și se repară, pentru toți cei '+clientiEligibili.length+' clienți cu cod: fișierele „fantomă" (existente în Drive, dar necunoscute Hub-ului) și denumirile care nu au încă prefixul corect. Poate dura câteva minute. Poți întrerupe oricând, fără să pierzi ce s-a făcut deja. Continui?'))return;
+  var clientiEligibili=clients.slice();
+  if(!clientiEligibili.length){alert('Niciun client în listă.');return;}
+  if(!confirm('Se verifică și se repară, pentru toți cei '+clientiEligibili.length+' clienți: fișierele „fantomă" (existente în Drive, dar necunoscute Hub-ului) și denumirile care nu au încă prefixul corect. Cine nu are încă un cod primește unul pe loc. Poate dura câteva minute. Poți întrerupe oricând, fără să pierzi ce s-a făcut deja. Continui?'))return;
   reparaTotulInCurs=true;
 
   var html='<div style="padding:1.2rem">'
@@ -10044,7 +10044,7 @@ function reparaTotulToti(){
   document.getElementById('restanta-picker').style.display='flex';
 
   var total=clientiEligibili.length;
-  var iC=0,totalFantome=0,totalRedenumite=0,totalEsuate=0,clientiCuFantome=0,clientiRedenumiti=0;
+  var iC=0,totalFantome=0,totalRedenumite=0,totalEsuate=0,clientiCuFantome=0,clientiRedenumiti=0,clientiCarora=0;
 
   function actualizeazaProgres(fractiune,text){
     var bar=document.getElementById('repara-tot-bar');
@@ -10057,7 +10057,8 @@ function reparaTotulToti(){
   function actualizeazaRezumat(){
     var el=document.getElementById('repara-tot-rezumat');
     if(!el)return;
-    el.innerHTML='Fișiere fantomă găsite: <b>'+totalFantome+'</b> (la '+clientiCuFantome+' client'+(clientiCuFantome===1?'':'i')+')<br>'
+    el.innerHTML='Coduri atribuite pe loc: <b>'+clientiCarora+'</b><br>'
+      +'Fișiere fantomă găsite: <b>'+totalFantome+'</b> (la '+clientiCuFantome+' client'+(clientiCuFantome===1?'':'i')+')<br>'
       +'Fișiere redenumite: <b>'+totalRedenumite+'</b> (la '+clientiRedenumiti+' client'+(clientiRedenumiti===1?'':'i')+')'
       +(totalEsuate?'<br><span style="color:#b23b3b">Eșuate: '+totalEsuate+'</span>':'');
   }
@@ -10073,6 +10074,7 @@ function reparaTotulToti(){
     }
     var c=clientiEligibili[iC];
     var bazaFractiune=iC/total;
+    if(!c.codClient){c.codClient=getNextClientCode();save();clientiCarora++;}
     actualizeazaProgres(bazaFractiune,'Client '+(iC+1)+'/'+total+': '+esc(c.nume)+' — verific fișiere fantomă...');
     gasesteFisiereFantomaClient(c.id).then(function(rezF){
       if(rezF.gasite){totalFantome+=rezF.gasite;clientiCuFantome++;}
