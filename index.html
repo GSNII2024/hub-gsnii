@@ -9919,6 +9919,7 @@ function gasesteFisiereFantomaClient(clientId){
           });
           return gdriveSet('doc_meta_'+clientId,meta).then(function(setRes){
             if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
+            delete docMetaSessionCache[clientId];
             return {gasite:toateFantomele.length};
           });
         });
@@ -10002,6 +10003,7 @@ function redenumesteFisiereleClient(clientId){
           if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
           return gdriveDelete(caleVeche).catch(function(){});
         }).then(function(){
+          delete docMetaSessionCache[clientId];
           redenumite++;
           setTimeout(next,150);
         }).catch(function(e){
