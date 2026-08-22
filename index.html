@@ -2191,6 +2191,29 @@ if(!clients){
 var svcStore=JSON.parse(localStorage.getItem('crm_servicii_v1')||'{}');
 var duStore=JSON.parse(localStorage.getItem('crm_du_v1')||'{}');
 
+// ── Categorii de documente per client — magazin SEPARAT, dedicat, aditiv ───
+// Aceeași problemă ca la coduri: categoriile trăiau doar pe obiectul
+// clientului, în array-ul care se poate suprascrie în bloc la o sincronizare
+// — o categorie nouă (creată la încărcare) putea "dispărea" complet, iar
+// fișierele deja urcate în folderul ei deveneau invizibile în Hub, deși
+// existau intacte în Drive. Acum se ține minte separat, aditiv.
+var docCategoriesMap=JSON.parse(localStorage.getItem('crm_doc_categories_map_v1')||'{}');
+function persistaDocCategoriesMap(clientId){
+  localStorage.setItem('crm_doc_categories_map_v1',JSON.stringify(docCategoriesMap));
+  sbSet('doc_categories_map',docCategoriesMap).catch(function(){});
+}
+// Migrare o singură dată: dacă vreun client mai are categoriile direct pe
+// obiect (c.docCategories), dar magazinul nou nu le are încă, le copiem acum.
+(function migreazaDocCategoriesVechi(){
+  var completat=false;
+  (clients||[]).forEach(function(c){
+    if(c&&c.docCategories&&c.docCategories.length&&!docCategoriesMap[c.id]){
+      docCategoriesMap[c.id]=c.docCategories;completat=true;
+    }
+  });
+  if(completat)persistaDocCategoriesMap();
+})();
+
 // ── Coduri de client — magazin SEPARAT, dedicat, aditiv ────────────────────
 // Ținute separat de array-ul de clienți, ca să nu poată fi PIERDUTE niciodată
 // printr-o suprascriere în bloc a listei de clienți (ex. o sincronizare care
@@ -3151,7 +3174,8 @@ function syncFromCloud(){
     sbGet('servicii_diverse'),
     sbGet('registre'),
     sbGet('programari'),
-    sbGet('cod_client_map')
+    sbGet('cod_client_map'),
+    sbGet('doc_categories_map')
   ]).then(function(results){
     var changed=false;
     var avertismente=[];
@@ -3169,6 +3193,26 @@ function syncFromCloud(){
           if(cloudCoduri[id]&&!codClientMap[id]){codClientMap[id]=cloudCoduri[id];completatCoduri=true;}
         });
         if(completatCoduri)localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+      }catch(e){}
+    }
+
+    // ── categorii de documente per client — MERGE aditiv, pe "key" — orice
+    // categorie găsită în cloud dar lipsă local se adaugă; niciuna existentă
+    // local nu se șterge sau înlocuiește vreodată.
+    if(results[13]){
+      try{
+        var cloudCategorii=typeof results[13]==='string'?JSON.parse(results[13]):results[13];
+        var completatCategorii=false;
+        Object.keys(cloudCategorii||{}).forEach(function(id){
+          var localCats=docCategoriesMap[id]||[];
+          var cheiLocale={};
+          localCats.forEach(function(cat){cheiLocale[cat.key]=true;});
+          (cloudCategorii[id]||[]).forEach(function(cat){
+            if(cat&&cat.key&&!cheiLocale[cat.key]){localCats.push(cat);completatCategorii=true;}
+          });
+          docCategoriesMap[id]=localCats;
+        });
+        if(completatCategorii)localStorage.setItem('crm_doc_categories_map_v1',JSON.stringify(docCategoriesMap));
       }catch(e){}
     }
 
@@ -3190,6 +3234,17 @@ function syncFromCloud(){
           // magazinul dedicat — pur aditiv, nu poate șterge nimic existent.
           clients.forEach(function(cl){if(cl&&cl.codClient&&!codClientMap[cl.id])codClientMap[cl.id]=cl.codClient;});
           localStorage.setItem('crm_cod_client_map_v1',JSON.stringify(codClientMap));
+          // La fel și pentru categoriile de documente rămase direct pe obiect.
+          clients.forEach(function(cl){
+            if(cl&&cl.docCategories&&cl.docCategories.length){
+              var localCats=docCategoriesMap[cl.id]||[];
+              var cheiLocale={};
+              localCats.forEach(function(cat){cheiLocale[cat.key]=true;});
+              cl.docCategories.forEach(function(cat){if(cat&&cat.key&&!cheiLocale[cat.key])localCats.push(cat);});
+              docCategoriesMap[cl.id]=localCats;
+            }
+          });
+          localStorage.setItem('crm_doc_categories_map_v1',JSON.stringify(docCategoriesMap));
         }
       }
     }
@@ -8609,6 +8664,21 @@ function buildForm(c){
 // prestabilite + orice foldere personalizate create anterior (compatibilitate).
 function ensureDocCategories(c){
   if(!c)return [];
+  // Sincronizăm, aditiv (după "key"), cele două surse — obiectul clientului
+  // și magazinul dedicat — ca nicio categorie să nu rămână "cunoscută" doar
+  // de una dintre ele. Devin ACELAȘI array (aceeași referință), ca orice
+  // .push() ulterior (din restul aplicației) să ajungă automat în ambele.
+  var dinClient=c.docCategories,dinMagazin=docCategoriesMap[c.id];
+  if(dinClient||dinMagazin){
+    var chei={};
+    (dinClient||[]).forEach(function(cat){chei[cat.key]=cat;});
+    (dinMagazin||[]).forEach(function(cat){if(!chei[cat.key])chei[cat.key]=cat;});
+    var unite=Object.keys(chei).map(function(k){return chei[k];});
+    var schimbat=!dinMagazin||unite.length!==dinMagazin.length;
+    c.docCategories=unite;
+    docCategoriesMap[c.id]=unite;
+    if(schimbat)persistaDocCategoriesMap();
+  }
   if(c.docCategories){
     // completare retroactivă: dacă unele categorii nu au încă folderName
     // (create înainte de această reparație), le asignăm acum, o singură dată.
@@ -8623,7 +8693,7 @@ function ensureDocCategories(c){
       c.docCategories.push({key:'procura_speciala',label:'Procură Specială',folderName:'Procură Specială'});
       completat=true;
     }
-    if(completat)save();
+    if(completat){save();persistaDocCategoriesMap();}
     return c.docCategories;
   }
   var defaults=[
@@ -8634,7 +8704,9 @@ function ensureDocCategories(c){
   ];
   var custom=(c.foldereCustom||[]).map(function(f){return {key:f.key,label:f.label,folderName:(f.label||f.key).replace(/[\/\\:*?"<>|]/g,'_').trim()||f.key};});
   c.docCategories=defaults.concat(custom);
+  docCategoriesMap[c.id]=c.docCategories;
   save(); // persistăm imediat, altfel migrarea se pierde la reîncărcarea aplicației
+  persistaDocCategoriesMap();
   return c.docCategories;
 }
 
@@ -8982,6 +9054,8 @@ function confirmaStergereCategorie(clientId,key,actiune,targetKey){
 
   function finalizeaza(){
     c.docCategories=(c.docCategories||[]).filter(function(x){return x.key!==key;});
+    docCategoriesMap[c.id]=c.docCategories;
+    persistaDocCategoriesMap();
     save();
     delete docMetaSessionCache[clientId];refreshDocCategoriesUI(clientId);
   }
@@ -9913,6 +9987,28 @@ function codClientPF(c){var cod=c&&getClientCode(c.id);return cod?cod+'PF':'';}
 // (de obicei rămase după o încărcare la care fișierul a urcat cu succes, dar
 // salvarea listei a eșuat). Verificăm folderul fiecărei categorii cunoscute a
 // clientului, comparăm cu ce știe deja aplicația, și adăugăm ce lipsește.
+// Scanează RECURSIV un folder din Drive — coboară prin oricâte subfoldere
+// interne există, la orice adâncime, și întoarce toate fișierele găsite,
+// oriunde ar fi. Fără asta, un dosar organizat pe subfoldere (ex.
+// "Dosar ONRC/Acte depuse/...") rămânea invizibil — se verifica doar
+// nivelul de sus al fiecărei categorii, nu și ce era mai adânc.
+function scaneazaFolderRecursiv(path){
+  return gdriveList(path).then(function(res){
+    var fisiere=(res.files||[]).map(function(f){
+      return {path:path+'/'+f.name,name:f.name,type:f.mimeType};
+    });
+    var subfoldere=res.folders||[];
+    if(!subfoldere.length)return fisiere;
+    return Promise.all(subfoldere.map(function(sub){
+      return scaneazaFolderRecursiv(path+'/'+sub);
+    })).then(function(rezultateSub){
+      var toate=fisiere;
+      rezultateSub.forEach(function(r){toate=toate.concat(r);});
+      return toate;
+    });
+  });
+}
+
 function gasesteFisiereFantomaClient(clientId){
   var c=clients.find(function(x){return x.id===clientId;});
   if(!c)return Promise.resolve({gasite:0});
@@ -9939,38 +10035,55 @@ function gasesteFisiereFantomaClient(clientId){
   }).then(function(categoriiActualizate){
     return gdriveGet('doc_meta_'+clientId).then(function(existing){
       var meta=existing?(typeof existing==='string'?JSON.parse(existing):existing):[];
-      var caiCunoscute={};
-      meta.forEach(function(m){caiCunoscute[m.path]=true;});
+      var metaByPath={};
+      meta.forEach(function(m){metaByPath[m.path]=m;});
 
+      // Scanăm RECURSIV fiecare categorie — la orice adâncime de subfoldere.
+      // Pentru fiecare fișier găsit fizic: dacă e complet necunoscut, îl
+      // adăugăm ca nou; dacă e deja cunoscut, dar legat de o categorie care
+      // між timp a dispărut/s-a regenerat cu altă cheie (fișier "orfan"),
+      // îl realipim la categoria corectă — cea în care chiar se află fizic
+      // acum — fără să-l tratăm ca nou (nu mai cerem din nou viewUrl etc).
       var promisiuni=categoriiActualizate.map(function(cat){
         var folderPath='Clienți/'+numeClient+'/'+(cat.folderName||cat.label);
-        return gdriveList(folderPath).then(function(res){
+        return scaneazaFolderRecursiv(folderPath).then(function(fisiereGasite){
           var gasite=[];
-          (res.files||[]).forEach(function(f){
-            var caleCompleta=folderPath+'/'+f.name;
-            if(!caiCunoscute[caleCompleta])gasite.push({path:caleCompleta,name:f.name,type:f.mimeType,category:cat.key});
+          var reetichetate=0;
+          fisiereGasite.forEach(function(f){
+            var deja=metaByPath[f.path];
+            if(!deja){
+              gasite.push({path:f.path,name:f.name,type:f.type,category:cat.key});
+            }else if(deja.category!==cat.key){
+              deja.category=cat.key;
+              reetichetate++;
+            }
           });
-          return gasite;
+          return {gasite:gasite,reetichetate:reetichetate};
         });
       });
 
       return Promise.all(promisiuni).then(function(rezultate){
-        var toateFantomele=[].concat.apply([],rezultate);
-        if(!toateFantomele.length)return {gasite:0};
-        return Promise.all(toateFantomele.map(function(f){
-          return fetch(GDRIVE_SCRIPT_URL+'?action=geturl&path='+encodeURIComponent(f.path)+'&t='+Date.now())
-            .then(function(r){return r.json();}).catch(function(){return {};});
-        })).then(function(urlRes){
-          toateFantomele.forEach(function(f,idx){
-            meta.push({
-              path:f.path,name:f.name,type:f.type,category:f.category,duYear:'',date:todayRo(),
-              viewUrl:(urlRes[idx]&&urlRes[idx].viewUrl)||'',downloadUrl:(urlRes[idx]&&urlRes[idx].downloadUrl)||''
-            });
-          });
+        var toateFantomele=[].concat.apply([],rezultate.map(function(r){return r.gasite;}));
+        var totalReetichetate=rezultate.reduce(function(s,r){return s+r.reetichetate;},0);
+        if(!toateFantomele.length&&!totalReetichetate)return {gasite:0};
+        var adaugaNoi=toateFantomele.length
+          ?Promise.all(toateFantomele.map(function(f){
+              return fetch(GDRIVE_SCRIPT_URL+'?action=geturl&path='+encodeURIComponent(f.path)+'&t='+Date.now())
+                .then(function(r){return r.json();}).catch(function(){return {};});
+            })).then(function(urlRes){
+              toateFantomele.forEach(function(f,idx){
+                meta.push({
+                  path:f.path,name:f.name,type:f.type,category:f.category,duYear:'',date:todayRo(),
+                  viewUrl:(urlRes[idx]&&urlRes[idx].viewUrl)||'',downloadUrl:(urlRes[idx]&&urlRes[idx].downloadUrl)||''
+                });
+              });
+            })
+          :Promise.resolve();
+        return adaugaNoi.then(function(){
           return gdriveSet('doc_meta_'+clientId,meta).then(function(setRes){
             if(!setRes||!setRes.success)throw new Error('nu am putut salva metadatele');
             delete docMetaSessionCache[clientId];
-            return {gasite:toateFantomele.length};
+            return {gasite:toateFantomele.length+totalReetichetate};
           });
         });
       });
